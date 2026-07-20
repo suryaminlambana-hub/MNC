@@ -1,0 +1,49 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Audit Trail — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Audit Trail</h1>
+  <p class="text-muted"><i class="fa-solid fa-lock"></i> Log bersifat <b>immutable</b> (append-only) — mencatat seluruh transaksi & aktivitas untuk kepatuhan dan penelusuran.</p>
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tx">Transaksi</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#act">Aktivitas / Login</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade show active" id="tx">
+      <div class="ausy-card">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Detail</th></tr></thead>
+          <tbody>
+          <tr th:each="t : ${transactions}">
+            <td class="text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm:ss')}"></td>
+            <td th:text="${t.userId}"></td>
+            <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
+            <td class="small" th:text="${t.tinfo}"></td>
+          </tr>
+          <tr th:if="${transactions.isEmpty()}"><td colspan="4" class="text-center text-muted py-3">Belum ada transaksi.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="act">
+      <div class="ausy-card">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead><tr><th>Waktu</th><th>User</th><th>IP</th><th>Aktivitas</th><th>Info</th></tr></thead>
+          <tbody>
+          <tr th:each="a : ${activities}">
+            <td class="text-muted small text-nowrap" th:text="${#temporals.format(a.timeActivity,'dd-MM-yyyy HH:mm:ss')}"></td>
+            <td th:text="${a.userId}"></td>
+            <td class="small" th:text="${a.ip}"></td>
+            <td><span class="badge bg-secondary-subtle text-secondary" th:text="${a.nameActivity}"></span></td>
+            <td class="small" th:text="${a.info}"></td>
+          </tr>
+          <tr th:if="${activities.isEmpty()}"><td colspan="5" class="text-center text-muted py-3">Belum ada aktivitas.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+</html>

@@ -1,0 +1,33 @@
+server:
+  port: 8080
+  servlet:
+    context-path: ${CONTEXT_PATH:}
+
+spring:
+  application:
+    name: ausy
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:ausy_sb}
+    username: ${DB_USER:erosjovian}
+    password: ${DB_PASS:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none           # Flyway owns the schema
+    properties:
+      hibernate:
+        format_sql: false
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  thymeleaf:
+    cache: false                # dev; enable in prod
+
+logging:
+  level:
+    org.springframework.security: INFO

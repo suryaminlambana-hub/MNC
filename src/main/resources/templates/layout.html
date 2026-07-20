@@ -1,0 +1,102 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:fragment="main(pageTitle, content)" lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}"><meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <script>(function(){var t=localStorage.getItem('ausy-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+    <title th:replace="${pageTitle}">AUSY</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=7)}">
+</head>
+<body>
+<div class="ausy-shell">
+    <aside class="ausy-sidebar">
+        <div class="ausy-brand"><i class="fa-solid fa-building-columns"></i> <span>MNC <b>AUSY</b></span></div>
+        <ul class="ausy-nav">
+            <li><a th:href="@{/dashboard}" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
+        </ul>
+        <div class="ausy-group" th:each="p : ${sidebar}" th:attr="data-group=${p.namaMenu}">
+            <button type="button" class="ausy-group-title">
+                <i th:class="${p.icon} ?: 'fa-solid fa-folder'"></i>
+                <span th:text="${p.namaMenu}">Group</span>
+                <i class="ausy-chev fa-solid fa-chevron-down"></i>
+            </button>
+            <ul>
+                <li th:each="c : ${p.children}">
+                    <a th:href="@{${c.url}}" th:classappend="${currentPath == c.url} ? 'active'">
+                        <i th:class="${c.icon} ?: 'fa-regular fa-circle'"></i> <span th:text="${c.namaMenu}">item</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <div class="ausy-main">
+        <header class="ausy-topbar">
+            <div class="ausy-topbar-left">
+                <button class="ausy-iconbtn" id="navToggle" type="button" aria-label="Toggle menu"><i class="fa-solid fa-bars"></i></button>
+                <div class="ausy-title" th:text="${pageHeading} ?: 'AUSY'">AUSY</div>
+            </div>
+            <div class="ausy-user">
+                <button class="ausy-iconbtn" id="themeToggle" type="button" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+                <span class="ausy-user-name" th:text="${currentUser != null ? currentUser.nama : ''}">User</span>
+                <span class="ausy-role" th:text="${currentUser != null ? currentUser.level : ''}">ROLE</span>
+                <form th:action="@{/logout}" method="post" class="d-inline">
+                    <button class="ausy-iconbtn" type="submit" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </form>
+            </div>
+        </header>
+        <main class="ausy-content" th:replace="${content}">content here</main>
+    </div>
+    <div class="ausy-overlay" id="navOverlay"></div>
+</div>
+
+<script th:src="@{/webjars/jquery/3.7.1/jquery.min.js}"></script>
+<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<script>
+(function(){
+  var shell=document.querySelector('.ausy-shell'),
+      btn=document.getElementById('navToggle'),
+      ov=document.getElementById('navOverlay'),
+      theme=document.getElementById('themeToggle');
+  function mobile(){ return window.matchMedia('(max-width:860px)').matches; }
+
+  // burger
+  btn.addEventListener('click',function(){ shell.classList.toggle(mobile()?'nav-open':'nav-collapsed'); });
+  ov.addEventListener('click',function(){ shell.classList.remove('nav-open'); });
+  document.querySelectorAll('.ausy-sidebar a').forEach(function(a){
+    a.addEventListener('click',function(){ if(mobile()) shell.classList.remove('nav-open'); });
+  });
+
+  // theme toggle
+  function syncThemeIcon(){
+    var dark=document.documentElement.getAttribute('data-theme')==='dark';
+    theme.querySelector('i').className = dark?'fa-solid fa-sun':'fa-solid fa-moon';
+  }
+  syncThemeIcon();
+  theme.addEventListener('click',function(){
+    var dark=document.documentElement.getAttribute('data-theme')==='dark';
+    if(dark){ document.documentElement.removeAttribute('data-theme'); localStorage.setItem('ausy-theme','light'); }
+    else { document.documentElement.setAttribute('data-theme','dark'); localStorage.setItem('ausy-theme','dark'); }
+    syncThemeIcon();
+  });
+
+  // collapsible groups (persist; keep the active group open)
+  var collapsed=JSON.parse(localStorage.getItem('ausy-collapsed')||'[]');
+  document.querySelectorAll('.ausy-group').forEach(function(g){
+    var key=g.getAttribute('data-group');
+    if(collapsed.indexOf(key)>=0) g.classList.add('collapsed');
+    if(g.querySelector('a.active')) g.classList.remove('collapsed');
+    g.querySelector('.ausy-group-title').addEventListener('click',function(){
+      g.classList.toggle('collapsed');
+      var s=new Set(JSON.parse(localStorage.getItem('ausy-collapsed')||'[]'));
+      g.classList.contains('collapsed')?s.add(key):s.delete(key);
+      localStorage.setItem('ausy-collapsed',JSON.stringify([...s]));
+    });
+  });
+})();
+</script>
+</body>
+</html>

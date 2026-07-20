@@ -1,0 +1,101 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>NALA Seamless Upload — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">NALA Seamless Bulk Upload</h1>
+  <p class="text-muted">Upload chunked + checksum + <b>resume</b>. Bisa dijeda / diputus, lalu dilanjut kapan saja (bahkan login berikutnya) tanpa mengulang dari awal.</p>
+
+  <div class="ausy-card" style="padding:22px;max-width:680px">
+    <div class="mb-3"><input class="form-control" type="file" id="file" accept=".xlsx,.xls"></div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" id="go"><i class="fa-solid fa-cloud-arrow-up"></i> <span id="goLabel">Mulai Upload</span></button>
+      <button class="btn btn-outline-secondary" id="pause" style="display:none"><i class="fa-solid fa-pause"></i> Jeda</button>
+    </div>
+
+    <div id="resumeHint" class="alert alert-warning py-2 mt-3" style="display:none"></div>
+
+    <div class="mt-3" id="status" style="display:none">
+      <div class="small text-muted mb-1" id="msg">Menyiapkan…</div>
+      <div class="progress" style="height:20px"><div class="progress-bar" id="bar" style="width:0%">0%</div></div>
+    </div>
+    <div class="mt-3" id="result"></div>
+  </div>
+
+  <script>
+  const CSRF = document.querySelector('meta[name=_csrf]').content;
+  const CSRFH = document.querySelector('meta[name=_csrf_header]').content;
+  const CHUNK = 256*1024; // 256KB
+  const base = '[[@{/}]]'.replace(/\/$/,'');
+  let paused=false, running=false, cache={};   // cache checksum per file
+
+  const $=id=>document.getElementById(id);
+  function setBar(p){ const b=$('bar'); b.style.width=p+'%'; b.textContent=p+'%'; }
+  function msg(t){ $('msg').textContent=t; }
+  function hint(t){ const h=$('resumeHint'); if(t){h.style.display='block';h.textContent=t;} else h.style.display='none'; }
+  async function sha256(file){
+    const h=await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  async function post(url, body, multipart){
+    const opt={method:'POST', headers:{[CSRFH]:CSRF}, body};
+    if(!multipart) opt.headers['Content-Type']='application/x-www-form-urlencoded';
+    return (await fetch(base+url, opt)).json();
+  }
+
+  $('file').onchange = ()=>{ hint(''); $('result').innerHTML=''; setBar(0); $('status').style.display='none'; $('goLabel').textContent='Mulai Upload'; };
+
+  $('pause').onclick = ()=>{ paused=true; $('pause').disabled=true; msg('Menjeda…'); };
+
+  $('go').onclick = run;
+
+  async function run(){
+    if(running) return;
+    const f=$('file').files[0];
+    if(!f){ alert('Pilih file dulu'); return; }
+    running=true; paused=false;
+    $('go').disabled=true; $('file').disabled=true;
+    $('status').style.display='block';
+    $('pause').style.display='inline-flex'; $('pause').disabled=false;
+
+    // checksum (cache so re-run after pause is instant)
+    const key=f.name+f.size;
+    if(!cache[key]){ msg('Menghitung checksum…'); cache[key]=await sha256(f); }
+    const checksum=cache[key];
+    const total=Math.ceil(f.size/CHUNK);
+
+    const init=await post('/nala/init', new URLSearchParams({originalName:f.name,fileSize:f.size,totalChunks:total,checksum}));
+    const uploadId=init.upload_id; let start=init.chunks_received||0;
+    if(init.status==='done'){ finishUI('done', init.result||'Sudah selesai diproses sebelumnya.'); return; }
+    if(start>0 && start<total){ hint('↻ Melanjutkan upload yang belum selesai — '+start+'/'+total+' chunk sudah tersimpan di server. Sisa '+(total-start)+' chunk.'); }
+    else hint('');
+
+    for(let i=start;i<total;i++){
+      if(paused){ msg('⏸ Dijeda di chunk '+i+'/'+total+'. Klik "Lanjutkan Upload" untuk meneruskan (aman ditutup / logoff dulu).');
+        $('goLabel').textContent='Lanjutkan Upload'; reset(); return; }
+      const blob=f.slice(i*CHUNK, Math.min((i+1)*CHUNK, f.size));
+      const fd=new FormData(); fd.append('uploadId',uploadId); fd.append('chunkIndex',i); fd.append('chunk',blob);
+      await post('/nala/chunk', fd, true);
+      setBar(Math.round(((i+1)/total)*100)); msg('Mengirim chunk '+(i+1)+'/'+total+'…');
+    }
+    hint('');
+    msg('Finalisasi & verifikasi checksum…');
+    const fin=await post('/nala/finalize', new URLSearchParams({uploadId}));
+    if(!fin.ok){ finishUI('failed', fin.error||'Gagal'); return; }
+    msg('Diproses di backend (asynchronous)…');
+    const poll=setInterval(async ()=>{
+      const s=await fetch(base+'/nala/status?uploadId='+uploadId).then(r=>r.json());
+      if(s.status==='done'||s.status==='failed'){ clearInterval(poll); finishUI(s.status, s.result||s.status); }
+      else msg('Status: '+s.status+'…');
+    }, 1000);
+  }
+
+  function reset(){ running=false; $('go').disabled=false; $('file').disabled=false; $('pause').style.display='none'; }
+  function finishUI(status, text){
+    reset(); hint(''); $('goLabel').textContent='Mulai Upload';
+    const cls = status==='done'?'alert-success':'alert-danger';
+    $('result').innerHTML='<div class="alert '+cls+'">'+text+'</div>';
+    msg('Selesai: '+status);
+  }
+  </script>
+</main>
+</html>

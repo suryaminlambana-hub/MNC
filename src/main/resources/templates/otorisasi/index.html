@@ -1,0 +1,71 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Export to Text — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Verification — Export to Text</h1>
+  <p class="text-muted">Otorisasi paket GL: hanya paket dari group yang boleh Anda setujui yang tampil.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>No</th><th>Paket</th><th>Uploader</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="p,i : ${pakets}">
+        <td th:text="${i.count}"></td>
+        <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p.paket}"></span></span></td>
+        <td th:text="${p.inputer}"></td>
+        <td class="text-end" th:text="${p.jml}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(p.credit,1,'POINT',2,'COMMA')}"></td>
+        <td><span th:if="${p.balanced}" class="badge bg-success-subtle text-success">Balance</span>
+            <span th:unless="${p.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+        <td>
+          <a class="btn btn-sm btn-outline-secondary" th:href="@{'/report/jurnal/'+${p.paket}}" target="_blank"><i class="fa-solid fa-file-pdf"></i> PDF</a>
+          <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve &amp; export paket ini?');">
+            <input type="hidden" name="paket" th:value="${p.paket}"><input type="hidden" name="inputer" th:value="${p.inputer}">
+            <button class="btn btn-sm btn-success" th:disabled="${!p.balanced}"><i class="fa-solid fa-check"></i> Approve</button>
+          </form>
+          <button type="button" class="btn btn-sm btn-outline-danger btn-reject"
+                  th:attr="data-paket=${p.paket},data-inputer=${p.inputer}"><i class="fa-solid fa-xmark"></i> Reject</button>
+        </td>
+      </tr>
+      <tr th:if="${pakets.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada paket yang menunggu otorisasi (atau di luar wewenang group Anda).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Reject + decision note (Workflow 8.1.e / 8.2.d) -->
+  <div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" th:action="@{/otorisasi/reject}" method="post">
+        <div class="modal-header"><h5 class="modal-title">Tolak Paket <span id="rjPaket"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="paket" id="rjPaketIn"><input type="hidden" name="inputer" id="rjInputer">
+          <label class="form-label">Catatan penolakan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required placeholder="Alasan penolakan (tercatat di audit trail)"></textarea>
+          <p class="text-muted small mt-2 mb-0">Data paket akan dihapus dari antrian. Tindakan ini tercatat permanen di audit trail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger"><i class="fa-solid fa-xmark"></i> Tolak Paket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function(){
+      var m=new bootstrap.Modal(document.getElementById('rejectModal'));
+      document.querySelectorAll('.btn-reject').forEach(function(b){
+        b.addEventListener('click',function(){
+          document.getElementById('rjPaket').textContent=b.dataset.paket;
+          document.getElementById('rjPaketIn').value=b.dataset.paket;
+          document.getElementById('rjInputer').value=b.dataset.inputer;
+          m.show();
+        });
+      });
+    })();
+  </script>
+</main>
+</html>

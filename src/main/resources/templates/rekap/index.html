@@ -1,0 +1,39 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Rekapitulasi — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Rekapitulasi GL</h1>
+  <p class="text-muted">Ringkasan paket GL yang menunggu otorisasi, beserta volume dan posisi Debit/Credit.</p>
+
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Paket</th><th>Uploader</th><th>Volume</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th></tr></thead>
+      <tbody>
+      <tr th:each="r : ${rows}">
+        <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${r.paket}"></span></span></td>
+        <td th:text="${r.uploader}"></td>
+        <td style="min-width:160px">
+          <div class="progress" style="height:8px"><div class="progress-bar" th:style="'width:' + ${#numbers.formatDecimal(r.jml * 100.0 / maxJml,1,2)} + '%'"></div></div>
+        </td>
+        <td class="text-end" th:text="${r.jml}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA')}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(r.credit,1,'POINT',2,'COMMA')}"></td>
+        <td><span th:if="${r.balanced}" class="badge bg-success-subtle text-success">Balance</span>
+            <span th:unless="${r.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+      </tr>
+      <tr th:if="${rows.isEmpty()}"><td colspan="7" class="text-center text-muted py-3">Tidak ada paket menunggu otorisasi.</td></tr>
+      </tbody>
+      <tfoot th:unless="${rows.isEmpty()}">
+        <tr class="fw-semibold border-top">
+          <td colspan="3">TOTAL</td>
+          <td class="text-end" th:text="${totJml}"></td>
+          <td class="text-end" th:text="${#numbers.formatDecimal(totDebit,1,'POINT',2,'COMMA')}"></td>
+          <td class="text-end" th:text="${#numbers.formatDecimal(totCredit,1,'POINT',2,'COMMA')}"></td>
+          <td><span th:if="${totDebit == totCredit}" class="badge bg-success-subtle text-success">Balance</span>
+              <span th:unless="${totDebit == totCredit}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</main>
+</html>

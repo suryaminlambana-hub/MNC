@@ -1,0 +1,119 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Kelola Data GL — AUSY</title></head>
+<main>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <h1 class="ausy-page-title">Kelola Data GL</h1>
+      <p class="text-muted mb-0">Tambah / ubah / hapus baris GL. Setiap perubahan menunggu approval Checker (dual control) sebelum berlaku — Workflow 8.3.</p>
+    </div>
+    <button class="btn btn-primary" id="btnAdd"><i class="fa-solid fa-plus"></i> Tambah Data GL</button>
+  </div>
+
+  <div th:if="${ok}" class="alert alert-success py-2 mt-3" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2 mt-3" th:text="${warn}"></div>
+
+  <div class="ausy-card mt-3">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>ID</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Paket</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="r : ${rows}"
+          th:attr="data-id=${r.id},data-gltrac=${r.gltrac},data-gltrcd=${r.gltrcd},data-gltram=${r.gltram},data-gltrds=${r.gltrds},data-nopaket=${r.noPaket}">
+        <td th:text="${r.id}"></td>
+        <td th:text="${r.gltrac}"></td>
+        <td><span class="badge" th:classappend="${r.gltrcd == 'D'} ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'" th:text="${r.gltrcd}"></span></td>
+        <td class="text-end" th:text="${r.gltram != null ? #numbers.formatDecimal(r.gltram,1,'POINT',2,'COMMA') : ''}"></td>
+        <td th:text="${r.gltrds}"></td>
+        <td th:text="${r.noPaket}"></td>
+        <td><span class="badge bg-secondary-subtle text-secondary" th:text="${r.statusDual}"></span></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-secondary btn-edit"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-sm btn-outline-danger btn-del"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+      <tr th:if="${rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Add / Edit modal -->
+  <div class="modal fade" id="formModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="glForm" method="post" th:action="@{/gl-data/add}">
+        <div class="modal-header"><h5 class="modal-title" id="fmTitle">Tambah Data GL</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="glId" id="fGlId">
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">GL Code</label><input name="gltrac" id="fGltrac" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">D/C</label>
+              <select name="gltrcd" id="fGltrcd" class="form-select"><option value="D">D — Debit</option><option value="C">C — Credit</option></select></div>
+            <div class="col-6"><label class="form-label">Amount</label><input name="gltram" id="fGltram" type="number" step="0.01" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">Paket</label><input name="noPaket" id="fNoPaket" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Description</label><input name="gltrds" id="fGltrds" maxlength="40" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
+              <textarea name="note" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Ajukan ke Checker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete modal -->
+  <div class="modal fade" id="delModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" method="post" th:action="@{/gl-data/delete}">
+        <div class="modal-header"><h5 class="modal-title">Hapus Data GL #<span id="dId"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="glId" id="dGlId">
+          <p class="mb-2">Penghapusan bersifat <b>soft-delete</b> (data ditandai non-aktif, bukan dihapus permanen) dan menunggu approval Checker.</p>
+          <label class="form-label">Justifikasi penghapusan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="2" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">Ajukan Hapus</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script th:inline="javascript">
+    (function(){
+      var addUrl=/*[[@{/gl-data/add}]]*/'', editUrl=/*[[@{/gl-data/edit}]]*/'';
+      var fm=new bootstrap.Modal(document.getElementById('formModal'));
+      var dm=new bootstrap.Modal(document.getElementById('delModal'));
+      var form=document.getElementById('glForm');
+      document.getElementById('btnAdd').addEventListener('click',function(){
+        form.action=addUrl; document.getElementById('fmTitle').textContent='Tambah Data GL';
+        form.reset(); document.getElementById('fGlId').value=''; fm.show();
+      });
+      document.querySelectorAll('.btn-edit').forEach(function(b){
+        b.addEventListener('click',function(){
+          var d=b.closest('tr').dataset;
+          form.action=editUrl; document.getElementById('fmTitle').textContent='Ubah Data GL #'+d.id;
+          document.getElementById('fGlId').value=d.id;
+          document.getElementById('fGltrac').value=d.gltrac||'';
+          document.getElementById('fGltrcd').value=d.gltrcd||'D';
+          document.getElementById('fGltram').value=d.gltram||'';
+          document.getElementById('fGltrds').value=d.gltrds||'';
+          document.getElementById('fNoPaket').value=d.nopaket||'';
+          fm.show();
+        });
+      });
+      document.querySelectorAll('.btn-del').forEach(function(b){
+        b.addEventListener('click',function(){
+          var d=b.closest('tr').dataset;
+          document.getElementById('dId').textContent=d.id;
+          document.getElementById('dGlId').value=d.id; dm.show();
+        });
+      });
+    })();
+  </script>
+</main>
+</html>

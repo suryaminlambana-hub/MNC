@@ -1,0 +1,65 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Menu — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Menu</h1>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addM"><i class="fa-solid fa-plus"></i> Add Menu</button>
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>ID</th><th>Nama Menu</th><th>URL</th><th>Parent</th><th>Urutan</th><th>Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="m : ${menus}" th:classappend="${m.parent==0}?'table-light':''">
+        <td th:text="${m.idMenu}"></td>
+        <td><b th:if="${m.parent==0}" th:text="${m.namaMenu}"></b><span th:if="${m.parent!=0}" th:text="${m.namaMenu}"></span></td>
+        <td><code th:text="${m.url}"></code></td>
+        <td th:text="${m.parent==0?'(induk)':parentName.get(m.parent)}"></td>
+        <td th:text="${m.urutan}"></td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit"
+            th:attr="data-id=${m.idMenu},data-nama=${m.namaMenu},data-url=${m.url},data-parent=${m.parent},data-urutan=${m.urutan}"
+            data-bs-toggle="modal" data-bs-target="#editM">Edit</button>
+          <form th:action="@{/menus/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus menu?');">
+            <input type="hidden" name="idMenu" th:value="${m.idMenu}"><button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="modal fade" id="addM" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form th:action="@{/menus/add}" method="post">
+      <div class="modal-header"><h5 class="modal-title">Add Menu</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Nama Menu</label><input class="form-control" name="namaMenu" required></div>
+        <div class="mb-2"><label class="form-label">URL</label><input class="form-control" name="url" placeholder="/contoh (kosongkan jika induk)"></div>
+        <div class="mb-2"><label class="form-label">Parent</label>
+          <select class="form-select" name="parent"><option value="0">(induk / tanpa parent)</option>
+            <option th:each="p : ${parents}" th:value="${p.idMenu}" th:text="${p.namaMenu}"></option></select></div>
+        <div class="mb-2"><label class="form-label">Urutan</label><input class="form-control" type="number" name="urutan" value="0"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+    </form>
+  </div></div></div>
+  <div class="modal fade" id="editM" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form th:action="@{/menus/edit}" method="post">
+      <div class="modal-header"><h5 class="modal-title">Edit Menu</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="idMenu" id="m_id">
+        <div class="mb-2"><label class="form-label">Nama Menu</label><input class="form-control" name="namaMenu" id="m_nama" required></div>
+        <div class="mb-2"><label class="form-label">URL</label><input class="form-control" name="url" id="m_url"></div>
+        <div class="mb-2"><label class="form-label">Parent</label>
+          <select class="form-select" name="parent" id="m_parent"><option value="0">(induk / tanpa parent)</option>
+            <option th:each="p : ${parents}" th:value="${p.idMenu}" th:text="${p.namaMenu}"></option></select></div>
+        <div class="mb-2"><label class="form-label">Urutan</label><input class="form-control" type="number" name="urutan" id="m_urutan"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+    </form>
+  </div></div></div>
+  <script>
+  document.querySelectorAll('.btn-edit').forEach(function(b){b.addEventListener('click',function(){
+    m_id.value=b.dataset.id; m_nama.value=b.dataset.nama||''; m_url.value=b.dataset.url||'';
+    m_parent.value=b.dataset.parent||'0'; m_urutan.value=b.dataset.urutan||'0';});});
+  </script>
+</main>
+</html>

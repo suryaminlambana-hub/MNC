@@ -1,0 +1,83 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Manage GL Code — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Manage GL Code</h1>
+  <p class="text-muted">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <div class="ausy-card mb-3" style="padding:18px">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <b><i class="fa-solid fa-upload"></i> Import dari CSV</b>
+      <a class="small" th:href="@{/gl-code/template}"><i class="fa-solid fa-download"></i> Unduh Template CSV</a>
+    </div>
+    <form th:action="@{/gl-code/import}" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+      <div class="col"><input class="form-control" type="file" name="file" accept=".csv" required></div>
+      <div class="col-auto"><button class="btn btn-primary">Import</button></div>
+    </form>
+  </div>
+
+  <div class="ausy-card mb-3" style="padding:18px">
+    <b class="d-block mb-2"><i class="fa-solid fa-plus"></i> Tambah Kode GL</b>
+    <form th:action="@{/gl-code/add}" method="post" class="row g-2 align-items-end">
+      <div class="col-auto"><label class="form-label">NoGL</label><input class="form-control" name="code" required></div>
+      <div class="col-auto"><label class="form-label">Debit/Credit</label>
+        <select class="form-select" name="position"><option value="D">Debit</option><option value="C">Credit</option></select></div>
+      <div class="col"><label class="form-label">Description</label><input class="form-control" name="description"></div>
+      <div class="col-auto"><label class="form-label">Status</label>
+        <select class="form-select" name="status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
+      <div class="col-auto"><button class="btn btn-primary">Tambah</button></div>
+    </form>
+  </div>
+
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>No</th><th>NoGL</th><th>D/C</th><th>Description</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="g,i : ${rows}">
+        <td th:text="${i.count}"></td>
+        <td><code th:text="${g.code}"></code> <span th:if="${g.used}" class="badge bg-warning-subtle text-warning"><i class="fa-solid fa-lock"></i> Terpakai</span></td>
+        <td><span th:class="${g.position=='C'}?'badge bg-warning-subtle text-warning':'badge bg-info-subtle text-info'" th:text="${g.position=='C'?'Credit':'Debit'}"></span></td>
+        <td th:text="${g.description}"></td>
+        <td><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit"
+            th:attr="data-id=${g.id},data-code=${g.code},data-pos=${g.position},data-desc=${g.description},data-status=${g.status},data-used=${g.used}"
+            data-bs-toggle="modal" data-bs-target="#editGl">Edit</button>
+          <form th:if="${!g.used}" th:action="@{/gl-code/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus kode GL?');">
+            <input type="hidden" name="id" th:value="${g.id}"><button class="btn btn-sm btn-outline-danger">Hapus</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal fade" id="editGl" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form th:action="@{/gl-code/edit}" method="post">
+      <div class="modal-header"><h5 class="modal-title">Edit Kode GL</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="id" id="gl_id">
+        <div class="mb-2"><label class="form-label">NoGL</label><input class="form-control" name="code" id="gl_code"></div>
+        <div class="mb-2"><label class="form-label">Debit/Credit</label>
+          <select class="form-select" name="position" id="gl_pos"><option value="D">Debit</option><option value="C">Credit</option></select></div>
+        <div class="mb-2"><label class="form-label">Description</label><input class="form-control" name="description" id="gl_desc"></div>
+        <div class="mb-2"><label class="form-label">Status</label>
+          <select class="form-select" name="status" id="gl_status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
+        <div id="gl_lockmsg" class="small text-warning" style="display:none"><i class="fa-solid fa-lock"></i> NoGL &amp; posisi terkunci (sudah dipakai). Hanya Description &amp; Status yang dapat diubah.</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+    </form>
+  </div></div></div>
+
+  <script>
+  document.querySelectorAll('.btn-edit').forEach(function(b){b.addEventListener('click',function(){
+    gl_id.value=b.dataset.id; gl_code.value=b.dataset.code||''; gl_pos.value=b.dataset.pos||'D';
+    gl_desc.value=b.dataset.desc||''; gl_status.value=b.dataset.status||'1';
+    var used=b.dataset.used==='true';
+    gl_code.readOnly=used; gl_pos.disabled=used; gl_lockmsg.style.display=used?'block':'none';
+  });});
+  </script>
+</main>
+</html>

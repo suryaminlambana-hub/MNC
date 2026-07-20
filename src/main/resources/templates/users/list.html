@@ -1,0 +1,93 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>User — AUSY</title></head>
+<main>
+    <h1 class="ausy-page-title">User</h1>
+    <p class="text-muted">Manajemen akun pengguna.</p>
+
+    <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+    <div th:if="${err}" class="alert alert-danger py-2" th:text="${err}"></div>
+
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addUser"><i class="fa-solid fa-plus"></i> Add User</button>
+
+    <div class="ausy-card">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>No</th><th>Username</th><th>Nama</th><th>Group</th><th>Email</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>
+            <tr th:each="u, i : ${users}">
+                <td th:text="${i.count}">1</td>
+                <td><b th:text="${u.userId}">user</b></td>
+                <td th:text="${u.nama}">Nama</td>
+                <td th:text="${u.level}">ROLE</td>
+                <td th:text="${u.email}">email</td>
+                <td>
+                    <span th:if="${u.statusAccount == 1}" class="badge bg-success-subtle text-success">Active</span>
+                    <span th:unless="${u.statusAccount == 1}" class="badge bg-secondary-subtle text-secondary">Non Active</span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-secondary btn-edit"
+                            th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
+                            data-bs-toggle="modal" data-bs-target="#editUser">Edit</button>
+                    <form th:action="@{/users/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus user ini?');">
+                        <input type="hidden" name="userId" th:value="${u.userId}">
+                        <button class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add modal (no status; new users default Active) -->
+    <div class="modal fade" id="addUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form th:action="@{/users/add}" method="post">
+            <div class="modal-header"><h5 class="modal-title">Add User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-2"><label class="form-label">Username</label><input class="form-control" name="username" required></div>
+                <div class="mb-2"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
+                <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama"></div>
+                <div class="mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email"></div>
+                <div class="mb-2"><label class="form-label">Group</label>
+                    <select class="form-select" name="idGroup" required>
+                        <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
+                    </select></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+        </form>
+    </div></div></div>
+
+    <!-- Edit modal (status shown) -->
+    <div class="modal fade" id="editUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form th:action="@{/users/edit}" method="post">
+            <div class="modal-header"><h5 class="modal-title">Edit User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" name="userId" id="e_uid">
+                <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama" id="e_nama"></div>
+                <div class="mb-2"><label class="form-label">Email</label><input class="form-control" name="email" id="e_email"></div>
+                <div class="mb-2"><label class="form-label">Group</label>
+                    <select class="form-select" name="idGroup" id="e_group">
+                        <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
+                    </select></div>
+                <div class="mb-2"><label class="form-label">Status</label>
+                    <select class="form-select" name="status" id="e_status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
+                <div class="mb-2"><label class="form-label">Password baru <span class="text-muted">(kosongkan jika tidak diubah)</span></label>
+                    <input class="form-control" type="password" name="password"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+        </form>
+    </div></div></div>
+
+    <script th:inline="javascript">
+    document.querySelectorAll('.btn-edit').forEach(function(b){
+        b.addEventListener('click', function(){
+            document.getElementById('e_uid').value   = b.dataset.uid;
+            document.getElementById('e_nama').value  = b.dataset.nama || '';
+            document.getElementById('e_email').value = b.dataset.email || '';
+            document.getElementById('e_group').value = b.dataset.group || '';
+            document.getElementById('e_status').value= b.dataset.status || '1';
+        });
+    });
+    </script>
+</main>
+</html>

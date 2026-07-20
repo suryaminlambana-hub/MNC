@@ -1,0 +1,33 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>(function(){var t=localStorage.getItem('ausy-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+    <title>Login — AUSY</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=7)}">
+</head>
+<body class="ausy-login-bg">
+<div class="ausy-login-card">
+    <div class="ausy-login-brand"><i class="fa-solid fa-building-columns"></i> MNC <b>AUSY</b></div>
+    <p class="text-muted">Accounting Upload System</p>
+
+    <div th:if="${param.error}" class="alert alert-danger py-2">Username atau password salah.</div>
+    <div th:if="${param.logout}" class="alert alert-success py-2">Anda telah keluar.</div>
+
+    <form th:action="@{/login}" method="post">
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" name="username" class="form-control" required autofocus>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Masuk</button>
+    </form>
+</div>
+</body>
+</html>

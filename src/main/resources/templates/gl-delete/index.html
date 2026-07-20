@@ -1,0 +1,29 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Delete Paket — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Delete Paket</h1>
+  <p class="text-muted">Hapus paket GL yang belum diotorisasi.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>No</th><th>Paket</th><th>Uploader</th><th class="text-end">Jml Baris</th><th>Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="p,i : ${pakets}">
+        <td th:text="${i.count}"></td>
+        <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p[0]}"></span></span></td>
+        <td th:text="${p[1]}"></td>
+        <td class="text-end" th:text="${p[2]}"></td>
+        <td>
+          <form th:action="@{/gl-delete/process}" method="post" class="d-inline" onsubmit="return confirm('Hapus paket ini?');">
+            <input type="hidden" name="paket" th:value="${p[0]}"><input type="hidden" name="inputer" th:value="${p[1]}">
+            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus Paket</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${pakets.isEmpty()}"><td colspan="5" class="text-center text-muted py-3">Tidak ada paket.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</html>

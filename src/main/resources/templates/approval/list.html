@@ -1,0 +1,44 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Approval Group — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Approval Group</h1>
+  <p class="text-muted">Atur group mana yang berwenang menyetujui jurnal GL milik group lain.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <div class="ausy-card mb-3" style="padding:18px">
+    <form method="post" th:action="@{/approval/add}" class="row g-2 align-items-end">
+      <div class="col-auto"><label class="form-label">Group Penyetuju</label>
+        <select class="form-select" name="approverGroup" required>
+          <option value="">Pilih…</option><option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
+        </select></div>
+      <div class="col-auto pb-2"><i class="fa-solid fa-arrow-right text-muted"></i></div>
+      <div class="col-auto"><label class="form-label">Berwenang Menyetujui</label>
+        <select class="form-select" name="targetGroup" required>
+          <option value="">Pilih…</option><option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
+        </select></div>
+      <div class="col-auto"><button class="btn btn-primary">Tambah</button></div>
+    </form>
+  </div>
+
+  <div class="ausy-card">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>No</th><th>Group Penyetuju</th><th>Berwenang Menyetujui</th><th>Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="r,i : ${rules}">
+        <td th:text="${i.count}"></td>
+        <td><span class="badge bg-primary-subtle text-primary" th:text="${r.approverName}"></span></td>
+        <td><i class="fa-solid fa-arrow-right text-muted me-2"></i><span class="badge bg-secondary-subtle text-secondary" th:text="${r.targetName}"></span></td>
+        <td>
+          <form th:action="@{/approval/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus aturan?');">
+            <input type="hidden" name="id" th:value="${r.id}"><button class="btn btn-sm btn-outline-danger">Hapus</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${rules.isEmpty()}"><td colspan="4" class="text-center text-muted py-3">Belum ada aturan. Superadmin dapat menyetujui semua group secara default.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</html>

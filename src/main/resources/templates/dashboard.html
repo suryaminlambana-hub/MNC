@@ -1,0 +1,51 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Dashboard — AUSY</title></head>
+<main>
+    <h1 class="ausy-page-title">Dashboard</h1>
+    <p class="text-muted">Ringkasan operasional AUSY.</p>
+
+    <div class="dash-grid">
+        <div class="dash-card">
+            <div class="dash-ico c-accent"><i class="fa-solid fa-users"></i></div>
+            <div><div class="dash-num" th:text="${totalUsers}">0</div><div class="dash-label">Total User</div></div>
+        </div>
+        <div class="dash-card">
+            <div class="dash-ico c-info"><i class="fa-solid fa-user-shield"></i></div>
+            <div><div class="dash-num" th:text="${totalGroups}">0</div><div class="dash-label">Group</div></div>
+        </div>
+        <div class="dash-card">
+            <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>
+            <div><div class="dash-num" th:text="${activeGl}">0</div><div class="dash-label">Baris GL Aktif</div></div>
+        </div>
+        <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingPakets > 0}">PERLU AKSI</span>
+            <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Paket Menunggu Otorisasi</div></div>
+        </div>
+        <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU AKSI</span>
+            <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
+        </div>
+    </div>
+
+    <div class="ausy-card">
+        <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Transaksi Terbaru</h2>
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead><tr><th class="ps-3">Waktu</th><th>User</th><th>Aksi</th><th class="pe-3">Detail</th></tr></thead>
+            <tbody>
+            <tr th:each="t : ${recent}">
+                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM HH:mm')}"></td>
+                <td th:text="${t.userId}"></td>
+                <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
+                <td class="pe-3 small" th:text="${t.tinfo}"></td>
+            </tr>
+            <tr th:if="${recent.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada transaksi.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Access Menu — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Access Menu</h1>
+  <p class="text-muted">Atur menu apa saja yang dapat diakses tiap group.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+
+  <div class="ausy-card mb-3" style="padding:18px">
+    <form method="get" th:action="@{/access}" class="row g-2 align-items-end">
+      <div class="col-auto"><label class="form-label">Group</label>
+        <select class="form-select" name="group" onchange="this.form.submit()">
+          <option value="">Pilih group…</option>
+          <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}" th:selected="${selectedGroup != null and selectedGroup == g.idGroup}"></option>
+        </select></div>
+    </form>
+  </div>
+
+  <div class="ausy-card" th:if="${selectedGroup != null}" style="padding:18px">
+    <form method="post" th:action="@{/access/save}">
+      <input type="hidden" name="group" th:value="${selectedGroup}">
+      <div th:each="p : ${parents}" class="mb-3">
+        <div class="fw-bold text-uppercase text-muted small mb-2" th:text="${p.namaMenu}"></div>
+        <div class="row">
+          <div class="col-md-4 mb-1" th:each="c : ${p.children}">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="menu" th:value="${c.idMenu}"
+                     th:id="'m'+${c.idMenu}" th:checked="${granted.contains(c.idMenu)}">
+              <label class="form-check-label" th:for="'m'+${c.idMenu}" th:text="${c.namaMenu}"></label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Akses</button>
+    </form>
+  </div>
+</main>
+</html>
