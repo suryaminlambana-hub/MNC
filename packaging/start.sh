@@ -13,9 +13,10 @@ fi
 set -a; source ./.env; set +a
 
 SERVER_PORT="${SERVER_PORT:-8080}"
+CONTEXT_PATH="${CONTEXT_PATH:-/ausy}"
 DB_HOST="${DB_HOST:-127.0.0.1}"; DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-ausy}"; DB_USER="${DB_USER:-ausy_user}"; DB_PASS="${DB_PASS:-}"
-export SERVER_PORT DB_HOST DB_PORT DB_NAME DB_USER DB_PASS
+export SERVER_PORT CONTEXT_PATH DB_HOST DB_PORT DB_NAME DB_USER DB_PASS
 
 # --- 2. cek Java 21+ ---
 if ! command -v java >/dev/null 2>&1; then
@@ -59,6 +60,6 @@ if ! db_ok; then
 fi
 
 # --- 5. jalankan (Flyway otomatis bikin skema + seed saat pertama kali) ---
-echo ">> AUSY jalan di  http://localhost:${SERVER_PORT}    (Ctrl+C untuk berhenti)"
+echo ">> AUSY jalan di  http://localhost:${SERVER_PORT}${CONTEXT_PATH}    (Ctrl+C untuk berhenti)"
 echo ">> Login awal: admin / admin123   (juga: spv/spv123, user/user123)"
 exec java -jar "$JAR"

@@ -31,6 +31,11 @@ public class DashboardController {
         model.addAttribute("pendingPakets", gl.pendingPakets().size());
         model.addAttribute("pendingChanges", cr.countByStatus("PENDING"));
         model.addAttribute("recent", tx.findAllByOrderByTimeActivityDesc(PageRequest.of(0, 8)));
+        java.util.List<Object[]> daily = tx.dailyCounts();
+        long max = 1;
+        for (Object[] r : daily) max = Math.max(max, ((Number) r[1]).longValue());
+        model.addAttribute("chart", daily);
+        model.addAttribute("chartMax", max);
         return "dashboard";
     }
 }

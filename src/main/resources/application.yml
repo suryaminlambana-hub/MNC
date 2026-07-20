@@ -1,7 +1,7 @@
 server:
   port: 8080
   servlet:
-    context-path: ${CONTEXT_PATH:}
+    context-path: ${CONTEXT_PATH:/ausy}
 
 spring:
   application:

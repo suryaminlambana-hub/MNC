@@ -227,3 +227,25 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
 .dash-card.attn{background:linear-gradient(160deg,var(--wn-bg),var(--surface) 70%);border-color:var(--accent-line)}
 .dash-card .dash-pill{position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:700;letter-spacing:.03em;
   padding:3px 9px;border-radius:var(--pill);background:var(--wn-bg);color:var(--wn-fg)}
+
+
+/* ---------- Dashboard chart (volume per day) ---------- */
+.dash-chart{display:flex;align-items:flex-end;gap:10px;height:180px;padding-top:6px}
+.dash-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.dash-colbar-wrap{flex:1;width:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.dash-colval{font-size:11px;font-weight:700;color:var(--ink-soft)}
+.dash-colbar{width:62%;max-width:44px;min-height:3px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--accent),var(--accent-hover))}
+.dash-collabel{font-size:11px;color:var(--ink-faint);white-space:nowrap}
+
+/* ---------- DataTables (themed) ---------- */
+.dataTables_wrapper{padding:14px 16px}
+.dataTables_wrapper .dataTables_filter{margin-bottom:12px;text-align:right}
+.dataTables_wrapper .dataTables_filter input{border:1px solid var(--border);border-radius:var(--radius-sm);padding:.4rem .7rem;margin-left:8px;background:var(--surface);color:var(--ink)}
+.dataTables_wrapper .dataTables_filter input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dataTables_wrapper .dataTables_info{color:var(--ink-faint);font-size:12.5px;padding-top:12px!important}
+.dataTables_wrapper .dataTables_paginate{padding-top:10px}
+.dataTables_wrapper .dataTables_paginate .paginate_button{padding:.3rem .65rem!important;border-radius:var(--radius-sm)!important;border:none!important;color:var(--ink-soft)!important;background:transparent!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current{background:var(--accent)!important;color:var(--on-accent)!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current){background:var(--hover)!important;color:var(--ink)!important}
+table.dataTable{width:100%!important;border-collapse:collapse!important}
+table.dataTable thead th{cursor:pointer}

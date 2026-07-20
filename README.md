@@ -24,7 +24,7 @@ resumable chunked upload, audit trail, and RBAC.
 # needs Java 21 + PostgreSQL running
 createdb ausy_sb
 DB_NAME=ausy_sb DB_USER=$(whoami) mvn spring-boot:run
-# open http://localhost:8080   (admin/admin123, spv/spv123, user/user123)
+# open http://localhost:8080/ausy   (admin/admin123, spv/spv123, user/user123)
 ```
 Config via env: `SERVER_PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
 Flyway creates the schema + seed automatically on first start.

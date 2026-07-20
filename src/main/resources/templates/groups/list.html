@@ -6,7 +6,7 @@
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addG"><i class="fa-solid fa-plus"></i> Add Group</button>
   <div class="ausy-card">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table table-hover align-middle mb-0 dt">
       <thead><tr><th>No</th><th>Nama Group</th><th>Inisial</th><th>Level</th><th>Aksi</th></tr></thead>
       <tbody>
       <tr th:each="g,i : ${groups}">

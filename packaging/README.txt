@@ -22,7 +22,7 @@ LANGKAH DEPLOY (4 langkah)
   3. cp .env.example .env
   4. chmod +x start.sh && ./start.sh
 
-  Lalu buka:  http://localhost:8080
+  Lalu buka:  http://localhost:8080/ausy
   Login     :  admin / admin123   (atau spv/spv123, user/user123)
 
 CATATAN

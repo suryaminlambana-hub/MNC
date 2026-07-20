@@ -31,6 +31,20 @@
         </div>
     </div>
 
+    <div class="ausy-card" style="padding:18px 20px">
+        <h2 class="h6 mb-3 d-flex align-items-center gap-2"><i class="fa-solid fa-chart-column text-muted"></i> Volume Transaksi (7 hari terakhir)</h2>
+        <div class="dash-chart" th:if="${!chart.isEmpty()}">
+            <div class="dash-col" th:each="c : ${chart}">
+                <div class="dash-colbar-wrap">
+                    <span class="dash-colval" th:text="${c[1]}">0</span>
+                    <div class="dash-colbar" th:style="'height:' + ${#numbers.formatDecimal(c[1] * 100.0 / chartMax,1,2)} + '%'"></div>
+                </div>
+                <div class="dash-collabel" th:text="${c[0]}">01 Jul</div>
+            </div>
+        </div>
+        <p th:if="${chart.isEmpty()}" class="text-muted mb-0 py-3 text-center">Belum ada transaksi untuk digrafikkan.</p>
+    </div>
+
     <div class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Transaksi Terbaru</h2>
