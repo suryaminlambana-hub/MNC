@@ -18,12 +18,12 @@ public class OtorisasiService {
     private final GlTabelRepository gl;
     private final ApprovalService approval;
     private final AuditService audit;
+    private final FtpService ftp;
 
     @Value("${ausy.txt-dir:data/txt}") private String txtDir;
-    @Value("${ausy.ftp.host:}")        private String ftpHost;   // empty -> FTP skipped
 
-    public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit) {
-        this.gl = gl; this.approval = approval; this.audit = audit;
+    public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit, FtpService ftp) {
+        this.gl = gl; this.approval = approval; this.audit = audit; this.ftp = ftp;
     }
 
     public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced) {}
@@ -71,13 +71,23 @@ public class OtorisasiService {
             Files.writeString(dir.resolve("ACCTXT." + yymmdd), content.toString(),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 
-            // FTP push only when configured (skipped in dev — file still generated)
-            if (ftpHost != null && !ftpHost.isBlank()) { /* FtpService.push(...) — wired when configured */ }
+            // Transfer Out to GL FTP server (Data Flow §9.g) — only when ausy.ftp.host is set
+            String ftpNote = "";
+            if (ftp.enabled()) {
+                try {
+                    String remote = ftp.push(pkt);
+                    audit.transaction(checker, "FTP_SENT", "Paket " + paket + " -> FTP: " + remote);
+                    ftpNote = " Terkirim ke FTP: " + remote + ".";
+                } catch (Exception fe) {
+                    audit.transaction(checker, "FTP_FAILED", "Paket " + paket + " gagal kirim FTP: " + fe.getMessage());
+                    ftpNote = " (PERINGATAN: gagal kirim ke FTP — " + fe.getMessage() + "; file tetap tersimpan lokal.)";
+                }
+            }
 
             gl.deletePaket(paket, inputer);   // transaksi done -> migrate out of gl_tabel
             audit.transaction(checker, "OTORISASI_APPROVE",
                     "Paket " + paket + " (maker=" + inputer + ") di-approve & export, " + rows.size() + " baris -> " + pkt.getFileName());
-            return new ExportResult(true, "Otorisasi berhasil — Paket " + paket + " diproses (" + rows.size() + " baris). File: " + pkt.getFileName(), rows.size(), pkt.getFileName().toString());
+            return new ExportResult(true, "Otorisasi berhasil — Paket " + paket + " diproses (" + rows.size() + " baris). File: " + pkt.getFileName() + "." + ftpNote, rows.size(), pkt.getFileName().toString());
         } catch (Exception e) {
             return new ExportResult(false, "Gagal menulis file teks: " + e.getMessage(), 0, null);
         }

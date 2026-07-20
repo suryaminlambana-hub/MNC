@@ -28,6 +28,17 @@ spring:
   thymeleaf:
     cache: false                # dev; enable in prod
 
+ausy:
+  txt-dir: ${AUSY_TXT_DIR:data/txt}
+  ftp:
+    host: ${FTP_HOST:}          # empty -> FTP push dimatikan (file tetap dibuat lokal)
+    port: ${FTP_PORT:21}
+    user: ${FTP_USER:}
+    pass: ${FTP_PASS:}
+    dir: ${FTP_DIR:}            # folder tujuan di server FTP (opsional)
+    secure: ${FTP_SECURE:false} # true = FTPS (FTP over TLS)
+    passive: ${FTP_PASSIVE:true}
+
 logging:
   level:
     org.springframework.security: INFO
