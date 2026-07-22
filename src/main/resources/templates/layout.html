@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf.token}"><meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <script>(function(){var t=localStorage.getItem('ausy-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+    <script>(function(){var t=localStorage.getItem('ausy-theme');if(t)document.documentElement.setAttribute('data-theme',t);
+      if(localStorage.getItem('ausy-nav')==='collapsed' && !matchMedia('(max-width:860px)').matches) document.documentElement.classList.add('nav-collapsed');})();</script>
     <title th:replace="${pageTitle}">AUSY</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/datatables/1.13.5/css/jquery.dataTables.min.css}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=9)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=10)}">
     <!-- Libraries in <head> so page-level inline scripts (Bootstrap modals, etc.) always have $/bootstrap available -->
     <script th:src="@{/webjars/jquery/3.7.1/jquery.min.js}"></script>
     <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
@@ -20,17 +21,17 @@
     <aside class="ausy-sidebar">
         <div class="ausy-brand"><i class="fa-solid fa-building-columns"></i> <span>MNC <b>AUSY</b></span></div>
         <ul class="ausy-nav">
-            <li><a th:href="@{/dashboard}" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
+            <li><a th:href="@{/dashboard}" title="Home" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
         </ul>
         <div class="ausy-group" th:each="p : ${sidebar}" th:attr="data-group=${p.namaMenu}">
-            <button type="button" class="ausy-group-title">
+            <button type="button" class="ausy-group-title" th:title="${p.namaMenu}">
                 <i th:class="${p.icon} ?: 'fa-solid fa-folder'"></i>
                 <span th:text="${p.namaMenu}">Group</span>
                 <i class="ausy-chev fa-solid fa-chevron-down"></i>
             </button>
             <ul>
                 <li th:each="c : ${p.children}">
-                    <a th:href="@{${c.url}}" th:classappend="${currentPath == c.url} ? 'active'">
+                    <a th:href="@{${c.url}}" th:title="${c.namaMenu}" th:classappend="${currentPath == c.url} ? 'active'">
                         <i th:class="${c.icon} ?: 'fa-regular fa-circle'"></i> <span th:text="${c.namaMenu}">item</span>
                     </a>
                 </li>
@@ -88,8 +89,11 @@
       theme=document.getElementById('themeToggle');
   function mobile(){ return window.matchMedia('(max-width:860px)').matches; }
 
-  // burger
-  btn.addEventListener('click',function(){ shell.classList.toggle(mobile()?'nav-open':'nav-collapsed'); });
+  // burger: mobile = off-canvas; desktop = icon-only rail (persisted on <html>)
+  btn.addEventListener('click',function(){
+    if(mobile()){ shell.classList.toggle('nav-open'); }
+    else { var c=document.documentElement.classList.toggle('nav-collapsed'); localStorage.setItem('ausy-nav', c?'collapsed':'expanded'); }
+  });
   ov.addEventListener('click',function(){ shell.classList.remove('nav-open'); });
   document.querySelectorAll('.ausy-sidebar a').forEach(function(a){
     a.addEventListener('click',function(){ if(mobile()) shell.classList.remove('nav-open'); });
