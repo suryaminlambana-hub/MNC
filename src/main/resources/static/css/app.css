@@ -239,8 +239,11 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
 
 /* ---------- DataTables (themed) ---------- */
 .dataTables_wrapper{padding:14px 16px}
-.dataTables_wrapper .dataTables_filter{margin-bottom:12px;text-align:right}
-.dataTables_wrapper .dataTables_filter input{border:1px solid var(--border);border-radius:var(--radius-sm);padding:.4rem .7rem;margin-left:8px;background:var(--surface);color:var(--ink)}
+.dataTables_wrapper .dataTables_filter{margin-bottom:12px;display:flex;align-items:center;justify-content:flex-end;gap:18px;flex-wrap:wrap}
+.dataTables_wrapper .dataTables_filter label{margin:0;display:inline-flex;align-items:center;gap:6px;color:var(--ink-soft);font-size:13px}
+.dataTables_wrapper .dataTables_filter input{border:1px solid var(--border);border-radius:var(--radius-sm);padding:.4rem .7rem;margin:0;background:var(--surface);color:var(--ink)}
+.ausy-colfilter-wrap{display:inline-flex;align-items:center;gap:6px}
+.ausy-colfilter{width:auto;min-width:130px}
 .dataTables_wrapper .dataTables_filter input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .dataTables_wrapper .dataTables_info{color:var(--ink-faint);font-size:12.5px;padding-top:12px!important}
 .dataTables_wrapper .dataTables_paginate{padding-top:10px}

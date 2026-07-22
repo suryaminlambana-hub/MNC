@@ -9,7 +9,7 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/datatables/1.13.5/css/jquery.dataTables.min.css}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=8)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=9)}">
     <!-- Libraries in <head> so page-level inline scripts (Bootstrap modals, etc.) always have $/bootstrap available -->
     <script th:src="@{/webjars/jquery/3.7.1/jquery.min.js}"></script>
     <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
@@ -70,11 +70,11 @@
       var sc=$tbl.data('status-col');
       if(sc!==undefined && sc!==null && sc!==''){
         var col=t.column(parseInt(sc,10));
-        var $sel=$('<select class="form-select form-select-sm" style="width:auto;display:inline-block;margin-left:6px"><option value="">Semua</option></select>');
+        var $sel=$('<select class="form-select form-select-sm ausy-colfilter"><option value="">Semua</option></select>');
         var seen={};
         col.data().each(function(d){ var txt=$('<div>').html(d).text().trim(); if(txt&&!seen[txt]){seen[txt]=1; $sel.append($('<option>').text(txt));} });
         $sel.on('change',function(){ var v=this.value; col.search(v?('^'+$.fn.dataTable.util.escapeRegex(v)+'$'):'',true,false).draw(); });
-        var $wrap=$('<span class="me-3 small text-muted"></span>').append('Status:').append($sel);
+        var $wrap=$('<span class="ausy-colfilter-wrap"></span>').append('Status:').append($sel);
         $tbl.closest('.dataTables_wrapper').find('.dataTables_filter').prepend($wrap);
       }
     });
