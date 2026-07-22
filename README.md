@@ -54,6 +54,41 @@ Buka **http://localhost:8080/ausy** — login **`admin`/`admin123`** (atau `spv`
 - **FTP** (`FTP_*`) & **email** default mati — tidak memengaruhi run lokal.
 - Reset total: jalankan ulang `packaging/setup-db.sql` (selalu fresh).
 
+### Windows (step-by-step)
+
+**Prasyarat** (install via winget, lalu tutup & buka ulang terminal):
+```powershell
+winget install EclipseAdoptium.Temurin.21.JDK
+winget install PostgreSQL.PostgreSQL.16
+```
+> Saat instalasi PostgreSQL, catat password user `postgres` yang kamu set — dipakai di langkah 2.
+> Jika `psql` / `java` tidak dikenali, tambahkan ke PATH: `C:\Program Files\PostgreSQL\16\bin` dan folder `bin` JDK 21.
+
+**Langkah** (jalankan di folder repo setelah `git clone` + `cd AUSY-MNC-JAVA`):
+
+1. Bikin database + user (SEKALI) — akan diminta password `postgres`:
+```cmd
+psql -U postgres -f packaging\setup-db.sql
+```
+2. Jalankan aplikasi:
+
+   **Command Prompt (cmd):**
+   ```cmd
+   set DB_NAME=ausy
+   set DB_USER=ausy_user
+   set DB_PASS=ausy_pass_2026
+   mvnw.cmd spring-boot:run
+   ```
+   **PowerShell:**
+   ```powershell
+   $env:DB_NAME="ausy"; $env:DB_USER="ausy_user"; $env:DB_PASS="ausy_pass_2026"
+   .\mvnw.cmd spring-boot:run
+   ```
+3. Buka **http://localhost:8080/ausy** — login `admin`/`admin123`.
+
+> Ganti port: tambah `set SERVER_PORT=9090` (cmd) atau `$env:SERVER_PORT="9090"` (PowerShell) sebelum menjalankan.
+> Reset DB: jalankan ulang perintah `psql -U postgres -f packaging\setup-db.sql`.
+
 ## Deploy (plug-and-play zip)
 ```bash
 ./build-dist.sh          # -> target/app-dist.zip
