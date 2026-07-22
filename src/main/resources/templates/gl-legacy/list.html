@@ -14,7 +14,6 @@
         <td class="text-end" th:text="${#numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA')}"></td>
         <td th:text="${g.gltrpd}"></td><td th:text="${g.gltrus}"></td><td><small th:text="${g.gltrrf}"></small></td>
       </tr>
-      <tr th:if="${rows.isEmpty()}"><td colspan="9" class="text-center text-muted py-3">Belum ada data GL.</td></tr>
       </tbody>
     </table>
   </div>
