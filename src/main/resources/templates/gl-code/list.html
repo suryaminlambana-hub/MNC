@@ -12,7 +12,7 @@
         <td th:text="${i.count}"></td><td><code th:text="${g.code}"></code></td>
         <td><span th:class="${g.position=='C'}?'badge bg-warning-subtle text-warning':'badge bg-info-subtle text-info'" th:text="${g.position=='C'?'Credit':'Debit'}"></span></td>
         <td th:text="${g.description}"></td>
-        <td><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
+        <td th:attr="data-search=${g.status==1 ? 'Active' : 'NonAktif'},data-filter=${g.status==1 ? 'Active' : 'NonAktif'}"><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
         <td><span th:if="${g.used}" class="badge bg-warning-subtle text-warning">Terpakai</span><span th:unless="${g.used}" class="text-muted small">Belum dipakai</span></td>
       </tr>
       </tbody>
