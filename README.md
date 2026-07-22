@@ -19,15 +19,27 @@ resumable chunked upload, audit trail, and RBAC.
 - Immutable audit trail, Monitoring & Rekapitulasi, RBAC (group → menu access)
 - Theme: MNC gold & black, light/dark toggle
 
-## Run (dev)
+## Jalankan di lokal (clone dari Git)
+
+Prasyarat (sekali saja): **JDK 21** + **PostgreSQL**. Maven TIDAK perlu diinstal — pakai `./mvnw`.
+
 ```bash
-# needs Java 21 + PostgreSQL running
-createdb ausy_sb
-DB_NAME=ausy_sb DB_USER=$(whoami) mvn spring-boot:run
-# open http://localhost:8080/ausy   (admin/admin123, spv/spv123, user/user123)
+# 1. clone
+git clone https://github.com/SEAuser/AUSY-MNC-JAVA.git
+cd AUSY-MNC-JAVA
+
+# 2. bikin database + user (sekali). Jalankan sebagai superuser PostgreSQL:
+#    Linux : sudo -u postgres psql -f packaging/setup-db.sql
+#    Mac   : psql -d postgres -f packaging/setup-db.sql
+#    -> membuat db "ausy" + user "ausy_user" / pass "ausy_pass_2026"
+
+# 3. jalankan (Flyway otomatis bikin skema + data awal saat start pertama)
+DB_NAME=ausy DB_USER=ausy_user DB_PASS=ausy_pass_2026 ./mvnw spring-boot:run
+#   Windows: set env dulu lalu  mvnw.cmd spring-boot:run
 ```
-Config via env: `SERVER_PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
-Flyway creates the schema + seed automatically on first start.
+Buka **http://localhost:8080/ausy** — login `admin`/`admin123` (atau `spv`/`spv123`, `user`/`user123`).
+
+> Wajib set `DB_NAME/DB_USER/DB_PASS` (default di `application.yml` menunjuk DB dev penulis). Env lain: `SERVER_PORT`, `CONTEXT_PATH`, `DB_HOST`, `DB_PORT`, dan `FTP_*` (opsional). Flyway membuat skema + seed otomatis.
 
 ## Deploy (plug-and-play zip)
 ```bash
