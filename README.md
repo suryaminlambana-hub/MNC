@@ -21,25 +21,38 @@ resumable chunked upload, audit trail, and RBAC.
 
 ## Jalankan di lokal (clone dari Git)
 
-Prasyarat (sekali saja): **JDK 21** + **PostgreSQL**. Maven TIDAK perlu diinstal — pakai `./mvnw`.
+**Prasyarat (sekali saja):** OpenJDK **21** + **PostgreSQL**. Maven TIDAK perlu diinstal — pakai `./mvnw`.
 
+```bash
+# macOS
+brew install openjdk@21 postgresql@16 && brew services start postgresql@16
+# Ubuntu/Debian
+sudo apt install -y openjdk-21-jdk postgresql && sudo systemctl start postgresql
+```
+
+**Langkah:**
 ```bash
 # 1. clone
 git clone https://github.com/SEAuser/AUSY-MNC-JAVA.git
 cd AUSY-MNC-JAVA
 
-# 2. bikin database + user (sekali). Jalankan sebagai superuser PostgreSQL:
-#    Linux : sudo -u postgres psql -f packaging/setup-db.sql
-#    Mac   : psql -d postgres -f packaging/setup-db.sql
-#    -> membuat db "ausy" + user "ausy_user" / pass "ausy_pass_2026"
+# 2. bikin database + user (SEKALI), sebagai superuser PostgreSQL:
+sudo -u postgres psql -f packaging/setup-db.sql     # Linux
+psql -d postgres -f packaging/setup-db.sql          # Mac (kalau role OS-mu superuser)
+#    -> otomatis bikin db "ausy" + user "ausy_user" / pass "ausy_pass_2026"
 
-# 3. jalankan (Flyway otomatis bikin skema + data awal saat start pertama)
+# 3. jalankan (Flyway otomatis bikin tabel + data awal saat start pertama)
 DB_NAME=ausy DB_USER=ausy_user DB_PASS=ausy_pass_2026 ./mvnw spring-boot:run
-#   Windows: set env dulu lalu  mvnw.cmd spring-boot:run
 ```
-Buka **http://localhost:8080/ausy** — login `admin`/`admin123` (atau `spv`/`spv123`, `user`/`user123`).
 
-> Wajib set `DB_NAME/DB_USER/DB_PASS` (default di `application.yml` menunjuk DB dev penulis). Env lain: `SERVER_PORT`, `CONTEXT_PATH`, `DB_HOST`, `DB_PORT`, dan `FTP_*` (opsional). Flyway membuat skema + seed otomatis.
+Buka **http://localhost:8080/ausy** — login **`admin`/`admin123`** (atau `spv`/`spv123`, `user`/`user123`).
+
+**Catatan:**
+- **Wajib** set `DB_NAME/DB_USER/DB_PASS` di depan perintah — default di `application.yml` menunjuk DB dev penulis, jadi tanpa override akan gagal konek.
+- Ganti port: tambah `SERVER_PORT=9090`. Ganti context path: `CONTEXT_PATH=` (root) atau biarkan `/ausy` (default).
+- **Windows:** `set DB_NAME=ausy` (dst) dulu, lalu `mvnw.cmd spring-boot:run`.
+- **FTP** (`FTP_*`) & **email** default mati — tidak memengaruhi run lokal.
+- Reset total: jalankan ulang `packaging/setup-db.sql` (selalu fresh).
 
 ## Deploy (plug-and-play zip)
 ```bash
