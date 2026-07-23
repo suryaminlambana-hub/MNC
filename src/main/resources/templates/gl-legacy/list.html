@@ -2,17 +2,32 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Legacy - List GL — AUSY</title></head>
 <main>
-  <h1 class="ausy-page-title">List Data GL</h1>
-  <p class="text-muted">Seluruh baris jurnal GL yang ada di sistem.</p>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <h1 class="ausy-page-title">List Data GL</h1>
+      <p class="text-muted mb-0">Total <b th:text="${total}">0</b> baris jurnal ·
+        <span th:text="${totalRegistered}">0</span> terdaftar ·
+        nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
+    </div>
+    <a class="btn btn-primary" th:href="@{/gl-legacy/export}">
+      <i class="fa-solid fa-file-excel"></i> Export Excel</a>
+  </div>
+  <p class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
+     Export otomatis hanya menyertakan baris yang <b>GL-nya terdaftar</b> di master GL Code.</p>
+
   <div class="ausy-card">
     <table class="table table-sm table-hover align-middle mb-0 dt">
-      <thead><tr><th>Paket</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th></tr></thead>
+      <thead><tr><th>Paket</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
       <tbody>
       <tr th:each="g : ${rows}">
         <td th:text="${g.noPaket}"></td><td><code th:text="${g.gltrac}"></code></td>
         <td th:text="${g.gltrcd}"></td><td th:text="${g.glName}"></td><td th:text="${g.gltrds}"></td>
         <td class="text-end" th:text="${#numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA')}"></td>
         <td th:text="${g.gltrpd}"></td><td th:text="${g.gltrus}"></td><td><small th:text="${g.gltrrf}"></small></td>
+        <td>
+          <span th:if="${registered.contains(g.gltrac + '|' + g.gltrcd)}" class="badge bg-success-subtle text-success">Terdaftar</span>
+          <span th:unless="${registered.contains(g.gltrac + '|' + g.gltrcd)}" class="badge bg-secondary-subtle text-secondary">Tidak Terdaftar</span>
+        </td>
       </tr>
       </tbody>
     </table>
