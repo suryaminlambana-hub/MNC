@@ -1,5 +1,8 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.domain.GlCode;
+import com.mnc.ausy.service.AuditService;
+import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.GlCodeService;
 import com.mnc.ausy.security.AusyUserDetails;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,12 +15,37 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Controller
 @RequestMapping("/gl-code")
 public class GlCodeController {
     private final GlCodeService service;
-    public GlCodeController(GlCodeService service) { this.service = service; }
+    private final ExcelExportService excel;
+    private final AuditService audit;
+    public GlCodeController(GlCodeService service, ExcelExportService excel, AuditService audit) {
+        this.service = service; this.excel = excel; this.audit = audit;
+    }
+
+    /** Export the GL Code master (registered GL codes) to Excel. */
+    @GetMapping("/export")
+    public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
+        List<GlCode> codes = service.listWithUsage();
+        List<String> head = List.of("No","NoGL","Debit/Credit","Description","Status","Pemakaian");
+        List<List<Object>> data = new ArrayList<>();
+        int no = 1;
+        for (GlCode g : codes) {
+            data.add(Arrays.asList(no++, g.getCode(),
+                    "C".equals(g.getPosition()) ? "Credit" : "Debit",
+                    g.getDescription() == null ? "" : g.getDescription(),
+                    (g.getStatus() != null && g.getStatus() == 1) ? "Active" : "Non Active",
+                    g.isUsed() ? "Terpakai" : "Belum dipakai"));
+        }
+        excel.download(resp, "GL Code", "GL_Code", head, data, false);
+        audit.transaction(me.getUsername(), "EXPORT_GLCODE", "Export master GL Code ke Excel: " + codes.size() + " kode");
+    }
 
     @GetMapping
     public String manage(Model model) {

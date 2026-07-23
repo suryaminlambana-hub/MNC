@@ -2,8 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Manage GL Code — AUSY</title></head>
 <main>
-  <h1 class="ausy-page-title">Manage GL Code</h1>
-  <p class="text-muted">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <h1 class="ausy-page-title">Manage GL Code</h1>
+      <p class="text-muted mb-0">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
+    </div>
+    <a class="btn btn-primary" th:href="@{/gl-code/export}"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+  </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 

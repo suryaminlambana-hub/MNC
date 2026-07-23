@@ -2,8 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Audit Trail — AUSY</title></head>
 <main>
-  <h1 class="ausy-page-title">Audit Trail</h1>
-  <p class="text-muted"><i class="fa-solid fa-lock"></i> Log bersifat <b>immutable</b> (append-only) — mencatat seluruh transaksi & aktivitas untuk kepatuhan dan penelusuran.</p>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <h1 class="ausy-page-title">Audit Trail</h1>
+      <p class="text-muted mb-0"><i class="fa-solid fa-lock"></i> Log bersifat <b>immutable</b> (append-only) — mencatat seluruh transaksi & aktivitas untuk kepatuhan dan penelusuran.</p>
+    </div>
+    <a class="btn btn-primary" th:href="@{/audit/export}"><i class="fa-solid fa-file-excel"></i> Export Transaksi</a>
+  </div>
 
   <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tx">Transaksi</button></li>
