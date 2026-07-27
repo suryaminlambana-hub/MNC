@@ -45,7 +45,18 @@ psql -d postgres -f packaging/setup-db.sql          # Mac (kalau role OS-mu supe
 DB_NAME=ausy DB_USER=ausy_user DB_PASS=ausy_pass_2026 ./mvnw spring-boot:run
 ```
 
-Buka **http://localhost:8080/ausy** — login **`admin`/`admin123`** (atau `spv`/`spv123`, `user`/`user123`).
+Buka **http://localhost:8080/ausy**.
+
+**Role & login awal (Segregation of Duties):**
+
+| User | Password | Role | Akses |
+|------|----------|------|-------|
+| `admin` | admin123 | ① CONFIG / SETTING | Master Data (User/Group/Menu/Access/Approval) + GL Code (parameter); membuat semua user |
+| `adminapv` | admin123 | ② CONFIG APPROVER | approve perubahan config (monitoring: Audit/Rekap) |
+| `user` | user123 | ③ BUSINESS MAKER | Upload/NALA + Kelola Data GL |
+| `spv` | spv123 | ④ BUSINESS APPROVER | Otorisasi + Otorisasi Perubahan GL (approve-only) |
+
+Prinsip: yang meng-**approve tidak boleh** add/edit/delete; **CONFIG tidak** memproses data bisnis; **MAKER tidak** meng-approve. Ditegakkan di level menu (RBAC) & URL (Spring Security). Matriks approval: ④→③ (bisnis), ②→① (config).
 
 **Catatan:**
 - **Wajib** set `DB_NAME/DB_USER/DB_PASS` di depan perintah — default di `application.yml` menunjuk DB dev penulis, jadi tanpa override akan gagal konek.
@@ -84,7 +95,7 @@ psql -U postgres -f packaging\setup-db.sql
    $env:DB_NAME="ausy"; $env:DB_USER="ausy_user"; $env:DB_PASS="ausy_pass_2026"
    .\mvnw.cmd spring-boot:run
    ```
-3. Buka **http://localhost:8080/ausy** — login `admin`/`admin123`.
+3. Buka **http://localhost:8080/ausy** — login sesuai role — `admin`(config), `adminapv`(config-approver), `user`(maker), `spv`(approver). Lihat tabel Role di atas.
 
 > Ganti port: tambah `set SERVER_PORT=9090` (cmd) atau `$env:SERVER_PORT="9090"` (PowerShell) sebelum menjalankan.
 > Reset DB: jalankan ulang perintah `psql -U postgres -f packaging\setup-db.sql`.

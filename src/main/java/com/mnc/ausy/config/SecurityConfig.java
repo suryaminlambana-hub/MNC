@@ -20,6 +20,14 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/webjars/**", "/css/**", "/js/**", "/img/**", "/favicon.ico").permitAll()
+                // --- Segregation of Duties (group authorities: GROUP_1..GROUP_4) ---
+                // (1) CONFIG/SETTING: user, group, menu, access, approval, GL Code (parameter)
+                .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**", "/gl-code/**").hasAuthority("GROUP_1")
+                // (3) BUSINESS MAKER: upload & GL data operations
+                .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**").hasAuthority("GROUP_3")
+                // (4) BUSINESS APPROVER: otorisasi / approve (approve-only)
+                .requestMatchers("/otorisasi/**", "/gl-change/**").hasAuthority("GROUP_4")
+                // shared read (dashboard, list, rekap, audit, report) — any authenticated role
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

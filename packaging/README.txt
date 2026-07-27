@@ -23,7 +23,7 @@ LANGKAH DEPLOY (4 langkah)
   4. chmod +x start.sh && ./start.sh
 
   Lalu buka:  http://localhost:8080/ausy
-  Login     :  admin / admin123   (atau spv/spv123, user/user123)
+  Login     :  admin(config)/admin123 · adminapv/admin123 · user(maker)/user123 · spv(approver)/spv123
 
 CATATAN
   - Langkah 2 cukup SEKALI. Kalau dilewati, start.sh akan otomatis

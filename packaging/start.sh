@@ -61,5 +61,5 @@ fi
 
 # --- 5. jalankan (Flyway otomatis bikin skema + seed saat pertama kali) ---
 echo ">> AUSY jalan di  http://localhost:${SERVER_PORT}${CONTEXT_PATH}    (Ctrl+C untuk berhenti)"
-echo ">> Login awal: admin / admin123   (juga: spv/spv123, user/user123)"
+echo ">> Login: admin(config) / adminapv / user(maker) / spv(approver) — pw sama seperti sebelumnya"
 exec java -jar "$JAR"
