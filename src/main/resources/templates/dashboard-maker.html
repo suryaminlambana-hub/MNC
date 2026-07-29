@@ -1,0 +1,109 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Beranda — AUSY</title></head>
+<main>
+    <h1 class="ausy-page-title">Beranda Maker</h1>
+    <p class="text-muted">Ringkasan tugas upload &amp; perubahan GL.</p>
+
+    <div class="dash-grid">
+        <div class="dash-card">
+            <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>
+            <div><div class="dash-num" th:text="${activeGl}">0</div><div class="dash-label">Baris GL Aktif</div></div>
+        </div>
+        <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingPakets > 0}">MENUNGGU CHECKER</span>
+            <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Paket Menunggu Otorisasi</div></div>
+        </div>
+        <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingChanges > 0}">MENUNGGU CHECKER</span>
+            <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
+        </div>
+    </div>
+
+    <!-- Perubahan GL Pending (collapsible list) -->
+    <div class="ausy-card">
+        <button class="ausy-collapse-hd" type="button" data-bs-toggle="collapse" data-bs-target="#pendingChangeBox"
+                aria-expanded="true" aria-controls="pendingChangeBox">
+            <span><i class="fa-solid fa-clipboard-check text-muted"></i> Perubahan GL Pending
+                <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${pendingChanges}">0</span></span>
+            <i class="fa-solid fa-chevron-up ausy-collapse-caret"></i>
+        </button>
+        <div class="collapse show" id="pendingChangeBox">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead><tr>
+                    <th class="ps-3">Waktu</th><th>Operasi</th><th>Target GL / Paket</th>
+                    <th>Catatan Maker</th><th class="pe-3">Status</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="c : ${pendingChangeList}">
+                    <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(c.createdAt,'dd-MM HH:mm')}"></td>
+                    <td><span class="badge"
+                              th:classappend="${c.op == 'ADD'} ? 'bg-success-subtle text-success' : (${c.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
+                              th:text="${c.op}"></span></td>
+                    <td class="small">
+                        <span th:if="${c.glId != null}" th:text="'GL #' + ${c.glId}"></span>
+                        <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Paket ' + ${c.noPaket}"></span>
+                    </td>
+                    <td class="small text-muted" th:text="${c.noteMaker}"></td>
+                    <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU CHECKER</span></td>
+                </tr>
+                <tr th:if="${pendingChangeList.isEmpty()}">
+                    <td colspan="5" class="text-center text-muted py-4">Tidak ada perubahan GL yang menunggu persetujuan.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- List GL Aktif -->
+    <div class="ausy-card">
+        <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-table-list text-muted"></i> List GL Aktif</h2>
+        <div class="px-3 pb-3">
+            <table class="table table-sm table-hover align-middle mb-0 dt">
+                <thead><tr>
+                    <th>Tgl Posting</th><th>D/C</th><th>Kode GL</th><th>Nama GL</th>
+                    <th>Deskripsi</th><th>Cabang</th><th class="text-end">Nominal</th><th>Paket</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="g : ${glActiveList}">
+                    <td class="text-nowrap" th:text="${g.gltrpd}"></td>
+                    <td><span class="badge" th:classappend="${g.gltrcd == 'D'} ? 'bg-info-subtle text-info' : 'bg-secondary-subtle text-secondary'" th:text="${g.gltrcd}"></span></td>
+                    <td th:text="${g.gltrac}"></td>
+                    <td class="small" th:text="${g.glName}"></td>
+                    <td class="small" th:text="${g.gltrds}"></td>
+                    <td class="small" th:text="${g.gltrbr}"></td>
+                    <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(g.gltram,1,'POINT')}"></td>
+                    <td th:text="${g.noPaket}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Riwayat Upload -->
+    <div class="ausy-card">
+        <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat Upload GL</h2>
+        <div class="px-3 pb-3">
+            <table class="table table-sm table-hover align-middle mb-0 dt">
+                <thead><tr>
+                    <th>Waktu</th><th>Nama File</th><th class="text-end">Jml Baris</th><th>User</th><th>Status</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="u : ${uploadHistory}">
+                    <td class="text-nowrap text-muted small" th:text="${u.adddt != null ? #temporals.format(u.adddt,'dd-MM-yyyy HH:mm') : ''}"></td>
+                    <td class="small" th:text="${u.fileName}"></td>
+                    <td class="text-end" th:text="${u.jmlData}"></td>
+                    <td th:text="${u.userId}"></td>
+                    <td><span class="badge bg-success-subtle text-success" th:text="${u.status}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</html>

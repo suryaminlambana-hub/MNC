@@ -7,7 +7,7 @@
     <title>Login — AUSY</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=10)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=15)}">
 </head>
 <body class="ausy-login-bg">
 <div class="ausy-login-card">
@@ -16,18 +16,50 @@
 
     <div th:if="${param.error}" class="alert alert-danger py-2">Username atau password salah.</div>
     <div th:if="${param.logout}" class="alert alert-success py-2">Anda telah keluar.</div>
+    <div th:if="${param.expired}" class="alert alert-warning py-2">Sesi berakhir, silakan login lagi.</div>
 
-    <form th:action="@{/login}" method="post">
+    <form id="loginForm" th:action="@{/login}" method="post">
         <div class="mb-3">
             <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" required autofocus>
+            <input type="text" name="username" id="username" class="form-control" required autofocus>
         </div>
         <div class="mb-3">
             <label class="form-label">Password</label>
-            <input type="password" name="password" class="form-control" required>
+            <input type="password" name="password" id="password" class="form-control" required>
         </div>
         <button type="submit" class="btn btn-primary w-100">Masuk</button>
     </form>
+
+    <div class="ausy-quicklogin">
+        <div class="ausy-quicklogin-title"><i class="fa-solid fa-bolt"></i> Quick login <span>(demo)</span></div>
+        <div class="ausy-quicklogin-grid">
+            <button type="button" class="ausy-ql" data-u="admin"    data-p="admin123">
+                <span class="ausy-ql-role">Admin</span>
+                <span class="ausy-ql-user">admin</span>
+            </button>
+            <button type="button" class="ausy-ql" data-u="adminapv" data-p="admin123">
+                <span class="ausy-ql-role">Admin Approver</span>
+                <span class="ausy-ql-user">adminapv</span>
+            </button>
+            <button type="button" class="ausy-ql" data-u="user"     data-p="user123">
+                <span class="ausy-ql-role">Maker</span>
+                <span class="ausy-ql-user">user</span>
+            </button>
+            <button type="button" class="ausy-ql" data-u="spv"      data-p="spv123">
+                <span class="ausy-ql-role">Approver</span>
+                <span class="ausy-ql-user">spv</span>
+            </button>
+        </div>
+    </div>
 </div>
+<script>
+    document.querySelectorAll('.ausy-ql').forEach(function(b){
+        b.addEventListener('click', function(){
+            document.getElementById('username').value = b.dataset.u;
+            document.getElementById('password').value = b.dataset.p;
+            document.getElementById('loginForm').submit();
+        });
+    });
+</script>
 </body>
 </html>

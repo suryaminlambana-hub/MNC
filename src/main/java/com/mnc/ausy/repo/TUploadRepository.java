@@ -1,4 +1,7 @@
 package com.mnc.ausy.repo;
 import com.mnc.ausy.domain.TUpload;
 import org.springframework.data.jpa.repository.JpaRepository;
-public interface TUploadRepository extends JpaRepository<TUpload, Long> {}
+import java.util.List;
+public interface TUploadRepository extends JpaRepository<TUpload, Long> {
+    List<TUpload> findTop50ByOrderByAdddtDesc();
+}
