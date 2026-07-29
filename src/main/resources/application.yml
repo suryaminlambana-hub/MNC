@@ -27,6 +27,11 @@ spring:
     baseline-on-migrate: true
   thymeleaf:
     cache: false                # dev; enable in prod
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true        # always revalidate CSS/JS so UI changes show without a hard refresh
 
 ausy:
   txt-dir: ${AUSY_TXT_DIR:data/txt}

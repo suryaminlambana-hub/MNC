@@ -10,7 +10,7 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/datatables/1.13.5/css/jquery.dataTables.min.css}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=10)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=15)}">
     <!-- Libraries in <head> so page-level inline scripts (Bootstrap modals, etc.) always have $/bootstrap available -->
     <script th:src="@{/webjars/jquery/3.7.1/jquery.min.js}"></script>
     <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
@@ -78,6 +78,10 @@
         var $wrap=$('<span class="ausy-colfilter-wrap"></span>').append('Status:').append($sel);
         $tbl.closest('.dataTables_wrapper').find('.dataTables_filter').prepend($wrap);
       }
+    });
+    // Keep plain tables from overflowing their card: wrap in a horizontal-scroll container
+    $('.ausy-card table.table').not('.dt').each(function(){
+      if(!$(this).parent().hasClass('ausy-tablewrap')) $(this).wrap('<div class="ausy-tablewrap"></div>');
     });
   });
 </script>

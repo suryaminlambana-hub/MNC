@@ -2,6 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Otorisasi Perubahan GL — AUSY</title></head>
 <main>
+ <div class="ausy-review">
   <h1 class="ausy-page-title">Otorisasi Perubahan GL</h1>
   <p class="text-muted">Permintaan Add/Edit/Delete dari Maker. Bandingkan <b>before vs after</b> sebelum approve/reject — Workflow 8.3.</p>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
@@ -11,30 +12,43 @@
     Tidak ada permintaan perubahan yang menunggu otorisasi.
   </div>
 
-  <div class="ausy-card mb-3" th:each="it : ${items}">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-      <div>
+  <div class="ausy-card mb-3" th:each="it : ${items}" style="padding:16px 18px">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <div class="d-flex align-items-center gap-2">
         <span class="badge fs-6"
               th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : 'bg-primary')"
               th:text="${it.cr.op}">EDIT</span>
-        <span class="ms-2">CR#<span th:text="${it.cr.id}"></span></span>
-        <span class="text-muted ms-2">maker: <b th:text="${it.cr.maker}"></b></span>
-        <span class="text-muted ms-2" th:if="${it.cr.glId}">baris #<span th:text="${it.cr.glId}"></span></span>
+        <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
+        <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
+        <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
       </div>
       <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
     </div>
 
-    <table class="table table-sm align-middle mb-2">
-      <thead><tr><th style="width:28%">Field</th><th style="width:36%">Before</th><th style="width:36%">After</th></tr></thead>
+    <!-- ADD: only the new values (no empty Before column) -->
+    <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
+      <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
+      <tbody>
+      <tr th:each="d : ${it.diffs}">
+        <td class="text-muted" th:text="${d.label}"></td>
+        <td><b th:text="${d.after}"></b></td>
+      </tr>
+      </tbody>
+    </table>
+
+    <!-- EDIT / DELETE: before vs after -->
+    <table th:unless="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff">
+      <thead><tr><th style="width:30%">Field</th><th style="width:35%">Before</th><th style="width:35%">After</th></tr></thead>
       <tbody>
       <tr th:each="d : ${it.diffs}" th:classappend="${d.changed} ? 'table-warning'">
-        <td th:text="${d.label}"></td>
+        <td class="text-muted" th:text="${d.label}"></td>
         <td th:text="${d.before}"></td>
         <td><b th:if="${d.changed}" th:text="${d.after}"></b><span th:unless="${d.changed}" th:text="${d.after}"></span></td>
       </tr>
       </tbody>
     </table>
-    <p class="small text-muted mb-2" th:if="${it.cr.noteMaker}">Justifikasi maker: <span th:text="${it.cr.noteMaker}"></span></p>
+
+    <p class="small text-muted mb-3" th:if="${it.cr.noteMaker}"><i class="fa-solid fa-comment-dots"></i> Justifikasi maker: <span th:text="${it.cr.noteMaker}"></span></p>
 
     <div class="d-flex gap-2">
       <form th:action="@{/gl-change/approve}" method="post" onsubmit="return confirm('Approve &amp; terapkan perubahan ini ke database GL?');">
@@ -44,6 +58,7 @@
       <button class="btn btn-sm btn-outline-danger btn-rej" th:attr="data-cr=${it.cr.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
     </div>
   </div>
+ </div>
 
   <!-- Reject modal -->
   <div class="modal fade" id="crRejectModal" tabindex="-1">
