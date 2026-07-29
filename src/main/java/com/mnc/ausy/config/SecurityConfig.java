@@ -25,9 +25,14 @@ public class SecurityConfig {
                 .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**", "/gl-code/**").hasAuthority("GROUP_1")
                 // (3) BUSINESS MAKER: upload & GL data operations
                 .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**").hasAuthority("GROUP_3")
+                // (2) CONFIG APPROVER (Admin Approval): authorize user/config change requests
+                .requestMatchers("/config-change/**").hasAuthority("GROUP_2")
                 // (4) BUSINESS APPROVER: otorisasi / approve (approve-only)
                 .requestMatchers("/otorisasi/**", "/gl-change/**").hasAuthority("GROUP_4")
-                // shared read (dashboard, list, rekap, audit, report) — any authenticated role
+                // Audit Trail: only the approver roles — Config Approver (2) & Checker (4).
+                // Admin (1) and Maker (3) cannot view it (per role revisions).
+                .requestMatchers("/audit/**").hasAnyAuthority("GROUP_2", "GROUP_4")
+                // shared read (dashboard, list, rekap, report) — any authenticated role
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
