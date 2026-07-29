@@ -60,17 +60,17 @@ public class GlDataController {
         Set<String> reg = registeredKeys();
         List<GlTabel> rows = all.stream().filter(r -> isRegistered(reg, r)).collect(Collectors.toList());
 
-        List<String> head = List.of("No","Paket","NoGL","D/C","GL Name","Description","Amount","Tgl","Uploader","GLTRRF","Registered");
+        List<String> head = List.of("No","ID","Paket","NoGL","D/C","GL Name","Description","Amount","Tgl","Uploader","GLTRRF","Registered");
         List<List<Object>> data = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         int no = 1;
         for (GlTabel g : rows) {
-            data.add(Arrays.asList(no++, n(g.getNoPaket()), n(g.getGltrac()), n(g.getGltrcd()), n(g.getGlName()),
+            data.add(Arrays.asList(no++, g.getId(), n(g.getNoPaket()), n(g.getGltrac()), n(g.getGltrcd()), n(g.getGlName()),
                     n(g.getGltrds()), g.getGltram() == null ? 0d : g.getGltram(), n(g.getGltrpd()),
                     n(g.getGltrus()), n(g.getGltrrf()), "Terdaftar"));
             total = total.add(g.getGltram() == null ? BigDecimal.ZERO : g.getGltram());
         }
-        data.add(Arrays.asList("", "", "", "", "", "TOTAL (" + rows.size() + " data terdaftar)", total, "", "", "", ""));
+        data.add(Arrays.asList("", "", "", "", "", "", "TOTAL (" + rows.size() + " data terdaftar)", total, "", "", "", ""));
         excel.download(resp, "List GL", "List_GL", head, data, true);
         audit.transaction(me.getUsername(), "EXPORT_GL",
                 "Export List GL ke Excel: " + rows.size() + " baris terdaftar (dari " + all.size() + " total)");

@@ -88,6 +88,31 @@ public class GlChangeService {
         return "Permintaan UBAH data GL diajukan (menunggu approval Checker).";
     }
 
+    /** Bulk edit: apply the maker's non-blank field overrides to every selected row, one EDIT request each. */
+    @Transactional
+    public String submitBulkEdit(List<Long> glIds, Map<String,String> overrides, AusyUserDetails me, String note) {
+        if (glIds == null || glIds.isEmpty()) return "Tidak ada baris yang dipilih.";
+        Map<String,String> ov = new LinkedHashMap<>();
+        for (String k : FIELDS.keySet()) { String v = overrides.get(k); if (v != null && !v.isBlank()) ov.put(k, v.trim()); }
+        if (ov.isEmpty()) return "Isi minimal satu field yang ingin diubah.";
+        int n = 0;
+        for (Long id : glIds) {
+            GlTabel g = gl.findById(id).orElse(null);
+            if (g == null) continue;
+            Map<String,String> after = rowMap(g);
+            after.putAll(ov);                                   // only the fields maker chose to change
+            GlChangeRequest c = base("EDIT", id, me, note);
+            c.setNoPaket(g.getNoPaket());
+            c.setBeforeJson(toJson(rowMap(g)));
+            c.setAfterJson(toJson(after));
+            cr.save(c);
+            n++;
+        }
+        audit.transaction(me.getUsername(), "GL_CHANGE_REQ",
+                "BULK EDIT " + n + " baris (" + String.join(",", ov.keySet()) + ") diajukan");
+        return "Bulk edit " + n + " baris GL diajukan (menunggu approval Checker).";
+    }
+
     @Transactional
     public String submitDelete(Long glId, AusyUserDetails me, String note) {
         GlTabel g = gl.findById(glId).orElse(null);

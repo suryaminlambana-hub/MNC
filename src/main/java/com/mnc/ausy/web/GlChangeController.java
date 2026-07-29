@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.List;
 import java.util.Map;
 
 /** Workflow 8.3 — Update GL: maker page (/gl-data) + checker review (/gl-change/review). */
@@ -47,6 +48,14 @@ public class GlChangeController {
     public String delete(@RequestParam Long glId, @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("ok", service.submitDelete(glId, me, note));
+        return "redirect:/gl-data";
+    }
+
+    @PostMapping("/gl-data/bulk-edit")
+    public String bulkEdit(@RequestParam(required=false) List<Long> glIds, @RequestParam Map<String,String> form,
+                           @RequestParam(required=false) String note,
+                           @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", service.submitBulkEdit(glIds, form, me, note));
         return "redirect:/gl-data";
     }
 
