@@ -1,0 +1,93 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Otorisasi User — AUSY</title></head>
+<main>
+ <div class="ausy-review">
+  <h1 class="ausy-page-title">Otorisasi User</h1>
+  <p class="text-muted">Permintaan Add/Edit/Delete user dari Admin. Periksa alasan &amp; perubahan sebelum approve/reject.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+
+  <div th:if="${items.isEmpty()}" class="ausy-card text-center text-muted py-4">
+    Tidak ada permintaan perubahan user yang menunggu otorisasi.
+  </div>
+
+  <div class="ausy-card mb-3" th:each="it : ${items}" style="padding:16px 18px">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge fs-6"
+              th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : 'bg-primary')"
+              th:text="${it.cr.op}">EDIT</span>
+        <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
+        <span class="text-muted">· user <b th:text="${it.cr.targetId} ?: '(baru)'"></b></span>
+        <span class="text-muted">· admin <b th:text="${it.cr.maker}"></b></span>
+      </div>
+      <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
+    </div>
+
+    <!-- ADD: only new values -->
+    <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
+      <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
+      <tbody>
+      <tr th:each="d : ${it.diffs}">
+        <td class="text-muted" th:text="${d.label}"></td>
+        <td><b th:text="${d.after}"></b></td>
+      </tr>
+      </tbody>
+    </table>
+
+    <!-- EDIT / DELETE: before vs after -->
+    <table th:unless="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff">
+      <thead><tr><th style="width:30%">Field</th><th style="width:35%">Before</th><th style="width:35%">After</th></tr></thead>
+      <tbody>
+      <tr th:each="d : ${it.diffs}" th:classappend="${d.changed} ? 'table-warning'">
+        <td class="text-muted" th:text="${d.label}"></td>
+        <td th:text="${d.before}"></td>
+        <td><b th:if="${d.changed}" th:text="${d.after}"></b><span th:unless="${d.changed}" th:text="${d.after}"></span></td>
+      </tr>
+      </tbody>
+    </table>
+
+    <p class="small text-muted mb-3" th:if="${it.cr.noteMaker}"><i class="fa-solid fa-comment-dots"></i> Alasan admin: <span th:text="${it.cr.noteMaker}"></span></p>
+
+    <div class="d-flex gap-2">
+      <form th:action="@{/config-change/approve}" method="post" onsubmit="return confirm('Approve &amp; terapkan perubahan user ini?');">
+        <input type="hidden" name="crId" th:value="${it.cr.id}">
+        <button class="btn btn-sm btn-success"><i class="fa-solid fa-check"></i> Approve</button>
+      </form>
+      <button class="btn btn-sm btn-outline-danger btn-rej" th:attr="data-cr=${it.cr.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
+    </div>
+  </div>
+ </div>
+
+  <!-- Reject modal -->
+  <div class="modal fade" id="crRejectModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" th:action="@{/config-change/reject}" method="post">
+        <div class="modal-header"><h5 class="modal-title">Tolak Perubahan User CR#<span id="crNo"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="crId" id="crIdIn">
+          <label class="form-label">Catatan penolakan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required></textarea>
+          <p class="text-muted small mt-2 mb-0">Data user tidak diubah. Alasan tercatat di audit trail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">Tolak</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function(){
+      var m=new bootstrap.Modal(document.getElementById('crRejectModal'));
+      document.querySelectorAll('.btn-rej').forEach(function(b){
+        b.addEventListener('click',function(){
+          document.getElementById('crNo').textContent=b.dataset.cr;
+          document.getElementById('crIdIn').value=b.dataset.cr; m.show();
+        });
+      });
+    })();
+  </script>
+</main>
+</html>

@@ -4,10 +4,13 @@
 <head><title>User — AUSY</title></head>
 <main>
     <h1 class="ausy-page-title">User</h1>
-    <p class="text-muted">Manajemen akun pengguna.</p>
+    <p class="text-muted">Manajemen akun pengguna. Setiap Add/Edit/Delete <b>butuh alasan</b> dan menunggu approval Admin Approval (dual control).</p>
 
-    <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+    <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
     <div th:if="${err}" class="alert alert-danger py-2" th:text="${err}"></div>
+    <div th:if="${pendingConfig > 0}" class="alert alert-warning py-2">
+        <i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> permintaan perubahan user sedang menunggu otorisasi Admin Approval.
+    </div>
 
     <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addUser"><i class="fa-solid fa-plus"></i> Add User</button>
 
@@ -29,20 +32,18 @@
                     <button class="btn btn-sm btn-outline-secondary btn-edit"
                             th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
                             data-bs-toggle="modal" data-bs-target="#editUser">Edit</button>
-                    <form th:action="@{/users/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus user ini?');">
-                        <input type="hidden" name="userId" th:value="${u.userId}">
-                        <button class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
+                    <button class="btn btn-sm btn-outline-danger btn-del"
+                            th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Delete</button>
                 </td>
             </tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Add modal (no status; new users default Active) -->
+    <!-- Add modal -->
     <div class="modal fade" id="addUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
         <form th:action="@{/users/add}" method="post">
-            <div class="modal-header"><h5 class="modal-title">Add User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Ajukan Tambah User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-2"><label class="form-label">Username</label><input class="form-control" name="username" required></div>
                 <div class="mb-2"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
@@ -52,15 +53,17 @@
                     <select class="form-select" name="idGroup" required>
                         <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
                     </select></div>
+                <div class="mb-2"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="note" rows="2" required placeholder="Alasan penambahan user (dikirim ke Admin Approval)"></textarea></div>
             </div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Ajukan ke Admin Approval</button></div>
         </form>
     </div></div></div>
 
-    <!-- Edit modal (status shown) -->
+    <!-- Edit modal -->
     <div class="modal fade" id="editUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
         <form th:action="@{/users/edit}" method="post">
-            <div class="modal-header"><h5 class="modal-title">Edit User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Ajukan Ubah User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" name="userId" id="e_uid">
                 <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama" id="e_nama"></div>
@@ -73,8 +76,24 @@
                     <select class="form-select" name="status" id="e_status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
                 <div class="mb-2"><label class="form-label">Password baru <span class="text-muted">(kosongkan jika tidak diubah)</span></label>
                     <input class="form-control" type="password" name="password"></div>
+                <div class="mb-2"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="note" rows="2" required placeholder="Alasan perubahan (dikirim ke Admin Approval)"></textarea></div>
             </div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan</button></div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Ajukan ke Admin Approval</button></div>
+        </form>
+    </div></div></div>
+
+    <!-- Delete modal (reason required) -->
+    <div class="modal fade" id="delUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form th:action="@{/users/delete}" method="post">
+            <div class="modal-header"><h5 class="modal-title">Ajukan Hapus User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" name="userId" id="d_uid">
+                <p class="mb-2">Ajukan penghapusan user <b id="d_uid_label"></b>. Perlu approval Admin Approval sebelum dihapus.</p>
+                <div class="mb-2"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="note" rows="2" required placeholder="Alasan penghapusan (dikirim ke Admin Approval)"></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-danger">Ajukan Hapus</button></div>
         </form>
     </div></div></div>
 
@@ -86,6 +105,12 @@
             document.getElementById('e_email').value = b.dataset.email || '';
             document.getElementById('e_group').value = b.dataset.group || '';
             document.getElementById('e_status').value= b.dataset.status || '1';
+        });
+    });
+    document.querySelectorAll('.btn-del').forEach(function(b){
+        b.addEventListener('click', function(){
+            document.getElementById('d_uid').value = b.dataset.uid;
+            document.getElementById('d_uid_label').textContent = b.dataset.uid;
         });
     });
     </script>
