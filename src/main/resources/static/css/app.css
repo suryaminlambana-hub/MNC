@@ -141,6 +141,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
 
 /* ---------- Forms ---------- */
 .form-control,.form-select{border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13.5px;padding:.52rem .8rem;color:var(--ink);background-color:var(--surface)}
+/* keep room for the dropdown arrow so long option text can't run under it / into the border */
+.form-select{padding-right:2.25rem;text-overflow:ellipsis}
 .form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background-color:var(--surface);color:var(--ink)}
 .form-control::placeholder{color:var(--ink-faint)}
 .form-label{font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px}
