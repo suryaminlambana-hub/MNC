@@ -8,7 +8,8 @@
       <p class="text-muted mb-0">Tambah / ubah / hapus baris GL. Setiap perubahan menunggu approval Checker (dual control) sebelum berlaku — Workflow 8.3.</p>
     </div>
     <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" id="btnBulk" disabled><i class="fa-solid fa-pen-to-square"></i> Bulk Edit (<span id="bulkCount">0</span>)</button>
+      <a class="btn btn-outline-secondary" th:href="@{/gl-data/bulk-export}"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+      <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkModal"><i class="fa-solid fa-file-import"></i> Bulk Edit (Upload)</button>
       <button class="btn btn-primary" id="btnAdd"><i class="fa-solid fa-plus"></i> Tambah Data GL</button>
     </div>
   </div>
@@ -18,11 +19,10 @@
 
   <div class="ausy-card mt-3">
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th style="width:34px"><input type="checkbox" class="form-check-input" id="chkAll"></th><th>ID</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Paket</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
+      <thead><tr><th>ID</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Paket</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
       <tbody>
       <tr th:each="r : ${rows}"
           th:attr="data-id=${r.id},data-gltrac=${r.gltrac},data-gltrcd=${r.gltrcd},data-gltram=${r.gltram},data-gltrds=${r.gltrds},data-nopaket=${r.noPaket}">
-        <td><input type="checkbox" class="form-check-input rowchk" th:value="${r.id}"></td>
         <td th:text="${r.id}"></td>
         <td th:text="${r.gltrac}"></td>
         <td><span class="badge" th:classappend="${r.gltrcd == 'D'} ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'" th:text="${r.gltrcd}"></span></td>
@@ -35,7 +35,7 @@
           <button class="btn btn-sm btn-outline-danger btn-del"><i class="fa-solid fa-trash"></i></button>
         </td>
       </tr>
-      <tr th:if="${rows.isEmpty()}"><td colspan="9" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
+      <tr th:if="${rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
       </tbody>
     </table>
   </div>
@@ -87,25 +87,22 @@
     </div>
   </div>
 
-  <!-- Bulk edit modal -->
+  <!-- Bulk edit via Excel modal -->
   <div class="modal fade" id="bulkModal" tabindex="-1">
     <div class="modal-dialog">
-      <form class="modal-content" method="post" th:action="@{/gl-data/bulk-edit}" id="bulkForm">
-        <div class="modal-header"><h5 class="modal-title">Bulk Edit <span id="bulkN">0</span> baris GL</h5>
+      <form class="modal-content" method="post" enctype="multipart/form-data" th:action="@{/gl-data/bulk-upload}">
+        <div class="modal-header"><h5 class="modal-title">Bulk Edit via Excel</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-          <div id="bulkIds"></div>
-          <p class="text-muted small mb-3"><i class="fa-solid fa-circle-info"></i> Kosongkan field yang <b>tidak ingin diubah</b>. Field yang diisi akan diterapkan ke semua baris terpilih.</p>
-          <div class="row g-3">
-            <div class="col-6"><label class="form-label">GL Code</label><input name="gltrac" class="form-control" placeholder="(tidak diubah)"></div>
-            <div class="col-6"><label class="form-label">D/C</label>
-              <select name="gltrcd" class="form-select"><option value="">— tidak diubah —</option><option value="D">D — Debit</option><option value="C">C — Credit</option></select></div>
-            <div class="col-6"><label class="form-label">Amount</label><input name="gltram" type="number" step="0.01" class="form-control" placeholder="(tidak diubah)"></div>
-            <div class="col-6"><label class="form-label">Paket</label><input name="noPaket" class="form-control" placeholder="(tidak diubah)"></div>
-            <div class="col-12"><label class="form-label">Description</label><input name="gltrds" maxlength="40" class="form-control" placeholder="(tidak diubah)"></div>
-            <div class="col-12"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
-              <textarea name="note" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
-          </div>
+          <ol class="small text-muted ps-3 mb-3">
+            <li>Klik <b>Export Excel</b> untuk mengunduh data GL saat ini.</li>
+            <li>Ubah nilai di Excel (jangan ubah kolom <b>ID</b>).</li>
+            <li>Upload file yang sudah diubah di sini — hanya baris yang berubah yang diajukan ke Checker.</li>
+          </ol>
+          <div class="mb-2"><label class="form-label">File Excel (hasil edit) <span class="text-danger">*</span></label>
+            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required></div>
+          <div class="mb-2"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
+            <textarea name="note" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -145,29 +142,6 @@
           document.getElementById('dGlId').value=d.id; dm.show();
         });
       });
-
-      // --- Bulk selection ---
-      var bm=new bootstrap.Modal(document.getElementById('bulkModal'));
-      var btnBulk=document.getElementById('btnBulk'), chkAll=document.getElementById('chkAll');
-      function selectedIds(){ return Array.prototype.map.call(document.querySelectorAll('.rowchk:checked'),function(c){return c.value;}); }
-      function refresh(){
-        var ids=selectedIds();
-        document.getElementById('bulkCount').textContent=ids.length;
-        btnBulk.disabled = ids.length===0;
-      }
-      document.querySelectorAll('.rowchk').forEach(function(c){ c.addEventListener('change',refresh); });
-      if(chkAll) chkAll.addEventListener('change',function(){
-        document.querySelectorAll('.rowchk').forEach(function(c){ c.checked=chkAll.checked; });
-        refresh();
-      });
-      btnBulk.addEventListener('click',function(){
-        var ids=selectedIds(); if(!ids.length) return;
-        document.getElementById('bulkN').textContent=ids.length;
-        var box=document.getElementById('bulkIds'); box.innerHTML='';
-        ids.forEach(function(id){ var h=document.createElement('input'); h.type='hidden'; h.name='glIds'; h.value=id; box.appendChild(h); });
-        bm.show();
-      });
-      refresh();
     })();
   </script>
 </main>

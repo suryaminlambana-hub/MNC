@@ -62,6 +62,14 @@ public class GlChangeService {
         if (s == null || s.isBlank()) return null;
         try { return json.readValue(s, LinkedHashMap.class); } catch (Exception e) { return null; }
     }
+    private String toJsonList(List<Map<String,String>> l) {
+        try { return json.writeValueAsString(l); } catch (Exception e) { return "[]"; }
+    }
+    @SuppressWarnings("unchecked")
+    public List<Map<String,String>> parseList(String s) {
+        if (s == null || s.isBlank()) return java.util.Collections.emptyList();
+        try { return json.readValue(s, List.class); } catch (Exception e) { return java.util.Collections.emptyList(); }
+    }
     private static String n(String s){ return s==null?"":s; }
 
     // ---- maker actions: create pending request, do NOT touch live data ----
@@ -88,29 +96,53 @@ public class GlChangeService {
         return "Permintaan UBAH data GL diajukan (menunggu approval Checker).";
     }
 
-    /** Bulk edit: apply the maker's non-blank field overrides to every selected row, one EDIT request each. */
+    /**
+     * Bulk edit via Excel round-trip: maker exports GL, edits offline, re-uploads.
+     * We match each uploaded row to a live GL row by ID, keep only the rows that actually
+     * changed, and store the whole batch (before + after) in ONE change request so the
+     * checker can export/compare the Excel before & after, then approve/reject.
+     */
     @Transactional
-    public String submitBulkEdit(List<Long> glIds, Map<String,String> overrides, AusyUserDetails me, String note) {
-        if (glIds == null || glIds.isEmpty()) return "Tidak ada baris yang dipilih.";
-        Map<String,String> ov = new LinkedHashMap<>();
-        for (String k : FIELDS.keySet()) { String v = overrides.get(k); if (v != null && !v.isBlank()) ov.put(k, v.trim()); }
-        if (ov.isEmpty()) return "Isi minimal satu field yang ingin diubah.";
-        int n = 0;
-        for (Long id : glIds) {
+    public String submitBulkEditExcel(List<Map<String,String>> uploaded, AusyUserDetails me, String note) {
+        if (note == null || note.isBlank()) return "Alasan/justifikasi wajib diisi.";
+        if (uploaded == null || uploaded.isEmpty()) return "File kosong / tidak ada baris data.";
+        List<Map<String,String>> before = new ArrayList<>(), after = new ArrayList<>();
+        int skipped = 0;
+        for (Map<String,String> row : uploaded) {
+            Long id;
+            try { id = Long.valueOf(row.get("id")); } catch (Exception e) { skipped++; continue; }
             GlTabel g = gl.findById(id).orElse(null);
-            if (g == null) continue;
-            Map<String,String> after = rowMap(g);
-            after.putAll(ov);                                   // only the fields maker chose to change
-            GlChangeRequest c = base("EDIT", id, me, note);
-            c.setNoPaket(g.getNoPaket());
-            c.setBeforeJson(toJson(rowMap(g)));
-            c.setAfterJson(toJson(after));
-            cr.save(c);
-            n++;
+            if (g == null) { skipped++; continue; }
+            Map<String,String> cur = rowMap(g);
+            Map<String,String> neu = new LinkedHashMap<>(cur);
+            for (String k : FIELDS.keySet()) if (row.get(k) != null) {
+                neu.put(k, row.get(k).trim());
+            }
+            // normalise amount on both sides so "200000.00" vs "200000" isn't seen as a change
+            cur.put("gltram", normAmt(cur.get("gltram")));
+            neu.put("gltram", normAmt(neu.get("gltram")));
+            if (!cur.equals(neu)) {
+                Map<String,String> b = new LinkedHashMap<>(cur); b.put("id", String.valueOf(id));
+                Map<String,String> a = new LinkedHashMap<>(neu); a.put("id", String.valueOf(id));
+                before.add(b); after.add(a);
+            }
         }
+        if (after.isEmpty()) return "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini).";
+        GlChangeRequest c = base("BULK_EDIT", null, me, note);
+        c.setBeforeJson(toJsonList(before));
+        c.setAfterJson(toJsonList(after));
+        cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ",
-                "BULK EDIT " + n + " baris (" + String.join(",", ov.keySet()) + ") diajukan");
-        return "Bulk edit " + n + " baris GL diajukan (menunggu approval Checker).";
+                "BULK EDIT (Excel) " + after.size() + " baris diajukan (CR#" + c.getId() + ")");
+        return "Bulk edit " + after.size() + " baris GL diajukan via Excel (menunggu approval Checker)"
+                + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".");
+    }
+
+    /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
+    public List<Map<String,String>> bulkRows(Long crId, boolean after) {
+        GlChangeRequest c = cr.findById(crId).orElse(null);
+        if (c == null) return java.util.Collections.emptyList();
+        return parseList(after ? c.getAfterJson() : c.getBeforeJson());
     }
 
     @Transactional
@@ -134,13 +166,16 @@ public class GlChangeService {
 
     // ---- checker review ----
     public record Diff(String label, String before, String after, boolean changed) {}
-    public record ReviewItem(GlChangeRequest cr, List<Diff> diffs) {}
+    public record ReviewItem(GlChangeRequest cr, List<Diff> diffs, int bulkCount) {}
 
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!approval.canApprove(approverGroup, c.getMaker())) continue;
-            out.add(new ReviewItem(c, diffs(c)));
+            if ("BULK_EDIT".equals(c.getOp()))
+                out.add(new ReviewItem(c, List.of(), parseList(c.getAfterJson()).size()));
+            else
+                out.add(new ReviewItem(c, diffs(c), 0));
         }
         return out;
     }
@@ -167,6 +202,7 @@ public class GlChangeService {
             case "ADD" -> applyAdd(parse(c.getAfterJson()), c.getMaker());
             case "EDIT" -> applyEdit(c.getGlId(), parse(c.getAfterJson()));
             case "DELETE" -> applyDelete(c.getGlId());
+            case "BULK_EDIT" -> applyBulkEdit(parseList(c.getAfterJson()));
             default -> { return "Operasi tidak dikenal."; }
         }
         c.setStatus("APPROVED"); c.setChecker(me.getUsername());
@@ -218,9 +254,25 @@ public class GlChangeService {
         if (glId == null) return;
         gl.findById(glId).ifPresent(g -> { g.setActive((short)0); gl.save(g); });  // soft delete
     }
+    private void applyBulkEdit(List<Map<String,String>> rows) {
+        for (Map<String,String> a : rows) {
+            Long id;
+            try { id = Long.valueOf(a.get("id")); } catch (Exception e) { continue; }
+            gl.findById(id).ifPresent(g -> {
+                g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
+                g.setGltram(amt(a.get("gltram"))); g.setGltrds(a.get("gltrds"));
+                g.setNoPaket(a.get("noPaket"));
+                gl.save(g);
+            });
+        }
+    }
 
     private static BigDecimal amt(String s) {
         if (s == null || s.isBlank()) return BigDecimal.ZERO;
         try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
+    }
+    /** Canonical numeric form so different scales ("200000.00" vs "200000") compare equal. */
+    private static String normAmt(String s) {
+        return amt(s).stripTrailingZeros().toPlainString();
     }
 }
