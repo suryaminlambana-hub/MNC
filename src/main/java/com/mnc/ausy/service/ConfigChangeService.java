@@ -159,6 +159,21 @@ public class ConfigChangeService {
 
     public long countPending(){ return cr.countByStatus("PENDING"); }
 
+    /** Pending user changes for the Admin home "Perubahan User Pending" section. */
+    public record PendingUser(ConfigChangeRequest cr, String targetLabel) {}
+    public List<PendingUser> pendingList() {
+        List<PendingUser> out = new ArrayList<>();
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            String tgt = c.getTargetId();
+            if (tgt == null || tgt.isBlank()) {
+                Map<String,String> a = parse(c.getAfterJson());
+                tgt = (a != null && a.get("userId") != null) ? a.get("userId") : "(user baru)";
+            }
+            out.add(new PendingUser(c, tgt));
+        }
+        return out;
+    }
+
     @Transactional
     public String approve(Long crId, AusyUserDetails me, String note) {
         ConfigChangeRequest c = cr.findById(crId).orElse(null);

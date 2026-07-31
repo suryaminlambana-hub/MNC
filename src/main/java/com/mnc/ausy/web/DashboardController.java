@@ -1,6 +1,7 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.repo.*;
+import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.GlChangeService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -18,13 +19,13 @@ public class DashboardController {
     private final GlTabelRepository gl;
     private final TlogTransactionRepository tx;
     private final GlChangeService glChange;
-    private final ConfigChangeRequestRepository configCr;
+    private final ConfigChangeService configChange;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
-                               ConfigChangeRequestRepository configCr) {
+                               ConfigChangeService configChange) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
-        this.glChange = glChange; this.configCr = configCr;
+        this.glChange = glChange; this.configChange = configChange;
     }
 
     @GetMapping("/")
@@ -36,13 +37,15 @@ public class DashboardController {
         if (hasGroup(auth, "GROUP_1")) {
             model.addAttribute("totalUsers", users.count());
             model.addAttribute("totalGroups", groups.count());
+            model.addAttribute("pendingUsers", configChange.countPending());
+            model.addAttribute("pendingUserList", configChange.pendingList());
             model.addAttribute("userHistory", tx.byActivityPrefix("CONFIG_CHANGE%", PageRequest.of(0, 50)));
             return "dashboard-admin";
         }
 
         // --- Admin Approval (2): only user approvals + recent activity scoped to admin side ---
         if (hasGroup(auth, "GROUP_2")) {
-            model.addAttribute("pendingUsers", configCr.countByStatus("PENDING"));
+            model.addAttribute("pendingUsers", configChange.countPending());
             model.addAttribute("recent", tx.findByUserGroups(List.of(1, 2), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
