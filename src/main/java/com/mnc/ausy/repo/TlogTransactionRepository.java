@@ -25,6 +25,11 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
             "order by t.time_activity desc", nativeQuery = true)
     List<TlogTransaction> glHistoryForMaker(@Param("maker") String maker, @Param("makerLike") String makerLike, Pageable page);
 
+    /** Transactions whose activity name starts with a prefix, e.g. 'CONFIG_CHANGE%' for the user/config history. */
+    @Query(value = "select t.* from tlog_transaction t where t.name_activity like :prefix " +
+                   "order by t.time_activity desc", nativeQuery = true)
+    List<TlogTransaction> byActivityPrefix(@Param("prefix") String prefix, Pageable page);
+
     @Query(value = "select to_char(date_trunc('day',time_activity),'DD Mon') as d, count(*) as c " +
                    "from tlog_transaction where time_activity >= (current_date - 6) " +
                    "group by date_trunc('day',time_activity) order by date_trunc('day',time_activity)",

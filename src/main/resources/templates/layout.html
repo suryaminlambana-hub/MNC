@@ -63,10 +63,14 @@
   $(function(){
     $('table.dt').each(function(){
       var $tbl=$(this);
-      var t=$tbl.DataTable({ pageLength:10, lengthChange:false, autoWidth:false,
+      var opts={ pageLength:10, lengthChange:false, autoWidth:false,
         language:{ search:'Cari:', info:'Menampilkan _START_\u2013_END_ dari _TOTAL_',
           infoEmpty:'Tidak ada data', zeroRecords:'Tidak ditemukan', emptyTable:'Belum ada data',
-          paginate:{ previous:'\u2039', next:'\u203a' } } });
+          paginate:{ previous:'\u2039', next:'\u203a' } } };
+      // optional default sort: data-order-col="<idx>" data-order-dir="asc|desc"
+      var oc=$tbl.data('order-col');
+      if(oc!==undefined && oc!==null && oc!=='') opts.order=[ [parseInt(oc,10), ($tbl.data('order-dir')||'desc')] ];
+      var t=$tbl.DataTable(opts);
       // Optional exact-match dropdown filter for a column (data-status-col="<index>")
       var sc=$tbl.data('status-col');
       if(sc!==undefined && sc!==null && sc!==''){

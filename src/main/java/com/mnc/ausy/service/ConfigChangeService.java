@@ -48,6 +48,9 @@ public class ConfigChangeService {
     }
 
     private static String n(String s){ return s==null?"":s; }
+    private static final java.util.regex.Pattern EMAIL =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static boolean invalidEmail(String e){ return e != null && !e.isBlank() && !EMAIL.matcher(e.trim()).matches(); }
     private String groupName(Integer id){ return id==null?"":groups.findById(id).map(GroupUser::getNamaGroup).orElse("#"+id); }
     private String groupLevel(Integer id){ return id==null?"USER":groups.findById(id).map(GroupUser::getLevel).orElse("USER"); }
     private String statusLabel(Short s){ return (s!=null && s==1) ? "Active" : "Non Active"; }
@@ -74,6 +77,7 @@ public class ConfigChangeService {
         userId = userId==null?"":userId.toLowerCase().trim();
         if (userId.isEmpty()) return "Username tidak valid.";
         if (users.existsByUserId(userId)) return "Username sudah dipakai.";
+        if (invalidEmail(email)) return "Format email tidak valid.";
         Map<String,String> after = new LinkedHashMap<>();
         after.put("userId", userId); after.put("nama", n(nama)); after.put("email", n(email));
         after.put("group", groupName(idGroup)); after.put("status", "Active");
@@ -90,6 +94,7 @@ public class ConfigChangeService {
     public String submitEdit(String userId, String nama, String email, Integer idGroup, Short status,
                              String rawPass, AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
+        if (invalidEmail(email)) return "Format email tidak valid.";
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         Map<String,String> after = new LinkedHashMap<>();

@@ -67,7 +67,7 @@
             <div class="modal-body">
                 <input type="hidden" name="userId" id="e_uid">
                 <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama" id="e_nama"></div>
-                <div class="mb-2"><label class="form-label">Email</label><input class="form-control" name="email" id="e_email"></div>
+                <div class="mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email" id="e_email"></div>
                 <div class="mb-2"><label class="form-label">Group</label>
                     <select class="form-select" name="idGroup" id="e_group">
                         <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>

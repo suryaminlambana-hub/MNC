@@ -172,12 +172,29 @@ public class GlChangeService {
         List<ReviewItem> out = new ArrayList<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!approval.canApprove(approverGroup, c.getMaker())) continue;
+            if (isStale(c)) continue;
             if ("BULK_EDIT".equals(c.getOp()))
                 out.add(new ReviewItem(c, List.of(), parseList(c.getAfterJson()).size()));
             else
                 out.add(new ReviewItem(c, diffs(c), 0));
         }
         return out;
+    }
+
+    /** Pending changes whose target GL still exists & is active (drop stale ones — GL sudah tidak ada). */
+    public List<GlChangeRequest> pendingVisible() {
+        List<GlChangeRequest> out = new ArrayList<>();
+        for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) if (!isStale(c)) out.add(c);
+        return out;
+    }
+    public long pendingVisibleCount() { return pendingVisible().size(); }
+
+    /** EDIT/DELETE targeting a GL row that no longer exists (or was soft-deleted) is stale. */
+    private boolean isStale(GlChangeRequest c) {
+        if (!"EDIT".equals(c.getOp()) && !"DELETE".equals(c.getOp())) return false;   // ADD / BULK_EDIT never stale here
+        Long id = c.getGlId();
+        if (id == null) return false;
+        return gl.findById(id).map(g -> g.getActive() != null && g.getActive() == 0).orElse(true);
     }
 
     private List<Diff> diffs(GlChangeRequest c) {

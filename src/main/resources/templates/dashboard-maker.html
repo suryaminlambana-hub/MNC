@@ -90,13 +90,15 @@
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat GL
             <span class="text-muted fw-normal small">— aktivitas GL Anda &amp; keputusan Checker</span></h2>
         <div class="px-3 pb-3">
-            <table class="table table-sm table-hover align-middle mb-0 dt">
+            <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="0" data-order-dir="desc">
                 <thead><tr>
                     <th>Waktu</th><th>Oleh</th><th>Aktivitas</th><th>Detail</th>
                 </tr></thead>
                 <tbody>
                 <tr th:each="h : ${glHistory}">
-                    <td class="text-nowrap text-muted small" th:text="${#temporals.format(h.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
+                    <td class="text-nowrap text-muted small"
+                        th:attr="data-order=${#temporals.format(h.timeActivity,'yyyyMMddHHmm')}"
+                        th:text="${#temporals.format(h.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
                     <td th:text="${h.userId}"></td>
                     <td><span class="badge"
                               th:classappend="${#strings.contains(h.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(h.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"

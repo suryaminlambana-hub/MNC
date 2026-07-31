@@ -1,0 +1,42 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Beranda — AUSY</title></head>
+<main>
+    <h1 class="ausy-page-title">Beranda Admin Approval</h1>
+    <p class="text-muted">Otorisasi perubahan user dari Admin.</p>
+
+    <div class="dash-grid">
+        <div class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingUsers > 0}">PERLU OTORISASI</span>
+            <div class="dash-ico c-purple"><i class="fa-solid fa-user-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">User Menunggu Otorisasi</div></div>
+        </div>
+    </div>
+
+    <!-- Aktivitas terbaru = Audit Trail, hanya Admin + Admin Approval -->
+    <div class="ausy-card">
+        <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Terbaru (Audit Trail)
+            <span class="text-muted fw-normal small">— Admin &amp; Admin Approval</span></h2>
+        <div class="px-3 pb-3">
+            <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="0" data-order-dir="desc">
+                <thead><tr><th>Waktu</th><th>Oleh</th><th>Aktivitas</th><th>Detail</th></tr></thead>
+                <tbody>
+                <tr th:each="t : ${recent}">
+                    <td class="text-nowrap text-muted small"
+                        th:attr="data-order=${#temporals.format(t.timeActivity,'yyyyMMddHHmm')}"
+                        th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
+                    <td th:text="${t.userId}"></td>
+                    <td><span class="badge"
+                              th:classappend="${#strings.contains(t.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(t.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
+                              th:text="${t.nameActivity}"></span></td>
+                    <td class="small" th:text="${t.tinfo}"></td>
+                </tr>
+                <tr th:if="${recent.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada aktivitas.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</html>
