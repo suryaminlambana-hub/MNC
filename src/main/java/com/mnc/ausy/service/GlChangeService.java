@@ -189,12 +189,21 @@ public class GlChangeService {
     }
     public long pendingVisibleCount() { return pendingVisible().size(); }
 
-    /** EDIT/DELETE targeting a GL row that no longer exists (or was soft-deleted) is stale. */
+    /** A pending change is stale when the GL it refers to no longer exists in gl_tabel:
+     *  EDIT/DELETE -> target row gone/soft-deleted; ADD -> its paket no longer has any rows. */
     private boolean isStale(GlChangeRequest c) {
-        if (!"EDIT".equals(c.getOp()) && !"DELETE".equals(c.getOp())) return false;   // ADD / BULK_EDIT never stale here
-        Long id = c.getGlId();
-        if (id == null) return false;
-        return gl.findById(id).map(g -> g.getActive() != null && g.getActive() == 0).orElse(true);
+        String op = c.getOp();
+        if ("EDIT".equals(op) || "DELETE".equals(op)) {
+            Long id = c.getGlId();
+            if (id == null) return false;
+            return gl.findById(id).map(g -> g.getActive() != null && g.getActive() == 0).orElse(true);
+        }
+        if ("ADD".equals(op)) {
+            String pkt = c.getNoPaket();
+            if (pkt == null || pkt.isBlank()) return false;      // no paket reference -> can't judge, keep
+            return gl.countByNoPaket(pkt) == 0;                  // paket sudah tidak ada -> stale
+        }
+        return false;   // BULK_EDIT
     }
 
     private List<Diff> diffs(GlChangeRequest c) {

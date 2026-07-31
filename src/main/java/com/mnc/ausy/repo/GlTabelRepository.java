@@ -32,6 +32,9 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     List<GlTabel> findTop200ByActiveAndStatusDualNotOrderByIdDesc(Short active, String statusDual);
     long countByActiveAndStatusDualNot(Short active, String statusDual);
 
+    // how many GL rows still exist for a paket (0 = paket sudah tidak ada -> pending ADD jadi stale)
+    long countByNoPaket(String noPaket);
+
     @Modifying @Transactional
     @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u")
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
