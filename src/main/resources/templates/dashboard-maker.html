@@ -84,23 +84,26 @@
         </div>
     </div>
 
-    <!-- Riwayat Upload -->
+    <!-- Riwayat GL: request maker + keputusan checker -->
     <div class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-            <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat Upload GL</h2>
+            <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat GL
+            <span class="text-muted fw-normal small">— aktivitas GL Anda &amp; keputusan Checker</span></h2>
         <div class="px-3 pb-3">
             <table class="table table-sm table-hover align-middle mb-0 dt">
                 <thead><tr>
-                    <th>Waktu</th><th>Nama File</th><th class="text-end">Jml Baris</th><th>User</th><th>Status</th>
+                    <th>Waktu</th><th>Oleh</th><th>Aktivitas</th><th>Detail</th>
                 </tr></thead>
                 <tbody>
-                <tr th:each="u : ${uploadHistory}">
-                    <td class="text-nowrap text-muted small" th:text="${u.adddt != null ? #temporals.format(u.adddt,'dd-MM-yyyy HH:mm') : ''}"></td>
-                    <td class="small" th:text="${u.fileName}"></td>
-                    <td class="text-end" th:text="${u.jmlData}"></td>
-                    <td th:text="${u.userId}"></td>
-                    <td><span class="badge bg-success-subtle text-success" th:text="${u.status}"></span></td>
+                <tr th:each="h : ${glHistory}">
+                    <td class="text-nowrap text-muted small" th:text="${#temporals.format(h.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
+                    <td th:text="${h.userId}"></td>
+                    <td><span class="badge"
+                              th:classappend="${#strings.contains(h.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(h.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
+                              th:text="${h.nameActivity}"></span></td>
+                    <td class="small" th:text="${h.tinfo}"></td>
                 </tr>
+                <tr th:if="${glHistory.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada riwayat aktivitas GL.</td></tr>
                 </tbody>
             </table>
         </div>

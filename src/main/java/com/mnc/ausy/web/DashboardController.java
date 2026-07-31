@@ -31,12 +31,16 @@ public class DashboardController {
     public String dashboard(Model model, Authentication auth) {
         // --- Maker gets a task-focused home (no audit trail) ---
         if (hasGroup(auth, "GROUP_3")) {
-            model.addAttribute("activeGl", gl.countByActive((short) 1));
-            model.addAttribute("glActiveList", gl.findTop200ByActiveOrderByIdDesc((short) 1));
+            // "GL Aktif" = sudah lolos approval (bukan yang masih PENDING otorisasi)
+            model.addAttribute("activeGl", gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
+            model.addAttribute("glActiveList", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING"));
             model.addAttribute("pendingPakets", gl.pendingPakets().size());
             model.addAttribute("pendingChanges", cr.countByStatus("PENDING"));
             model.addAttribute("pendingChangeList", cr.findByStatusOrderByCreatedAtDesc("PENDING"));
-            model.addAttribute("uploadHistory", uploads.findTop50ByOrderByAdddtDesc());
+            // Riwayat GL: request maker (upload/add/edit/delete) + keputusan checker atas request-nya
+            String me = auth.getName();
+            model.addAttribute("glHistory",
+                    tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
             return "dashboard-maker";
         }
 

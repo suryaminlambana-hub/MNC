@@ -28,6 +28,10 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     List<GlTabel> findTop200ByActiveOrderByIdDesc(Short active);
     long countByActive(Short active);
 
+    // "GL Aktif" excludes rows still awaiting checker otorisasi (statusDual = PENDING)
+    List<GlTabel> findTop200ByActiveAndStatusDualNotOrderByIdDesc(Short active, String statusDual);
+    long countByActiveAndStatusDualNot(Short active, String statusDual);
+
     @Modifying @Transactional
     @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u")
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
