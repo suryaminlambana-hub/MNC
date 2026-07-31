@@ -31,7 +31,8 @@ public class GlChangeController {
     // ---- Maker ----
     @GetMapping("/gl-data")
     public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        model.addAttribute("rows", gl.findTop200ByActiveOrderByIdDesc((short)1));
+        // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif)
+        model.addAttribute("rows", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
         model.addAttribute("fields", GlChangeService.FIELDS);
         return "gl-data/index";
     }
@@ -60,7 +61,7 @@ public class GlChangeController {
     /** Bulk edit step 1 — maker downloads current GL data as an editable Excel (ID + editable fields). */
     @GetMapping("/gl-data/bulk-export")
     public void bulkExport(HttpServletResponse resp) throws Exception {
-        List<GlTabel> rows = gl.findTop200ByActiveOrderByIdDesc((short)1);
+        List<GlTabel> rows = gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING");
         List<List<Object>> data = new ArrayList<>();
         for (GlTabel g : rows) data.add(Arrays.asList(
                 g.getId(), s(g.getGltrac()), s(g.getGltrcd()),

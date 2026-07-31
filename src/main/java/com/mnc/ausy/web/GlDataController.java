@@ -39,7 +39,10 @@ public class GlDataController {
 
     @GetMapping("/gl-legacy")
     public String list(Model model) {
-        List<GlTabel> rows = gl.findAll();
+        // Only GL that has passed checker otorisasi (exclude rows still PENDING) — Workflow 8.x
+        List<GlTabel> rows = gl.findAll().stream()
+                .filter(r -> !"PENDING".equals(r.getStatusDual()))
+                .collect(Collectors.toList());
         Set<String> reg = registeredKeys();
         long registeredCount = rows.stream().filter(r -> isRegistered(reg, r)).count();
         BigDecimal totalAmount = rows.stream()
@@ -58,7 +61,10 @@ public class GlDataController {
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         List<GlTabel> all = gl.findAll();
         Set<String> reg = registeredKeys();
-        List<GlTabel> rows = all.stream().filter(r -> isRegistered(reg, r)).collect(Collectors.toList());
+        // export only registered rows that have passed otorisasi (not PENDING)
+        List<GlTabel> rows = all.stream()
+                .filter(r -> !"PENDING".equals(r.getStatusDual()) && isRegistered(reg, r))
+                .collect(Collectors.toList());
 
         List<String> head = List.of("No","ID","Paket","NoGL","D/C","GL Name","Description","Amount","Tgl","Uploader","GLTRRF","Registered");
         List<List<Object>> data = new ArrayList<>();
