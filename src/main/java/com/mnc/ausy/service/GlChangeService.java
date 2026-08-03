@@ -189,39 +189,28 @@ public class GlChangeService {
     }
     public long pendingVisibleCount() { return pendingVisible().size(); }
 
+    /** Pending requests older than this are treated as abandoned/junk and auto-hidden. */
+    private static final int STALE_DAYS = 7;
+
     /**
-     * A pending change is "stale" (auto-hidden) when the GL data it refers to no longer exists —
-     * per QA (Shella): valid pending changes always show until approved/rejected, but old junk
-     * (leftover from before checker-approval existed) whose data is gone is hidden.
-     *   EDIT/DELETE : the target GL row (gl_id) is gone or soft-deleted.
-     *   ADD         : it names a paket, and that paket has no rows left in gl_tabel.
-     *                 Paket is matched tolerantly ("2" vs "02") so VALID ADDs are never hidden.
-     *                 An ADD without a paket reference is kept (can't be judged as junk).
-     *   BULK_EDIT   : always shown.
+     * A pending change is "stale" (auto-hidden) per QA (Shella): valid pending changes show until
+     * approved/rejected, but old junk (leftover from the pre-approval bypass era) is hidden.
+     * Matching by paket alone proved unreliable because paket numbers get reused (an old junk ADD
+     * to "Paket 03" reappeared when a NEW paket 03 was uploaded — "kadang muncul kadang ngga"), so
+     * the primary rule is AGE: anything still pending after {@link #STALE_DAYS} days is abandoned/junk.
+     * On top of that, EDIT/DELETE are also hidden the moment their target GL row is gone/soft-deleted.
      */
     private boolean isStale(GlChangeRequest c) {
+        // abandoned/junk: pending far too long (reliable — not affected by paket-number reuse)
+        if (c.getCreatedAt() != null && c.getCreatedAt().isBefore(LocalDateTime.now().minusDays(STALE_DAYS)))
+            return true;
         String op = c.getOp();
         if ("EDIT".equals(op) || "DELETE".equals(op)) {
             Long id = c.getGlId();
             if (id == null) return false;
             return gl.findById(id).map(g -> g.getActive() != null && g.getActive() == 0).orElse(true);
         }
-        if ("ADD".equals(op)) {
-            String pkt = c.getNoPaket();
-            if (pkt == null || pkt.isBlank()) return false;
-            return !paketExists(pkt.trim());
-        }
-        return false;   // BULK_EDIT
-    }
-    /** Does the paket still have any rows in gl_tabel? Tolerates format differences (2 vs 02). */
-    private boolean paketExists(String pkt) {
-        if (gl.countByNoPaket(pkt) > 0) return true;
-        try {
-            int n = Integer.parseInt(pkt);
-            if (gl.countByNoPaket(String.format("%02d", n)) > 0) return true;
-            if (gl.countByNoPaket(String.valueOf(n)) > 0) return true;
-        } catch (NumberFormatException ignore) { /* non-numeric paket: exact match only */ }
-        return false;
+        return false;   // recent ADD / BULK_EDIT always shown
     }
 
     private List<Diff> diffs(GlChangeRequest c) {
