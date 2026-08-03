@@ -121,14 +121,14 @@ public class GlChangeController {
     public String approve(@RequestParam Long crId, @RequestParam(required=false) String note,
                           @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("ok", service.approve(crId, me, note));
-        return "redirect:/gl-change/review";
+        return "redirect:/otorisasi-gl";
     }
 
     @PostMapping("/gl-change/reject")
     public String reject(@RequestParam Long crId, @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("warn", service.reject(crId, me, note));
-        return "redirect:/gl-change/review";
+        return "redirect:/otorisasi-gl";
     }
 
     private static String s(String v){ return v==null?"":v; }

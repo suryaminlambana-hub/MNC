@@ -5,7 +5,7 @@
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
       <h1 class="ausy-page-title">Rekapitulasi GL</h1>
-      <p class="text-muted mb-0">Ringkasan paket GL yang menunggu otorisasi, beserta volume dan posisi Debit/Credit.</p>
+      <p class="text-muted mb-0">Ringkasan GL aktif (sudah diotorisasi), beserta volume dan posisi Debit/Credit.</p>
     </div>
     <a class="btn btn-primary" th:href="@{/rekap/export}"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
   </div>
@@ -26,7 +26,7 @@
         <td><span th:if="${r.balanced}" class="badge bg-success-subtle text-success">Balance</span>
             <span th:unless="${r.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
       </tr>
-      <tr th:if="${rows.isEmpty()}"><td colspan="7" class="text-center text-muted py-3">Tidak ada paket menunggu otorisasi.</td></tr>
+      <tr th:if="${rows.isEmpty()}"><td colspan="7" class="text-center text-muted py-3">Belum ada GL aktif.</td></tr>
       </tbody>
       <tfoot th:unless="${rows.isEmpty()}">
         <tr class="fw-semibold border-top">

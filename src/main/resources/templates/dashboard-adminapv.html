@@ -14,6 +14,40 @@
         </div>
     </div>
 
+    <!-- User menunggu otorisasi (collapsible + tombol ke halaman otorisasi) — mirror Checker -->
+    <div class="ausy-card">
+        <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-1">
+            <button class="ausy-collapse-hd flex-grow-1 p-0" type="button" data-bs-toggle="collapse" data-bs-target="#pendingUserBox"
+                    aria-expanded="true" aria-controls="pendingUserBox" style="border:0;background:none">
+                <span><i class="fa-solid fa-user-clock text-muted"></i> User Menunggu Otorisasi
+                    <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${pendingUsers}">0</span></span>
+                <i class="fa-solid fa-chevron-up ausy-collapse-caret"></i>
+            </button>
+            <a class="btn btn-sm btn-primary ms-2" th:href="@{/config-change/review}"><i class="fa-solid fa-user-check"></i> Buka Otorisasi User</a>
+        </div>
+        <div class="collapse show" id="pendingUserBox">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead><tr>
+                    <th class="ps-3">Waktu</th><th>Operasi</th><th>Target User</th><th>Oleh (Admin)</th><th class="pe-3">Catatan</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="p : ${pendingUserList}">
+                    <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(p.cr.createdAt,'dd-MM HH:mm')}"></td>
+                    <td><span class="badge"
+                              th:classappend="${p.cr.op == 'ADD'} ? 'bg-success-subtle text-success' : (${p.cr.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
+                              th:text="${p.cr.op}"></span></td>
+                    <td th:text="${p.targetLabel}"></td>
+                    <td th:text="${p.cr.maker}"></td>
+                    <td class="small text-muted pe-3" th:text="${p.cr.noteMaker}"></td>
+                </tr>
+                <tr th:if="${pendingUserList.isEmpty()}">
+                    <td colspan="5" class="text-center text-muted py-4">Tidak ada user yang menunggu otorisasi.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Aktivitas terbaru = Audit Trail, hanya Admin + Admin Approval -->
     <div class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">

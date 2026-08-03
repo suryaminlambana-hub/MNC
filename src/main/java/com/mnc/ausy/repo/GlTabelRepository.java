@@ -23,6 +23,14 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> pendingPakets();
 
+    /** Recap of GL that has passed otorisasi (active & not PENDING) — konsisten dengan List GL. */
+    @Query(value = "select no_paket, gltrus, count(*), " +
+                   "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
+                   "from gl_tabel where active=1 and (status_dual is null or status_dual <> 'PENDING') " +
+                   "group by no_paket, gltrus order by no_paket", nativeQuery = true)
+    List<Object[]> approvedPakets();
+
     List<GlTabel> findByNoPaketAndGltrusOrderById(String paket, String inputer);
     List<GlTabel> findByNoPaketOrderById(String paket);
     List<GlTabel> findTop200ByActiveOrderByIdDesc(Short active);

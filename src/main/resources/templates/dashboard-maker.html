@@ -11,11 +11,6 @@
             <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>
             <div><div class="dash-num" th:text="${activeGl}">0</div><div class="dash-label">Baris GL Aktif</div></div>
         </div>
-        <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
-            <span class="dash-pill" th:if="${pendingPakets > 0}">MENUNGGU CHECKER</span>
-            <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
-            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Paket Menunggu Otorisasi</div></div>
-        </div>
         <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">MENUNGGU CHECKER</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
@@ -38,6 +33,15 @@
                     <th>Catatan Maker</th><th class="pe-3">Status</th>
                 </tr></thead>
                 <tbody>
+                <!-- Upload paket yang menunggu otorisasi checker -->
+                <tr th:each="p : ${pendingPaketList}">
+                    <td class="ps-3 text-muted small text-nowrap">—</td>
+                    <td><span class="badge bg-info-subtle text-info">UPLOAD</span></td>
+                    <td class="small">Paket <span th:text="${p[0]}"></span> · <span th:text="${p[2]}"></span> baris</td>
+                    <td class="small text-muted">Upload GL menunggu otorisasi</td>
+                    <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU CHECKER</span></td>
+                </tr>
+                <!-- Perubahan GL (add/edit/delete) -->
                 <tr th:each="c : ${pendingChangeList}">
                     <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(c.createdAt,'dd-MM HH:mm')}"></td>
                     <td><span class="badge"
@@ -50,7 +54,7 @@
                     <td class="small text-muted" th:text="${c.noteMaker}"></td>
                     <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU CHECKER</span></td>
                 </tr>
-                <tr th:if="${pendingChangeList.isEmpty()}">
+                <tr th:if="${pendingPaketList.isEmpty() and pendingChangeList.isEmpty()}">
                     <td colspan="5" class="text-center text-muted py-4">Tidak ada perubahan GL yang menunggu persetujuan.</td>
                 </tr>
                 </tbody>

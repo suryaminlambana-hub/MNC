@@ -46,6 +46,7 @@ public class DashboardController {
         // --- Admin Approval (2): only user approvals + recent activity scoped to admin side ---
         if (hasGroup(auth, "GROUP_2")) {
             model.addAttribute("pendingUsers", configChange.countPending());
+            model.addAttribute("pendingUserList", configChange.pendingList());
             model.addAttribute("recent", tx.findByUserGroups(List.of(1, 2), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
@@ -54,9 +55,12 @@ public class DashboardController {
         if (hasGroup(auth, "GROUP_3")) {
             model.addAttribute("activeGl", gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
             model.addAttribute("glActiveList", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING"));
-            model.addAttribute("pendingPakets", gl.pendingPakets().size());
-            model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
-            model.addAttribute("pendingChangeList", glChange.pendingVisible());
+            // "Perubahan GL Pending" = upload paket menunggu otorisasi + change request (add/edit/delete)
+            List<Object[]> pendingPaketList = gl.pendingPakets();
+            List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible();
+            model.addAttribute("pendingPaketList", pendingPaketList);
+            model.addAttribute("pendingChangeList", pendingChangeList);
+            model.addAttribute("pendingChanges", pendingPaketList.size() + pendingChangeList.size());
             String me = auth.getName();
             model.addAttribute("glHistory", tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
             return "dashboard-maker";

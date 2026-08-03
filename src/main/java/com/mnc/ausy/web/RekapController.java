@@ -30,7 +30,7 @@ public class RekapController {
         List<String> head = List.of("Paket","Uploader","Jumlah Baris","Debit","Credit","Balance");
         List<List<Object>> data = new ArrayList<>();
         long totJml = 0; BigDecimal totD = BigDecimal.ZERO, totC = BigDecimal.ZERO;
-        for (Object[] r : gl.pendingPakets()) {
+        for (Object[] r : gl.approvedPakets()) {
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
             data.add(Arrays.asList(r[0], r[1], jml, d, c, d.compareTo(c) == 0 ? "Balance" : "Tidak Balance"));
@@ -45,7 +45,7 @@ public class RekapController {
     public String rekap(Model model) {
         List<Row> rows = new ArrayList<>();
         long totJml = 0; BigDecimal totD = BigDecimal.ZERO, totC = BigDecimal.ZERO; long maxJml = 1;
-        for (Object[] r : gl.pendingPakets()) {
+        for (Object[] r : gl.approvedPakets()) {
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
             rows.add(new Row((String) r[0], (String) r[1], jml, d, c, d.compareTo(c) == 0));

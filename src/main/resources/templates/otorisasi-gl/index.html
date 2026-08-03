@@ -1,0 +1,171 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Manajemen Otorisasi GL — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Manajemen Otorisasi GL</h1>
+  <p class="text-muted">Otorisasi upload GL (export ke core banking) &amp; otorisasi perubahan GL — dalam satu halaman.</p>
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabUpload" type="button">
+      <i class="fa-solid fa-file-circle-check"></i> Otorisasi Upload GL
+      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(pakets)}">0</span></button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabChange" type="button">
+      <i class="fa-solid fa-clipboard-check"></i> Otorisasi Perubahan GL
+      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(items)}">0</span></button></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- ===== TAB 1: Otorisasi Upload GL (export) ===== -->
+    <div class="tab-pane fade show active" id="tabUpload">
+      <div class="ausy-card">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>No</th><th>Paket</th><th>Uploader</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
+          <tbody>
+          <tr th:each="p,i : ${pakets}">
+            <td th:text="${i.count}"></td>
+            <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p.paket}"></span></span></td>
+            <td th:text="${p.inputer}"></td>
+            <td class="text-end" th:text="${p.jml}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(p.credit,1,'POINT',2,'COMMA')}"></td>
+            <td><span th:if="${p.balanced}" class="badge bg-success-subtle text-success">Balance</span>
+                <span th:unless="${p.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" th:href="@{'/report/jurnal/'+${p.paket}}" target="_blank"><i class="fa-solid fa-file-pdf"></i> PDF</a>
+              <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve &amp; export paket ini ke core banking?');">
+                <input type="hidden" name="paket" th:value="${p.paket}"><input type="hidden" name="inputer" th:value="${p.inputer}">
+                <button class="btn btn-sm btn-success" th:disabled="${!p.balanced}"><i class="fa-solid fa-check"></i> Approve &amp; Export</button>
+              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger btn-reject-paket"
+                      th:attr="data-paket=${p.paket},data-inputer=${p.inputer}"><i class="fa-solid fa-xmark"></i> Reject</button>
+            </td>
+          </tr>
+          <tr th:if="${pakets.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada paket upload yang menunggu otorisasi.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== TAB 2: Otorisasi Perubahan GL ===== -->
+    <div class="tab-pane fade" id="tabChange">
+      <div class="ausy-review">
+        <div th:if="${items.isEmpty()}" class="ausy-card text-center text-muted py-4">
+          Tidak ada permintaan perubahan GL yang menunggu otorisasi.
+        </div>
+        <div class="ausy-card mb-3" th:each="it : ${items}" style="padding:16px 18px">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge fs-6"
+                    th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : (${it.cr.op == 'BULK_EDIT'} ? 'bg-info text-dark' : 'bg-primary'))"
+                    th:text="${it.cr.op == 'BULK_EDIT' ? 'BULK EDIT' : it.cr.op}">EDIT</span>
+              <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
+              <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
+              <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
+            </div>
+            <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
+          </div>
+
+          <div th:if="${it.cr.op == 'BULK_EDIT'}" class="mb-2">
+            <p class="mb-2"><i class="fa-solid fa-file-excel text-muted"></i>
+              Bulk edit via Excel — <b th:text="${it.bulkCount}">0</b> baris diubah. Unduh &amp; bandingkan:</p>
+            <div class="d-flex gap-2 flex-wrap">
+              <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-change/' + ${it.cr.id} + '/export/before'}"><i class="fa-solid fa-download"></i> Export Before</a>
+              <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-change/' + ${it.cr.id} + '/export/after'}"><i class="fa-solid fa-download"></i> Export After</a>
+            </div>
+          </div>
+
+          <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
+            <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
+            <tbody>
+            <tr th:each="d : ${it.diffs}"><td class="text-muted" th:text="${d.label}"></td><td><b th:text="${d.after}"></b></td></tr>
+            </tbody>
+          </table>
+
+          <table th:if="${it.cr.op == 'EDIT' or it.cr.op == 'DELETE'}" class="table table-sm align-middle mb-2 ausy-diff">
+            <thead><tr><th style="width:30%">Field</th><th style="width:35%">Before</th><th style="width:35%">After</th></tr></thead>
+            <tbody>
+            <tr th:each="d : ${it.diffs}" th:classappend="${d.changed} ? 'table-warning'">
+              <td class="text-muted" th:text="${d.label}"></td>
+              <td th:text="${d.before}"></td>
+              <td><b th:if="${d.changed}" th:text="${d.after}"></b><span th:unless="${d.changed}" th:text="${d.after}"></span></td>
+            </tr>
+            </tbody>
+          </table>
+
+          <p class="small text-muted mb-3" th:if="${it.cr.noteMaker}"><i class="fa-solid fa-comment-dots"></i> Justifikasi maker: <span th:text="${it.cr.noteMaker}"></span></p>
+
+          <div class="d-flex gap-2">
+            <form th:action="@{/gl-change/approve}" method="post" onsubmit="return confirm('Approve &amp; terapkan perubahan ini ke database GL?');">
+              <input type="hidden" name="crId" th:value="${it.cr.id}">
+              <button class="btn btn-sm btn-success"><i class="fa-solid fa-check"></i> Approve</button>
+            </form>
+            <button class="btn btn-sm btn-outline-danger btn-reject-cr" th:attr="data-cr=${it.cr.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reject modal: PAKET upload -->
+  <div class="modal fade" id="rejectPaketModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" th:action="@{/otorisasi/reject}" method="post">
+        <div class="modal-header"><h5 class="modal-title">Tolak Paket <span id="rjPaket"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="paket" id="rjPaketIn"><input type="hidden" name="inputer" id="rjInputer">
+          <label class="form-label">Catatan penolakan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required placeholder="Alasan penolakan (tercatat di audit trail)"></textarea>
+          <p class="text-muted small mt-2 mb-0">Data paket dihapus dari antrian; tercatat di audit trail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">Tolak Paket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reject modal: change request -->
+  <div class="modal fade" id="rejectCrModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" th:action="@{/gl-change/reject}" method="post">
+        <div class="modal-header"><h5 class="modal-title">Tolak Perubahan CR#<span id="crNo"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="crId" id="crIdIn">
+          <label class="form-label">Catatan penolakan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required></textarea>
+          <p class="text-muted small mt-2 mb-0">Data GL tidak diubah. Alasan tercatat di audit trail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">Tolak</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var mp=new bootstrap.Modal(document.getElementById('rejectPaketModal'));
+      document.querySelectorAll('.btn-reject-paket').forEach(function(b){
+        b.addEventListener('click',function(){
+          document.getElementById('rjPaket').textContent=b.dataset.paket;
+          document.getElementById('rjPaketIn').value=b.dataset.paket;
+          document.getElementById('rjInputer').value=b.dataset.inputer; mp.show();
+        });
+      });
+      var mc=new bootstrap.Modal(document.getElementById('rejectCrModal'));
+      document.querySelectorAll('.btn-reject-cr').forEach(function(b){
+        b.addEventListener('click',function(){
+          document.getElementById('crNo').textContent=b.dataset.cr;
+          document.getElementById('crIdIn').value=b.dataset.cr; mc.show();
+        });
+      });
+    })();
+  </script>
+</main>
+</html>

@@ -25,7 +25,7 @@ public class OtorisasiController {
                           @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         OtorisasiService.ExportResult r = service.export(paket, inputer, me.getIdGroup(), me.getUsername());
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-        return "redirect:/otorisasi";
+        return "redirect:/otorisasi-gl";
     }
 
     @PostMapping("/reject")
@@ -33,6 +33,6 @@ public class OtorisasiController {
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         OtorisasiService.ExportResult r = service.reject(paket, inputer, me.getIdGroup(), me.getUsername(), note);
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-        return "redirect:/otorisasi";
+        return "redirect:/otorisasi-gl";
     }
 }

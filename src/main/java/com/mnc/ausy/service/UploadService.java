@@ -136,7 +136,7 @@ public class UploadService {
             audit.transaction(username, "UPLOAD", "Paket " + paket + " — " + n + " baris (D=" + res.debit + ", C=" + res.credit + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
 
             res.success = true;
-            res.message = "Upload berhasil — Paket " + paket + " dibuat (" + n + " baris jurnal). " +
+            res.message = "Upload berhasil — Paket " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
                           (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!");
             return res;
         }
