@@ -84,7 +84,13 @@ public class OtorisasiService {
                 }
             }
 
-            gl.deletePaket(paket, inputer);   // transaksi done -> migrate out of gl_tabel
+            // Approve: JANGAN hapus dari gl_tabel — tandai sudah diotorisasi & ter-export supaya
+            // datanya tetap tampil sebagai "GL Aktif" di sisi Maker (bukan hilang setelah approve).
+            for (GlTabel g : rows) {
+                g.setStatusDual("APPROVED");
+                g.setStatusPrint("SUDAH UPLOAD");
+            }
+            gl.saveAll(rows);
             audit.transaction(checker, "OTORISASI_APPROVE",
                     "Paket " + paket + " (maker=" + inputer + ") di-approve & export, " + rows.size() + " baris -> " + pkt.getFileName());
             return new ExportResult(true, "Otorisasi berhasil — Paket " + paket + " diproses (" + rows.size() + " baris). File: " + pkt.getFileName() + "." + ftpNote, rows.size(), pkt.getFileName().toString());
