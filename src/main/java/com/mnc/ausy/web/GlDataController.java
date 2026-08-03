@@ -84,7 +84,8 @@ public class GlDataController {
 
     @GetMapping("/gl-delete")
     public String deletePage(Model model) {
-        model.addAttribute("pakets", gl.pendingPakets());
+        // Sinkron dengan List GL: tampilkan paket GL aktif (sudah diotorisasi) agar bisa dihapus
+        model.addAttribute("pakets", gl.approvedPakets());
         return "gl-delete/index";
     }
 
