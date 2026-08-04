@@ -63,6 +63,12 @@
   $(function(){
     $('table.dt').each(function(){
       var $tbl=$(this);
+      // strip a single-cell colspan placeholder ("Belum ada data") empty-state row so DataTables
+      // doesn't miscount columns (tn/18); DataTables shows its own emptyTable message instead.
+      $tbl.find('tbody > tr').each(function(){
+        var $tds=$(this).children('td');
+        if($tds.length===1 && $tds.is('[colspan]')) $(this).remove();
+      });
       var opts={ pageLength:10, lengthChange:false, autoWidth:false,
         language:{ search:'Cari:', info:'Menampilkan _START_\u2013_END_ dari _TOTAL_',
           infoEmpty:'Tidak ada data', zeroRecords:'Tidak ditemukan', emptyTable:'Belum ada data',
