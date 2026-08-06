@@ -65,10 +65,11 @@ public class OtorisasiService {
             Path dir = Paths.get(txtDir);
             Files.createDirectories(dir);
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-            String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+            // ACCTXT.<DDMMYY> — pakai tanggal generate hari ini (mis. 6 Agu 2026 -> ACCTXT.060826)
+            String ddmmyy = LocalDateTime.now().format(DateTimeFormatter.ofPattern("ddMMyy"));
             Path pkt = dir.resolve("ACCTXT_" + ts + "_" + paket + ".txt");
             Files.writeString(pkt, content.toString(), StandardCharsets.UTF_8);
-            Files.writeString(dir.resolve("ACCTXT." + yymmdd), content.toString(),
+            Files.writeString(dir.resolve("ACCTXT." + ddmmyy), content.toString(),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 
             // Transfer Out to GL FTP server (Data Flow §9.g) — only when ausy.ftp.host is set
