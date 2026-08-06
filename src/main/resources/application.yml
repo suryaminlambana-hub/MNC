@@ -11,9 +11,9 @@ spring:
       max-file-size: 25MB
       max-request-size: 30MB
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:ausy_sb}
-    username: ${DB_USER:erosjovian}
-    password: ${DB_PASS:}
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:ausy}
+    username: ${DB_USER:ausy_user}
+    password: ${DB_PASS:ausy_pass_2026}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
