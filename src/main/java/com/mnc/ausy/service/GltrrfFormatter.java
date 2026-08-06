@@ -7,9 +7,18 @@ import java.math.BigDecimal;
 public final class GltrrfFormatter {
     private GltrrfFormatter() {}
 
-    private static String s(Object o) { return o == null ? "" : o.toString().trim(); }
+    /** Trim + keep only printable ASCII (0x20..0x7E); non-ASCII/control -> space (AS400-safe). */
+    private static String s(Object o) {
+        if (o == null) return "";
+        String v = o.toString().trim();
+        StringBuilder sb = new StringBuilder(v.length());
+        for (int i = 0; i < v.length(); i++) { char c = v.charAt(i); sb.append(c >= 0x20 && c <= 0x7E ? c : ' '); }
+        return sb.toString();
+    }
     private static String padL0(String v, int n) { v = v == null ? "" : v; return v.length() >= n ? v : "0".repeat(n - v.length()) + v; }
     private static String padR (String v, int n) { v = v == null ? "" : v; return v.length() >= n ? v : v + " ".repeat(n - v.length()); }
+    /** Fixed-width field: sanitize, truncate to n, right-pad with spaces to exactly n (guarantees record length). */
+    private static String fit(String v, int n) { String x = s(v); if (x.length() > n) x = x.substring(0, n); return padR(x, n); }
 
     static String gltrbr(String v){ return padL0(s(v),5); }
     static String gltrac(String v){ return padL0(s(v),11); }
@@ -20,18 +29,24 @@ public final class GltrrfFormatter {
     static String gltrds(String v){ String x=s(v); if(x.length()>40)x=x.substring(0,40); return padR(x,40); }
     static String gltrrf(String v){ return padR(s(v),20); }
     static String gltrus(String v){ String x=s(v); if(x.length()>10)x=x.substring(0,10); return padR(x,10); }
-    static String glflag(String v){ return (v==null||v.isEmpty())?" ":v; }
+    static String glflag(String v){ String x=s(v); return x.isEmpty()?" ":fit(x,1); }
     static String glrate(){ return "0000000000000"; }
     static String sisaTxt(){ return "0000000000000000000" + " ".repeat(40); }
-    static String glprdc(String v){ return (v==null||v.isEmpty())?"00000":v; }
+    static String glprdc(String v){ String x=s(v); return x.isEmpty()?"00000":x; }
+    // Fields the PHP left un-padded — now fixed-width so a null/short value can't shift the record.
+    static String gltrcy(String v){ return fit(v,3); }   // currency (IDR)
+    static String gltrcd(String v){ return fit(v,1); }   // D / C
+    static String gltrpd(String v){ return fit(v,6); }   // posting date ddMMyy
+    static String glsrc (String v){ return fit(v,1); }   // source p / m
+    static String glotcc(String v){ return fit(v,3); }   // offset currency
 
     /** One fixed-width line for a GL row, matching the PHP otorisasi assembly. */
     public static String line(GlTabel r) {
         StringBuilder b = new StringBuilder();
-        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc())).append(s(r.getGltrcy()));
-        b.append(gltrfy(r.getGltrfy())).append(s(r.getGltrcd())).append(s(r.getGltrpd())).append(gltram(r.getGltram())).append(gltrds(r.getGltrds()));
+        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc())).append(gltrcy(r.getGltrcy()));
+        b.append(gltrfy(r.getGltrfy())).append(gltrcd(r.getGltrcd())).append(gltrpd(r.getGltrpd())).append(gltram(r.getGltram())).append(gltrds(r.getGltrds()));
         b.append(gltrrf(r.getGltrrf())).append(gltrus(r.getGltrus())).append(glflag(r.getGlflag())).append(glresp(r.getGlresp())).append(gltram(r.getGleqam()));
-        b.append(glrate()).append(s(r.getGlsrc())).append(s(r.getGlotcc())).append(' ').append(gltram(r.getGlotam())).append(glprdc(r.getGlprdc()));
+        b.append(glrate()).append(glsrc(r.getGlsrc())).append(glotcc(r.getGlotcc())).append(' ').append(gltram(r.getGlotam())).append(glprdc(r.getGlprdc()));
         b.append(sisaTxt());
         return b.toString();
     }
