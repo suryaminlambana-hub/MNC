@@ -70,19 +70,18 @@ public class OtorisasiService {
         try {
             Path dir = Paths.get(txtDir);
             Files.createDirectories(dir);
-            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-            // ACCTXT.<DDMMYY> — pakai tanggal generate hari ini (mis. 6 Agu 2026 -> ACCTXT.060826)
-            String ddmmyy = LocalDateTime.now().format(DateTimeFormatter.ofPattern("ddMMyy"));
-            Path pkt = dir.resolve("ACCTXT_" + ts + "_" + paket + ".txt");
-            Files.writeString(pkt, content.toString(), StandardCharsets.UTF_8);
-            Files.writeString(dir.resolve("ACCTXT." + ddmmyy), content.toString(),
+            // Nama file sesuai contoh AS400: ACCTXT.<YYMMDD> — tanggal di extension, TANPA jam & TANPA .txt.
+            String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+            String fileName = "ACCTXT." + yymmdd;
+            Path out = dir.resolve(fileName);
+            Files.writeString(out, content.toString(),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 
             // Transfer Out to GL FTP server (Data Flow §9.g) — only when ausy.ftp.host is set
             String ftpNote = "";
             if (ftp.enabled()) {
                 try {
-                    String remote = ftp.push(pkt);
+                    String remote = ftp.push(out);
                     audit.transaction(checker, "FTP_SENT", "Paket " + paket + " -> FTP: " + remote);
                     ftpNote = " Terkirim ke FTP: " + remote + ".";
                 } catch (Exception fe) {
@@ -99,8 +98,8 @@ public class OtorisasiService {
             }
             gl.saveAll(rows);
             audit.transaction(checker, "OTORISASI_APPROVE",
-                    "Paket " + paket + " (maker=" + inputer + ") di-approve & export, " + rows.size() + " baris -> " + pkt.getFileName());
-            return new ExportResult(true, "Otorisasi berhasil — Paket " + paket + " diproses (" + rows.size() + " baris). File: " + pkt.getFileName() + "." + ftpNote, rows.size(), pkt.getFileName().toString());
+                    "Paket " + paket + " (maker=" + inputer + ") di-approve & export, " + rows.size() + " baris -> " + fileName);
+            return new ExportResult(true, "Otorisasi berhasil — Paket " + paket + " diproses (" + rows.size() + " baris). File: " + fileName + "." + ftpNote, rows.size(), fileName);
         } catch (Exception e) {
             return new ExportResult(false, "Gagal menulis file teks: " + e.getMessage(), 0, null);
         }
