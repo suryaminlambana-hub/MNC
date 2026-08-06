@@ -44,6 +44,12 @@ public class OtorisasiService {
 
     public record ExportResult(boolean ok, String message, int rows, String file) {}
 
+    /** Resolve a generated text file inside the txt dir (basename only — no path traversal). */
+    public Path txtFile(String name) {
+        String safe = Paths.get(name == null ? "" : name).getFileName().toString();
+        return Paths.get(txtDir).resolve(safe);
+    }
+
     @Transactional
     public ExportResult export(String paket, String inputer, Integer approverGroup, String checker) {
         if (!approval.canApprove(approverGroup, inputer))
