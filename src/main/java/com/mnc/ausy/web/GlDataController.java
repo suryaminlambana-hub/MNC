@@ -39,9 +39,9 @@ public class GlDataController {
 
     @GetMapping("/gl-legacy")
     public String list(Model model) {
-        // Only GL that has passed checker otorisasi (exclude rows still PENDING) — Workflow 8.x
+        // Only GL yang aktif & sudah lolos otorisasi — exclude PENDING dan soft-deleted (active=0).
         List<GlTabel> rows = gl.findAll().stream()
-                .filter(r -> !"PENDING".equals(r.getStatusDual()))
+                .filter(r -> r.getActive() != null && r.getActive() == 1 && !"PENDING".equals(r.getStatusDual()))
                 .collect(Collectors.toList());
         Set<String> reg = registeredKeys();
         long registeredCount = rows.stream().filter(r -> isRegistered(reg, r)).count();
@@ -61,9 +61,10 @@ public class GlDataController {
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         List<GlTabel> all = gl.findAll();
         Set<String> reg = registeredKeys();
-        // export only registered rows that have passed otorisasi (not PENDING)
+        // export only active, registered rows that have passed otorisasi (exclude PENDING & soft-deleted)
         List<GlTabel> rows = all.stream()
-                .filter(r -> !"PENDING".equals(r.getStatusDual()) && isRegistered(reg, r))
+                .filter(r -> r.getActive() != null && r.getActive() == 1
+                        && !"PENDING".equals(r.getStatusDual()) && isRegistered(reg, r))
                 .collect(Collectors.toList());
 
         List<String> head = List.of("No","ID","Paket","NoGL","D/C","GL Name","Description","Amount","Tgl","Uploader","GLTRRF","Registered");

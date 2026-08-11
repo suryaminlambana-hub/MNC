@@ -141,5 +141,16 @@
   });
 })();
 </script>
+<script>
+// Pesan validasi HTML5 dalam bahasa Indonesia (mis. field wajib kosong) — konsisten seluruh form.
+(function(){
+  function msg(el){ return (el.tagName==='SELECT'||el.type==='file') ? 'Wajib dipilih.' : 'Wajib diisi.'; }
+  document.addEventListener('invalid', function(e){
+    var el=e.target; if(el && el.validity && el.validity.valueMissing) el.setCustomValidity(msg(el));
+  }, true);
+  document.addEventListener('input',  function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
+  document.addEventListener('change', function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
+})();
+</script>
 </body>
 </html>

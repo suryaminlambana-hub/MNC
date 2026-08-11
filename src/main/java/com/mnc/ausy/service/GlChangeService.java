@@ -270,7 +270,9 @@ public class GlChangeService {
         g.setGltram(amt(a.get("gltram"))); g.setGltrds(a.get("gltrds"));
         g.setNoPaket(a.get("noPaket"));
         g.setGltrus(maker.length()>10?maker.substring(0,10):maker);
-        g.setStatusPrint("BELUM UPLOAD"); g.setStatusDual("APPROVED");
+        // ADD lewat change request sudah di-approve checker -> GL aktif langsung, JANGAN masuk
+        // antrian Otorisasi Upload GL (yang difilter status_print='BELUM UPLOAD').
+        g.setStatusPrint("SUDAH UPLOAD"); g.setStatusDual("APPROVED");
         g.setGlsrc("m"); g.setActive((short)1);
         gl.save(g);
     }
