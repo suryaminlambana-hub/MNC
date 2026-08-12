@@ -146,7 +146,11 @@
 (function(){
   function msg(el){ return (el.tagName==='SELECT'||el.type==='file') ? 'Wajib dipilih.' : 'Wajib diisi.'; }
   document.addEventListener('invalid', function(e){
-    var el=e.target; if(el && el.validity && el.validity.valueMissing) el.setCustomValidity(msg(el));
+    var el=e.target;
+    if(el && el.validity && el.validity.valueMissing){
+      el.setCustomValidity(msg(el));
+      setTimeout(function(){ el.setCustomValidity(''); }, 50);   // reset so a stale message can't block a filled field
+    }
   }, true);
   document.addEventListener('input',  function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
   document.addEventListener('change', function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);

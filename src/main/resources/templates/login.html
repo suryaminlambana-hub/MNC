@@ -74,12 +74,14 @@
             tg.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
         });
     })();
-    // Pesan error bahasa Indonesia bila username/password kosong saat klik Masuk (BUG_00047/00049).
+    // Pesan error bahasa Indonesia bila username/password kosong (BUG_00047) — di-reset otomatis
+    // supaya tidak "nyangkut" setelah field diisi via autofill/quick-login/paste (BUG_00053).
     (function(){
         document.addEventListener('invalid', function(e){
-            if(e.target && e.target.validity && e.target.validity.valueMissing){
-                var f = e.target.name === 'username' ? 'Username' : 'Password';
-                e.target.setCustomValidity(f + ' wajib diisi.');
+            var el = e.target;
+            if(el && el.validity && el.validity.valueMissing){
+                el.setCustomValidity((el.name === 'username' ? 'Username' : 'Password') + ' wajib diisi.');
+                setTimeout(function(){ el.setCustomValidity(''); }, 50);   // clear so it never blocks next submit
             }
         }, true);
         document.addEventListener('input', function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
