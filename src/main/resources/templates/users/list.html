@@ -12,7 +12,7 @@
         <i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> permintaan perubahan user sedang menunggu otorisasi Admin Approval.
     </div>
 
-    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addUser"><i class="fa-solid fa-plus"></i> Add User</button>
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addUser"><i class="fa-solid fa-plus"></i> Tambah User</button>
 
     <div class="ausy-card">
         <table class="table table-hover align-middle mb-0 dt">
@@ -31,9 +31,9 @@
                 <td>
                     <button class="btn btn-sm btn-outline-secondary btn-edit"
                             th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
-                            data-bs-toggle="modal" data-bs-target="#editUser">Edit</button>
+                            data-bs-toggle="modal" data-bs-target="#editUser">Ubah</button>
                     <button class="btn btn-sm btn-outline-danger btn-del"
-                            th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Delete</button>
+                            th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
                 </td>
             </tr>
             </tbody>
@@ -45,8 +45,8 @@
         <form th:action="@{/users/add}" method="post">
             <div class="modal-header"><h5 class="modal-title">Ajukan Tambah User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="mb-2"><label class="form-label">Username</label><input class="form-control" name="username" required></div>
-                <div class="mb-2"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
+                <div class="mb-2"><label class="form-label">Username <span class="text-danger">*</span></label><input class="form-control" name="username" required></div>
+                <div class="mb-2"><label class="form-label">Password <span class="text-danger">*</span></label><input class="form-control" type="password" name="password" required></div>
                 <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama"></div>
                 <div class="mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email"></div>
                 <div class="mb-2"><label class="form-label">Group</label>

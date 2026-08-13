@@ -4,7 +4,7 @@
 <main>
   <h1 class="ausy-page-title">Group User</h1>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
-  <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addG"><i class="fa-solid fa-plus"></i> Add Group</button>
+  <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addG"><i class="fa-solid fa-plus"></i> Tambah Group</button>
   <div class="ausy-card">
     <table class="table table-hover align-middle mb-0 dt">
       <thead><tr><th>No</th><th>Nama Group</th><th>Inisial</th><th>Level</th><th>Aksi</th></tr></thead>
@@ -15,9 +15,9 @@
         <td>
           <button class="btn btn-sm btn-outline-secondary btn-edit"
             th:attr="data-id=${g.idGroup},data-nama=${g.namaGroup},data-ini=${g.inisial},data-lvl=${g.level}"
-            data-bs-toggle="modal" data-bs-target="#editG">Edit</button>
+            data-bs-toggle="modal" data-bs-target="#editG">Ubah</button>
           <form th:action="@{/groups/delete}" method="post" class="d-inline" onsubmit="return confirm('Hapus group?');">
-            <input type="hidden" name="idGroup" th:value="${g.idGroup}"><button class="btn btn-sm btn-outline-danger">Delete</button>
+            <input type="hidden" name="idGroup" th:value="${g.idGroup}"><button class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>
         </td>
       </tr>
@@ -26,9 +26,9 @@
   </div>
   <div class="modal fade" id="addG" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <form th:action="@{/groups/add}" method="post">
-      <div class="modal-header"><h5 class="modal-title">Add Group</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Tambah Group</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
-        <div class="mb-2"><label class="form-label">Nama Group</label><input class="form-control" name="namaGroup" required></div>
+        <div class="mb-2"><label class="form-label">Nama Group <span class="text-danger">*</span></label><input class="form-control" name="namaGroup" required></div>
         <div class="mb-2"><label class="form-label">Inisial</label><input class="form-control" name="inisial"></div>
         <div class="mb-2"><label class="form-label">Level</label><input class="form-control" name="level" placeholder="ADMIN / SPV / USER"></div>
       </div>
@@ -37,10 +37,10 @@
   </div></div></div>
   <div class="modal fade" id="editG" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <form th:action="@{/groups/edit}" method="post">
-      <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Ubah Group</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <input type="hidden" name="idGroup" id="g_id">
-        <div class="mb-2"><label class="form-label">Nama Group</label><input class="form-control" name="namaGroup" id="g_nama" required></div>
+        <div class="mb-2"><label class="form-label">Nama Group <span class="text-danger">*</span></label><input class="form-control" name="namaGroup" id="g_nama" required></div>
         <div class="mb-2"><label class="form-label">Inisial</label><input class="form-control" name="inisial" id="g_ini"></div>
         <div class="mb-2"><label class="form-label">Level</label><input class="form-control" name="level" id="g_lvl"></div>
       </div>

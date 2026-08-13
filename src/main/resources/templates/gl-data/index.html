@@ -31,8 +31,8 @@
         <td th:text="${r.noPaket}"></td>
         <td><span class="badge bg-secondary-subtle text-secondary" th:text="${r.statusDual}"></span></td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-secondary btn-edit"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-sm btn-outline-danger btn-del"><i class="fa-solid fa-trash"></i></button>
+          <button class="btn btn-sm btn-outline-secondary btn-edit" title="Ubah"><i class="fa-solid fa-pen"></i> Ubah</button>
+          <button class="btn btn-sm btn-outline-danger btn-del" title="Hapus"><i class="fa-solid fa-trash"></i> Hapus</button>
         </td>
       </tr>
       <tr th:if="${rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
