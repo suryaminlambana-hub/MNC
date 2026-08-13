@@ -4,6 +4,9 @@ import com.mnc.ausy.domain.ApprovalGroup;
 import com.mnc.ausy.domain.GroupUser;
 import com.mnc.ausy.repo.ApprovalGroupRepository;
 import com.mnc.ausy.repo.GroupUserRepository;
+import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ConfigChangeService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +19,10 @@ import java.util.*;
 public class ApprovalController {
     private final ApprovalGroupRepository rules;
     private final GroupUserRepository groups;
+    private final ConfigChangeService configChange;
 
-    public ApprovalController(ApprovalGroupRepository rules, GroupUserRepository groups) {
-        this.rules = rules; this.groups = groups;
+    public ApprovalController(ApprovalGroupRepository rules, GroupUserRepository groups, ConfigChangeService configChange) {
+        this.rules = rules; this.groups = groups; this.configChange = configChange;
     }
 
     @GetMapping
@@ -32,24 +36,23 @@ public class ApprovalController {
         }
         model.addAttribute("rules", rows);
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
+        model.addAttribute("pendingConfig", configChange.countPending());
         return "approval/list";
     }
 
+    // Tambah/Hapus aturan approval -> config dual control (butuh alasan + approval Admin Approval).
     @PostMapping("/add")
-    public String add(@RequestParam Integer approverGroup, @RequestParam Integer targetGroup, RedirectAttributes ra) {
-        if (approverGroup.equals(targetGroup)) { ra.addFlashAttribute("warn", "Approver dan target tidak boleh group yang sama."); }
-        else if (rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) { ra.addFlashAttribute("warn", "Aturan tersebut sudah ada."); }
-        else {
-            ApprovalGroup r = new ApprovalGroup(); r.setApproverGroup(approverGroup); r.setTargetGroup(targetGroup); rules.save(r);
-            ra.addFlashAttribute("ok", "Aturan persetujuan ditambahkan.");
-        }
+    public String add(@RequestParam Integer approverGroup, @RequestParam Integer targetGroup,
+                      @RequestParam(required=false) String note,
+                      @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitApprovalAdd(approverGroup, targetGroup, me, note));
         return "redirect:/approval";
     }
 
     @PostMapping("/delete")
-    public String delete(@RequestParam Long id, RedirectAttributes ra) {
-        rules.deleteById(id);
-        ra.addFlashAttribute("ok", "Aturan persetujuan dihapus.");
+    public String delete(@RequestParam Long id, @RequestParam(required=false) String note,
+                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitApprovalDelete(id, me, note));
         return "redirect:/approval";
     }
 }

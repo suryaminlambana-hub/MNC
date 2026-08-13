@@ -1,7 +1,9 @@
 package com.mnc.ausy.web;
 
-import com.mnc.ausy.domain.GroupUser;
 import com.mnc.ausy.repo.GroupUserRepository;
+import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ConfigChangeService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -11,38 +13,40 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/groups")
 public class GroupController {
     private final GroupUserRepository groups;
-    public GroupController(GroupUserRepository groups) { this.groups = groups; }
+    private final ConfigChangeService configChange;
+    public GroupController(GroupUserRepository groups, ConfigChangeService configChange) {
+        this.groups = groups; this.configChange = configChange;
+    }
 
     @GetMapping
     public String list(Model model) {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
+        model.addAttribute("pendingConfig", configChange.countPending());
         return "groups/list";
     }
 
+    // Add/Edit/Delete Group -> config dual control (butuh alasan + approval Admin Approval).
     @PostMapping("/add")
     public String add(@RequestParam String namaGroup, @RequestParam(required=false) String inisial,
-                      @RequestParam(required=false) String level, RedirectAttributes ra) {
-        GroupUser g = new GroupUser();
-        g.setNamaGroup(namaGroup); g.setInisial(inisial); g.setLevel(level);
-        groups.save(g);
-        ra.addFlashAttribute("ok", "Group berhasil ditambahkan.");
+                      @RequestParam(required=false) String level, @RequestParam(required=false) String note,
+                      @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitGroupAdd(namaGroup, inisial, level, me, note));
         return "redirect:/groups";
     }
 
     @PostMapping("/edit")
     public String edit(@RequestParam Integer idGroup, @RequestParam String namaGroup,
-                       @RequestParam(required=false) String inisial, @RequestParam(required=false) String level, RedirectAttributes ra) {
-        groups.findById(idGroup).ifPresent(g -> {
-            g.setNamaGroup(namaGroup); g.setInisial(inisial); g.setLevel(level); groups.save(g);
-        });
-        ra.addFlashAttribute("ok", "Group berhasil diperbarui.");
+                       @RequestParam(required=false) String inisial, @RequestParam(required=false) String level,
+                       @RequestParam(required=false) String note,
+                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitGroupEdit(idGroup, namaGroup, inisial, level, me, note));
         return "redirect:/groups";
     }
 
     @PostMapping("/delete")
-    public String delete(@RequestParam Integer idGroup, RedirectAttributes ra) {
-        groups.deleteById(idGroup);
-        ra.addFlashAttribute("ok", "Group berhasil dihapus.");
+    public String delete(@RequestParam Integer idGroup, @RequestParam(required=false) String note,
+                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitGroupDelete(idGroup, me, note));
         return "redirect:/groups";
     }
 }

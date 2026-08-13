@@ -18,27 +18,28 @@
         <div class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingUsers > 0}">MENUNGGU APPROVAL</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-user-clock"></i></div>
-            <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">Perubahan User Pending</div></div>
+            <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">Perubahan Config Pending</div></div>
         </div>
     </div>
 
-    <!-- Perubahan User Pending (collapsible) — mirror section GL Pending di Maker -->
+    <!-- Perubahan Config Pending (collapsible) — User/Group/Menu/Akses/Approval -->
     <div class="ausy-card">
         <button class="ausy-collapse-hd" type="button" data-bs-toggle="collapse" data-bs-target="#pendingUserBox"
                 aria-expanded="true" aria-controls="pendingUserBox">
-            <span><i class="fa-solid fa-user-clock text-muted"></i> Perubahan User Pending
+            <span><i class="fa-solid fa-user-clock text-muted"></i> Perubahan Config Pending
                 <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${pendingUsers}">0</span></span>
             <i class="fa-solid fa-chevron-up ausy-collapse-caret"></i>
         </button>
         <div class="collapse show" id="pendingUserBox">
             <table class="table table-sm table-hover align-middle mb-0">
                 <thead><tr>
-                    <th class="ps-3">Waktu</th><th>Operasi</th><th>Target User</th>
+                    <th class="ps-3">Waktu</th><th>Entity</th><th>Operasi</th><th>Target</th>
                     <th>Catatan / Alasan</th><th class="pe-3">Status</th>
                 </tr></thead>
                 <tbody>
                 <tr th:each="p : ${pendingUserList}">
                     <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(p.cr.createdAt,'dd-MM HH:mm')}"></td>
+                    <td><span class="badge bg-secondary-subtle text-secondary" th:text="${p.entityLabel}"></span></td>
                     <td><span class="badge"
                               th:classappend="${p.cr.op == 'ADD'} ? 'bg-success-subtle text-success' : (${p.cr.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
                               th:text="${p.cr.op}"></span></td>
@@ -47,7 +48,7 @@
                     <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU APPROVAL</span></td>
                 </tr>
                 <tr th:if="${pendingUserList.isEmpty()}">
-                    <td colspan="5" class="text-center text-muted py-4">Tidak ada perubahan user yang menunggu approval.</td>
+                    <td colspan="6" class="text-center text-muted py-4">Tidak ada perubahan config yang menunggu approval.</td>
                 </tr>
                 </tbody>
             </table>

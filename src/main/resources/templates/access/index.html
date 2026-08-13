@@ -3,8 +3,9 @@
 <head><title>Access Menu — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Access Menu</h1>
-  <p class="text-muted">Atur menu apa saja yang dapat diakses tiap group.</p>
-  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <p class="text-muted">Atur menu apa saja yang dapat diakses tiap group. Perubahan <b>butuh alasan</b> &amp; menunggu approval Admin Approval (dual control).</p>
+  <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
+  <div th:if="${pendingConfig > 0}" class="alert alert-warning py-2"><i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> perubahan config menunggu otorisasi Admin Approval.</div>
 
   <div class="ausy-card mb-3" style="padding:18px">
     <form method="get" th:action="@{/access}" class="row g-2 align-items-end">
@@ -31,7 +32,9 @@
           </div>
         </div>
       </div>
-      <button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Akses</button>
+      <div class="mb-2" style="max-width:520px"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+        <textarea class="form-control" name="note" rows="2" required placeholder="Dikirim ke Admin Approval"></textarea></div>
+      <button class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Ajukan ke Admin Approval</button>
     </form>
   </div>
 </main>

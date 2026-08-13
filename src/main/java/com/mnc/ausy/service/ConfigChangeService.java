@@ -1,12 +1,8 @@
 package com.mnc.ausy.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mnc.ausy.domain.ConfigChangeRequest;
-import com.mnc.ausy.domain.GroupUser;
-import com.mnc.ausy.domain.User;
-import com.mnc.ausy.repo.ConfigChangeRequestRepository;
-import com.mnc.ausy.repo.GroupUserRepository;
-import com.mnc.ausy.repo.UserRepository;
+import com.mnc.ausy.domain.*;
+import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,35 +12,51 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Config dual control — Add/Edit/Delete USER under maker/checker.
- * Admin (①) submits a change request WITH A REASON (data unchanged until approval);
- * Admin Approval (②) approves/rejects. Only on approve is it applied to the users table.
+ * Config dual control — Add/Edit/Delete on Master Data (USER, GROUP, MENU, ACCESS, APPROVAL)
+ * under maker/checker. Admin (①) submits a change request WITH A REASON (nothing changes yet);
+ * Admin Approval (②) approves/rejects. Only on approve is it applied to the live tables.
  */
 @Service
 public class ConfigChangeService {
 
-    /** Displayed fields (key -> label). */
-    public static final LinkedHashMap<String,String> FIELDS = new LinkedHashMap<>();
+    /** Displayed fields per entity (json key -> label) for the review diff. */
+    static final Map<String, LinkedHashMap<String,String>> ENTITY_FIELDS = new LinkedHashMap<>();
     static {
-        FIELDS.put("userId", "Username");
-        FIELDS.put("nama",   "Nama");
-        FIELDS.put("email",  "Email");
-        FIELDS.put("group",  "Group");
-        FIELDS.put("status", "Status");
+        ENTITY_FIELDS.put("USER", fields("userId","Username","nama","Nama","email","Email","group","Group","status","Status"));
+        ENTITY_FIELDS.put("GROUP", fields("namaGroup","Nama Group","inisial","Inisial","level","Level"));
+        ENTITY_FIELDS.put("MENU", fields("namaMenu","Nama Menu","url","URL","parent","Parent","urutan","Urutan"));
+        ENTITY_FIELDS.put("ACCESS", fields("group","Group","aksesMenu","Menu yang Diberi Akses"));
+        ENTITY_FIELDS.put("APPROVAL", fields("approver","Group Penyetuju","target","Berwenang Menyetujui"));
     }
+    private static LinkedHashMap<String,String> fields(String... kv){
+        LinkedHashMap<String,String> m=new LinkedHashMap<>();
+        for(int i=0;i+1<kv.length;i+=2) m.put(kv[i],kv[i+1]);
+        return m;
+    }
+    private static String entityLabel(String e){
+        return switch (e==null?"":e){ case "GROUP"->"Group"; case "MENU"->"Menu"; case "ACCESS"->"Akses Menu";
+            case "APPROVAL"->"Approval Group"; default->"User"; };
+    }
+    /** Kept for backward compat (GL/user forms may reference it). */
+    public static final LinkedHashMap<String,String> FIELDS = ENTITY_FIELDS.get("USER");
 
     private final UserRepository users;
     private final GroupUserRepository groups;
+    private final MenuRepository menuRepo;
+    private final GroupMenuRepository groupMenus;
+    private final ApprovalGroupRepository approvalRules;
     private final ConfigChangeRequestRepository cr;
     private final ApprovalService approval;
     private final AuditService audit;
     private final PasswordEncoder encoder;
     private final ObjectMapper json = new ObjectMapper();
 
-    public ConfigChangeService(UserRepository users, GroupUserRepository groups, ConfigChangeRequestRepository cr,
-                               ApprovalService approval, AuditService audit, PasswordEncoder encoder) {
-        this.users = users; this.groups = groups; this.cr = cr;
-        this.approval = approval; this.audit = audit; this.encoder = encoder;
+    public ConfigChangeService(UserRepository users, GroupUserRepository groups, MenuRepository menuRepo,
+                               GroupMenuRepository groupMenus, ApprovalGroupRepository approvalRules,
+                               ConfigChangeRequestRepository cr, ApprovalService approval, AuditService audit,
+                               PasswordEncoder encoder) {
+        this.users = users; this.groups = groups; this.menuRepo = menuRepo; this.groupMenus = groupMenus;
+        this.approvalRules = approvalRules; this.cr = cr; this.approval = approval; this.audit = audit; this.encoder = encoder;
     }
 
     private static String n(String s){ return s==null?"":s; }
@@ -53,6 +65,7 @@ public class ConfigChangeService {
     private static boolean invalidEmail(String e){ return e != null && !e.isBlank() && !EMAIL.matcher(e.trim()).matches(); }
     private String groupName(Integer id){ return id==null?"":groups.findById(id).map(GroupUser::getNamaGroup).orElse("#"+id); }
     private String groupLevel(Integer id){ return id==null?"USER":groups.findById(id).map(GroupUser::getLevel).orElse("USER"); }
+    private String menuName(Integer id){ return id==null?"":menuRepo.findById(id).map(Menu::getNamaMenu).orElse("#"+id); }
     private String statusLabel(Short s){ return (s!=null && s==1) ? "Active" : "Non Active"; }
     private String toJson(Map<String,String> m){ try { return json.writeValueAsString(m); } catch (Exception e){ return "{}"; } }
     @SuppressWarnings("unchecked")
@@ -60,16 +73,22 @@ public class ConfigChangeService {
         if (s==null || s.isBlank()) return null;
         try { return json.readValue(s, LinkedHashMap.class); } catch (Exception e){ return null; }
     }
+    private static Integer toInt(String s){ try { return Integer.valueOf(s.trim()); } catch (Exception e){ return null; } }
 
-    private Map<String,String> userMap(User u){
-        Map<String,String> m = new LinkedHashMap<>();
-        m.put("userId", n(u.getUserId())); m.put("nama", n(u.getNama())); m.put("email", n(u.getEmail()));
-        m.put("group", groupName(u.getIdGroup())); m.put("status", statusLabel(u.getStatusAccount()));
-        m.put("idGroup", u.getIdGroup()==null?"":String.valueOf(u.getIdGroup()));
-        return m;
+    private ConfigChangeRequest base(String entity, String op, String targetId, AusyUserDetails me, String note){
+        ConfigChangeRequest c = new ConfigChangeRequest();
+        c.setEntity(entity); c.setOp(op); c.setTargetId(targetId);
+        c.setMaker(me.getUsername()); c.setMakerGroup(me.getIdGroup());
+        c.setNoteMaker(note); c.setStatus("PENDING");
+        return c;
+    }
+    private String saveReq(ConfigChangeRequest c, String entity, String op, String what){
+        cr.save(c);
+        audit.transaction(c.getMaker(), "CONFIG_CHANGE_REQ", op + " " + entity + " " + what + " diajukan (CR#" + c.getId() + ")");
+        return "Permintaan " + op + " " + entityLabel(entity) + " diajukan (menunggu approval Admin Approval).";
     }
 
-    // ---------- Maker (admin ①) submits — NOTHING applied yet ----------
+    // ================= USER =================
     @Transactional
     public String submitAdd(String userId, String rawPass, String nama, String email, Integer idGroup,
                             AusyUserDetails me, String note) {
@@ -81,13 +100,9 @@ public class ConfigChangeService {
         Map<String,String> after = new LinkedHashMap<>();
         after.put("userId", userId); after.put("nama", n(nama)); after.put("email", n(email));
         after.put("group", groupName(idGroup)); after.put("status", "Active");
-        after.put("idGroup", String.valueOf(idGroup));
-        after.put("pass", encoder.encode(rawPass));           // store encoded, never raw
-        ConfigChangeRequest c = base("ADD", null, me, note);
-        c.setAfterJson(toJson(after));
-        cr.save(c);
-        audit.transaction(me.getUsername(), "CONFIG_CHANGE_REQ", "ADD user '" + userId + "' diajukan (CR#" + c.getId() + ")");
-        return "Permintaan TAMBAH user diajukan (menunggu approval Admin Approval).";
+        after.put("idGroup", String.valueOf(idGroup)); after.put("pass", encoder.encode(rawPass));
+        ConfigChangeRequest c = base("USER","ADD", null, me, note); c.setAfterJson(toJson(after));
+        return saveReq(c, "USER", "ADD", "'" + userId + "'");
     }
 
     @Transactional
@@ -102,12 +117,9 @@ public class ConfigChangeService {
         after.put("group", groupName(idGroup)); after.put("status", statusLabel(status));
         after.put("idGroup", String.valueOf(idGroup));
         if (rawPass != null && !rawPass.isBlank()) { after.put("pass", encoder.encode(rawPass)); after.put("passChanged", "1"); }
-        ConfigChangeRequest c = base("EDIT", userId, me, note);
-        c.setBeforeJson(toJson(userMap(u)));
-        c.setAfterJson(toJson(after));
-        cr.save(c);
-        audit.transaction(me.getUsername(), "CONFIG_CHANGE_REQ", "EDIT user '" + userId + "' diajukan (CR#" + c.getId() + ")");
-        return "Permintaan UBAH user diajukan (menunggu approval Admin Approval).";
+        ConfigChangeRequest c = base("USER","EDIT", userId, me, note);
+        c.setBeforeJson(toJson(userMap(u))); c.setAfterJson(toJson(after));
+        return saveReq(c, "USER", "EDIT", "'" + userId + "'");
     }
 
     @Transactional
@@ -116,62 +128,180 @@ public class ConfigChangeService {
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
-        ConfigChangeRequest c = base("DELETE", userId, me, note);
-        c.setBeforeJson(toJson(userMap(u)));
-        cr.save(c);
-        audit.transaction(me.getUsername(), "CONFIG_CHANGE_REQ", "DELETE user '" + userId + "' diajukan (CR#" + c.getId() + ")");
-        return "Permintaan HAPUS user diajukan (menunggu approval Admin Approval).";
+        ConfigChangeRequest c = base("USER","DELETE", userId, me, note); c.setBeforeJson(toJson(userMap(u)));
+        return saveReq(c, "USER", "DELETE", "'" + userId + "'");
+    }
+    private Map<String,String> userMap(User u){
+        Map<String,String> m = new LinkedHashMap<>();
+        m.put("userId", n(u.getUserId())); m.put("nama", n(u.getNama())); m.put("email", n(u.getEmail()));
+        m.put("group", groupName(u.getIdGroup())); m.put("status", statusLabel(u.getStatusAccount()));
+        m.put("idGroup", u.getIdGroup()==null?"":String.valueOf(u.getIdGroup()));
+        return m;
     }
 
-    private ConfigChangeRequest base(String op, String targetId, AusyUserDetails me, String note){
-        ConfigChangeRequest c = new ConfigChangeRequest();
-        c.setEntity("USER"); c.setOp(op); c.setTargetId(targetId);
-        c.setMaker(me.getUsername()); c.setMakerGroup(me.getIdGroup());
-        c.setNoteMaker(note); c.setStatus("PENDING");
-        return c;
+    // ================= GROUP =================
+    private Map<String,String> groupMap(GroupUser g){
+        Map<String,String> m=new LinkedHashMap<>();
+        m.put("namaGroup", n(g.getNamaGroup())); m.put("inisial", n(g.getInisial())); m.put("level", n(g.getLevel()));
+        return m;
+    }
+    @Transactional
+    public String submitGroupAdd(String namaGroup, String inisial, String level, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        if (namaGroup==null||namaGroup.isBlank()) return "Nama Group wajib diisi.";
+        Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",namaGroup.trim()); a.put("inisial",n(inisial)); a.put("level",n(level));
+        ConfigChangeRequest c=base("GROUP","ADD",null,me,note); c.setAfterJson(toJson(a));
+        return saveReq(c,"GROUP","ADD","'"+namaGroup.trim()+"'");
+    }
+    @Transactional
+    public String submitGroupEdit(Integer idGroup, String namaGroup, String inisial, String level, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",n(namaGroup)); a.put("inisial",n(inisial)); a.put("level",n(level));
+        ConfigChangeRequest c=base("GROUP","EDIT",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g))); c.setAfterJson(toJson(a));
+        return saveReq(c,"GROUP","EDIT","'"+g.getNamaGroup()+"'");
+    }
+    @Transactional
+    public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        ConfigChangeRequest c=base("GROUP","DELETE",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g)));
+        return saveReq(c,"GROUP","DELETE","'"+g.getNamaGroup()+"'");
     }
 
-    // ---------- Admin Approval (②) review ----------
+    // ================= MENU =================
+    private Map<String,String> menuMap(Menu m){
+        Map<String,String> x=new LinkedHashMap<>();
+        x.put("namaMenu",n(m.getNamaMenu())); x.put("url",n(m.getUrl()));
+        x.put("parent", m.getParent()==null?"0":String.valueOf(m.getParent()));
+        x.put("urutan", m.getUrutan()==null?"0":String.valueOf(m.getUrutan()));
+        return x;
+    }
+    @Transactional
+    public String submitMenuAdd(String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        if (namaMenu==null||namaMenu.isBlank()) return "Nama Menu wajib diisi.";
+        Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",namaMenu.trim()); a.put("url",n(url));
+        a.put("parent",String.valueOf(parent==null?0:parent)); a.put("urutan",String.valueOf(urutan==null?0:urutan));
+        ConfigChangeRequest c=base("MENU","ADD",null,me,note); c.setAfterJson(toJson(a));
+        return saveReq(c,"MENU","ADD","'"+namaMenu.trim()+"'");
+    }
+    @Transactional
+    public String submitMenuEdit(Integer idMenu, String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
+        Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",n(namaMenu)); a.put("url",n(url));
+        a.put("parent",String.valueOf(parent==null?0:parent)); a.put("urutan",String.valueOf(urutan==null?0:urutan));
+        ConfigChangeRequest c=base("MENU","EDIT",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m))); c.setAfterJson(toJson(a));
+        return saveReq(c,"MENU","EDIT","'"+m.getNamaMenu()+"'");
+    }
+    @Transactional
+    public String submitMenuDelete(Integer idMenu, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
+        ConfigChangeRequest c=base("MENU","DELETE",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m)));
+        return saveReq(c,"MENU","DELETE","'"+m.getNamaMenu()+"'");
+    }
+
+    // ================= ACCESS (group_menu) =================
+    @Transactional
+    public String submitAccess(Integer group, List<Integer> menuIds, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        if (group==null) return "Group belum dipilih.";
+        Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
+        // current granted (leaf menus)
+        List<Integer> cur = new ArrayList<>();
+        for (GroupMenu gm : groupMenus.findByIdGroup(group)) cur.add(gm.getIdMenu());
+        Map<String,String> before = accessMap(group, cur);
+        Map<String,String> after  = accessMap(group, new ArrayList<>(want));
+        ConfigChangeRequest c=base("ACCESS","EDIT",String.valueOf(group),me,note);
+        c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
+        return saveReq(c,"ACCESS","EDIT","'"+groupName(group)+"'");
+    }
+    private Map<String,String> accessMap(Integer group, List<Integer> ids){
+        Collections.sort(ids);
+        List<String> names=new ArrayList<>(); for(Integer id:ids) names.add(menuName(id));
+        Map<String,String> m=new LinkedHashMap<>();
+        m.put("group", groupName(group));
+        m.put("aksesMenu", names.isEmpty()? "(tidak ada)" : String.join(", ", names));
+        m.put("menuIds", ids.stream().map(String::valueOf).reduce((x,y)->x+","+y).orElse(""));
+        return m;
+    }
+
+    // ================= APPROVAL (approval_group) =================
+    @Transactional
+    public String submitApprovalAdd(Integer approverGroup, Integer targetGroup, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        if (approverGroup==null||targetGroup==null) return "Group belum lengkap.";
+        if (approverGroup.equals(targetGroup)) return "Approver dan target tidak boleh group yang sama.";
+        if (approvalRules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) return "Aturan tersebut sudah ada.";
+        Map<String,String> a=new LinkedHashMap<>();
+        a.put("approver", groupName(approverGroup)); a.put("target", groupName(targetGroup));
+        a.put("approverGroup", String.valueOf(approverGroup)); a.put("targetGroup", String.valueOf(targetGroup));
+        ConfigChangeRequest c=base("APPROVAL","ADD",null,me,note); c.setAfterJson(toJson(a));
+        return saveReq(c,"APPROVAL","ADD","("+groupName(approverGroup)+" → "+groupName(targetGroup)+")");
+    }
+    @Transactional
+    public String submitApprovalDelete(Long ruleId, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        ApprovalGroup r=approvalRules.findById(ruleId).orElse(null); if(r==null) return "Aturan tidak ditemukan.";
+        Map<String,String> b=new LinkedHashMap<>();
+        b.put("approver", groupName(r.getApproverGroup())); b.put("target", groupName(r.getTargetGroup()));
+        ConfigChangeRequest c=base("APPROVAL","DELETE",String.valueOf(ruleId),me,note); c.setBeforeJson(toJson(b));
+        return saveReq(c,"APPROVAL","DELETE","("+groupName(r.getApproverGroup())+" → "+groupName(r.getTargetGroup())+")");
+    }
+
+    // ================= Admin Approval (②) review =================
     public record Diff(String label, String before, String after, boolean changed) {}
-    public record ReviewItem(ConfigChangeRequest cr, List<Diff> diffs) {}
+    public record ReviewItem(ConfigChangeRequest cr, List<Diff> diffs, String entityLabel) {}
 
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!approval.canApprove(approverGroup, c.getMaker())) continue;
-            out.add(new ReviewItem(c, diffs(c)));
+            out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity())));
         }
         return out;
     }
 
     private List<Diff> diffs(ConfigChangeRequest c) {
+        var fields = ENTITY_FIELDS.getOrDefault(c.getEntity(), ENTITY_FIELDS.get("USER"));
         Map<String,String> b = parse(c.getBeforeJson()), a = parse(c.getAfterJson());
         List<Diff> list = new ArrayList<>();
-        for (var e : FIELDS.entrySet()) {
+        for (var e : fields.entrySet()) {
             String bv = b==null?null:b.get(e.getKey());
             String av = a==null?null:a.get(e.getKey());
             list.add(new Diff(e.getValue(), bv==null?"—":bv, av==null?"—":av, !Objects.equals(bv,av)));
         }
-        if (a != null && "1".equals(a.get("passChanged")))
+        if ("USER".equals(c.getEntity()) && a != null && "1".equals(a.get("passChanged")))
             list.add(new Diff("Password", "—", "(diubah)", true));
         return list;
     }
 
     public long countPending(){ return cr.countByStatus("PENDING"); }
 
-    /** Pending user changes for the Admin home "Perubahan User Pending" section. */
-    public record PendingUser(ConfigChangeRequest cr, String targetLabel) {}
+    /** Pending config changes for the Admin home "Perubahan Config Pending" section. */
+    public record PendingUser(ConfigChangeRequest cr, String targetLabel, String entityLabel) {}
     public List<PendingUser> pendingList() {
         List<PendingUser> out = new ArrayList<>();
-        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            String tgt = c.getTargetId();
-            if (tgt == null || tgt.isBlank()) {
-                Map<String,String> a = parse(c.getAfterJson());
-                tgt = (a != null && a.get("userId") != null) ? a.get("userId") : "(user baru)";
-            }
-            out.add(new PendingUser(c, tgt));
-        }
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING"))
+            out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity())));
         return out;
+    }
+    private String targetLabel(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson()), b = parse(c.getBeforeJson());
+        Map<String,String> ref = a!=null?a:b;
+        return switch (n(c.getEntity())) {
+            case "GROUP"    -> ref!=null && ref.get("namaGroup")!=null ? ref.get("namaGroup") : ("Group #"+n(c.getTargetId()));
+            case "MENU"     -> ref!=null && ref.get("namaMenu")!=null ? ref.get("namaMenu") : ("Menu #"+n(c.getTargetId()));
+            case "ACCESS"   -> ref!=null && ref.get("group")!=null ? ref.get("group") : ("Group #"+n(c.getTargetId()));
+            case "APPROVAL" -> ref!=null ? n(ref.get("approver"))+" → "+n(ref.get("target")) : "Aturan #"+n(c.getTargetId());
+            default -> {
+                String t=c.getTargetId();
+                if(t==null||t.isBlank()) yield (a!=null && a.get("userId")!=null)? a.get("userId") : "(baru)";
+                yield t;
+            }
+        };
     }
 
     @Transactional
@@ -180,19 +310,20 @@ public class ConfigChangeService {
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
         if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
             return "Group Anda tidak berwenang meng-approve permintaan config ini.";
-        String applyMsg = switch (c.getOp()) {
-            case "ADD" -> applyAdd(parse(c.getAfterJson()), c.getMaker());
-            case "EDIT" -> applyEdit(c.getTargetId(), parse(c.getAfterJson()));
-            case "DELETE" -> applyDelete(c.getTargetId());
-            default -> "Operasi tidak dikenal.";
+        String applyMsg = switch (n(c.getEntity())) {
+            case "GROUP"    -> applyGroup(c);
+            case "MENU"     -> applyMenu(c);
+            case "ACCESS"   -> applyAccess(c);
+            case "APPROVAL" -> applyApproval(c);
+            default          -> applyUser(c);
         };
         if (applyMsg != null) return applyMsg;   // apply failed -> keep pending
         c.setStatus("APPROVED"); c.setChecker(me.getUsername());
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
         audit.transaction(me.getUsername(), "CONFIG_CHANGE_APPROVE",
-                c.getOp() + " user CR#" + c.getId() + " (maker=" + c.getMaker() + ") di-approve & diterapkan");
-        return c.getOp() + " user disetujui dan diterapkan.";
+                c.getOp() + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") di-approve & diterapkan");
+        return c.getOp() + " " + entityLabel(c.getEntity()) + " disetujui dan diterapkan.";
     }
 
     @Transactional
@@ -206,14 +337,22 @@ public class ConfigChangeService {
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
         audit.transaction(me.getUsername(), "CONFIG_CHANGE_REJECT",
-                c.getOp() + " user CR#" + c.getId() + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
-        return "Permintaan ditolak. Data user tidak diubah; alasan tercatat di audit trail.";
+                c.getOp() + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
+        return "Permintaan ditolak. Data tidak diubah; alasan tercatat di audit trail.";
     }
 
-    // ---------- apply to live users ----------
-    private Integer gid(Map<String,String> m){ try { return Integer.valueOf(m.get("idGroup")); } catch (Exception e){ return null; } }
+    // ================= apply to live tables =================
+    private Integer gid(Map<String,String> m){ return toInt(n(m.get("idGroup"))); }
 
-    private String applyAdd(Map<String,String> a, String maker) {
+    private String applyUser(ConfigChangeRequest c){
+        return switch (c.getOp()) {
+            case "ADD" -> applyUserAdd(parse(c.getAfterJson()), c.getMaker());
+            case "EDIT" -> applyUserEdit(c.getTargetId(), parse(c.getAfterJson()));
+            case "DELETE" -> applyUserDelete(c.getTargetId());
+            default -> "Operasi tidak dikenal.";
+        };
+    }
+    private String applyUserAdd(Map<String,String> a, String maker) {
         if (a == null) return "Data permintaan rusak.";
         String uid = a.get("userId");
         if (users.existsByUserId(uid)) return "Username '" + uid + "' sudah dipakai (tidak bisa di-approve).";
@@ -222,11 +361,9 @@ public class ConfigChangeService {
         u.setUserId(uid); u.setPass(a.get("pass")); u.setNama(a.get("nama")); u.setEmail(a.get("email"));
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount((short)1); u.setCreDate(LocalDateTime.now()); u.setAddby(maker);
-        users.save(u);
-        return null;
+        users.save(u); return null;
     }
-
-    private String applyEdit(String targetId, Map<String,String> a) {
+    private String applyUserEdit(String targetId, Map<String,String> a) {
         if (a == null) return "Data permintaan rusak.";
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
@@ -235,14 +372,69 @@ public class ConfigChangeService {
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount("Active".equals(a.get("status")) ? (short)1 : (short)0);
         if (a.get("pass") != null && !a.get("pass").isBlank()) u.setPass(a.get("pass"));
-        users.save(u);
-        return null;
+        users.save(u); return null;
     }
-
-    private String applyDelete(String targetId) {
+    private String applyUserDelete(String targetId) {
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
-        users.delete(u);
+        users.delete(u); return null;
+    }
+
+    private String applyGroup(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson());
+        switch (c.getOp()) {
+            case "ADD" -> { if(a==null) return "Data rusak."; GroupUser g=new GroupUser();
+                g.setNamaGroup(a.get("namaGroup")); g.setInisial(a.get("inisial")); g.setLevel(a.get("level")); groups.save(g); }
+            case "EDIT" -> { GroupUser g=groups.findById(toInt(c.getTargetId())).orElse(null);
+                if(g==null) return "Group sudah tidak ada."; if(a==null) return "Data rusak.";
+                g.setNamaGroup(a.get("namaGroup")); g.setInisial(a.get("inisial")); g.setLevel(a.get("level")); groups.save(g); }
+            case "DELETE" -> { Integer id=toInt(c.getTargetId()); if(id!=null && groups.existsById(id)) groups.deleteById(id); }
+            default -> { return "Operasi tidak dikenal."; }
+        }
+        return null;
+    }
+    private String applyMenu(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson());
+        switch (c.getOp()) {
+            case "ADD" -> { if(a==null) return "Data rusak."; Menu m=new Menu();
+                m.setNamaMenu(a.get("namaMenu")); String u=a.get("url"); m.setUrl(u==null||u.isBlank()?null:u.trim());
+                m.setParent(toInt(a.getOrDefault("parent","0"))); m.setUrutan(toInt(a.getOrDefault("urutan","0"))); m.setActive((short)1); menuRepo.save(m); }
+            case "EDIT" -> { Menu m=menuRepo.findById(toInt(c.getTargetId())).orElse(null);
+                if(m==null) return "Menu sudah tidak ada."; if(a==null) return "Data rusak.";
+                m.setNamaMenu(a.get("namaMenu")); String u=a.get("url"); m.setUrl(u==null||u.isBlank()?null:u.trim());
+                m.setParent(toInt(a.getOrDefault("parent","0"))); m.setUrutan(toInt(a.getOrDefault("urutan","0"))); menuRepo.save(m); }
+            case "DELETE" -> { Integer id=toInt(c.getTargetId()); if(id!=null){ groupMenus.deleteByIdMenu(id); if(menuRepo.existsById(id)) menuRepo.deleteById(id); } }
+            default -> { return "Operasi tidak dikenal."; }
+        }
+        return null;
+    }
+    private String applyAccess(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson());
+        Integer group = toInt(c.getTargetId());
+        if (a==null || group==null) return "Data rusak.";
+        Set<Integer> want = new HashSet<>();
+        String ids = a.get("menuIds");
+        if (ids!=null && !ids.isBlank()) for(String s: ids.split(",")) { Integer id=toInt(s); if(id!=null) want.add(id); }
+        for (Menu m : menuRepo.findAllByOrderByParentAscUrutanAsc()) {
+            if (m.getParent()==0) continue;                       // only leaf menus
+            boolean has = groupMenus.existsByIdGroupAndIdMenu(group, m.getIdMenu());
+            boolean w   = want.contains(m.getIdMenu());
+            if (w && !has) { GroupMenu gm=new GroupMenu(); gm.setIdGroup(group); gm.setIdMenu(m.getIdMenu()); groupMenus.save(gm); }
+            else if (!w && has) groupMenus.deleteByIdGroupAndIdMenu(group, m.getIdMenu());
+        }
+        return null;
+    }
+    private String applyApproval(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson());
+        switch (c.getOp()) {
+            case "ADD" -> { if(a==null) return "Data rusak.";
+                Integer ap=toInt(a.get("approverGroup")), tg=toInt(a.get("targetGroup"));
+                if(ap==null||tg==null) return "Data rusak.";
+                if(!approvalRules.existsByApproverGroupAndTargetGroup(ap,tg)){ ApprovalGroup r=new ApprovalGroup(); r.setApproverGroup(ap); r.setTargetGroup(tg); approvalRules.save(r); } }
+            case "DELETE" -> { Long id=null; try{ id=Long.valueOf(c.getTargetId()); }catch(Exception ignore){}
+                if(id!=null && approvalRules.existsById(id)) approvalRules.deleteById(id); }
+            default -> { return "Operasi tidak dikenal."; }
+        }
         return null;
     }
 }

@@ -3,12 +3,12 @@
 <head><title>Otorisasi User — AUSY</title></head>
 <main>
  <div class="ausy-review">
-  <h1 class="ausy-page-title">Otorisasi User</h1>
-  <p class="text-muted">Permintaan Add/Edit/Delete user dari Admin. Periksa alasan &amp; perubahan sebelum approve/reject.</p>
+  <h1 class="ausy-page-title">Otorisasi Config</h1>
+  <p class="text-muted">Permintaan perubahan Master Data (User, Group, Menu, Akses Menu, Approval) dari Admin. Periksa alasan &amp; perubahan sebelum approve/reject.</p>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
 
   <div th:if="${items.isEmpty()}" class="ausy-card text-center text-muted py-4">
-    Tidak ada permintaan perubahan user yang menunggu otorisasi.
+    Tidak ada permintaan perubahan config yang menunggu otorisasi.
   </div>
 
   <div class="ausy-card mb-3" th:each="it : ${items}" style="padding:16px 18px">
@@ -17,8 +17,8 @@
         <span class="badge fs-6"
               th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : 'bg-primary')"
               th:text="${it.cr.op}">EDIT</span>
+        <span class="badge bg-secondary-subtle text-secondary" th:text="${it.entityLabel}">User</span>
         <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
-        <span class="text-muted">· user <b th:text="${it.cr.targetId} ?: '(baru)'"></b></span>
         <span class="text-muted">· admin <b th:text="${it.cr.maker}"></b></span>
       </div>
       <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
@@ -63,7 +63,7 @@
   <div class="modal fade" id="crRejectModal" tabindex="-1">
     <div class="modal-dialog">
       <form class="modal-content" th:action="@{/config-change/reject}" method="post">
-        <div class="modal-header"><h5 class="modal-title">Tolak Perubahan User CR#<span id="crNo"></span></h5>
+        <div class="modal-header"><h5 class="modal-title">Tolak Perubahan Config CR#<span id="crNo"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <input type="hidden" name="crId" id="crIdIn">

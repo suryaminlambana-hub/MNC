@@ -1,8 +1,10 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.domain.Menu;
-import com.mnc.ausy.repo.GroupMenuRepository;
 import com.mnc.ausy.repo.MenuRepository;
+import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ConfigChangeService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -14,10 +16,10 @@ import java.util.*;
 @RequestMapping("/menus")
 public class MenuAdminController {
     private final MenuRepository menus;
-    private final GroupMenuRepository groupMenus;
+    private final ConfigChangeService configChange;
 
-    public MenuAdminController(MenuRepository menus, GroupMenuRepository groupMenus) {
-        this.menus = menus; this.groupMenus = groupMenus;
+    public MenuAdminController(MenuRepository menus, ConfigChangeService configChange) {
+        this.menus = menus; this.configChange = configChange;
     }
 
     @GetMapping
@@ -28,36 +30,33 @@ public class MenuAdminController {
         model.addAttribute("menus", all);
         model.addAttribute("parentName", parentName);
         model.addAttribute("parents", all.stream().filter(m -> m.getParent()==0).toList());
+        model.addAttribute("pendingConfig", configChange.countPending());
         return "menus/list";
     }
 
+    // Add/Edit/Delete Menu -> config dual control (butuh alasan + approval Admin Approval).
     @PostMapping("/add")
     public String add(@RequestParam String namaMenu, @RequestParam(required=false) String url,
-                      @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan, RedirectAttributes ra) {
-        Menu m = new Menu();
-        m.setNamaMenu(namaMenu); m.setUrl(url==null||url.isBlank()?null:url.trim());
-        m.setParent(parent); m.setUrutan(urutan); m.setActive((short)1);
-        menus.save(m);
-        ra.addFlashAttribute("ok", "Menu ditambahkan.");
+                      @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan,
+                      @RequestParam(required=false) String note,
+                      @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitMenuAdd(namaMenu, url, parent, urutan, me, note));
         return "redirect:/menus";
     }
 
     @PostMapping("/edit")
     public String edit(@RequestParam Integer idMenu, @RequestParam String namaMenu, @RequestParam(required=false) String url,
-                       @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan, RedirectAttributes ra) {
-        menus.findById(idMenu).ifPresent(m -> {
-            m.setNamaMenu(namaMenu); m.setUrl(url==null||url.isBlank()?null:url.trim());
-            m.setParent(parent); m.setUrutan(urutan); menus.save(m);
-        });
-        ra.addFlashAttribute("ok", "Menu diperbarui.");
+                       @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan,
+                       @RequestParam(required=false) String note,
+                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitMenuEdit(idMenu, namaMenu, url, parent, urutan, me, note));
         return "redirect:/menus";
     }
 
     @PostMapping("/delete")
-    public String delete(@RequestParam Integer idMenu, RedirectAttributes ra) {
-        groupMenus.deleteByIdMenu(idMenu);
-        menus.deleteById(idMenu);
-        ra.addFlashAttribute("ok", "Menu dihapus.");
+    public String delete(@RequestParam Integer idMenu, @RequestParam(required=false) String note,
+                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitMenuDelete(idMenu, me, note));
         return "redirect:/menus";
     }
 }

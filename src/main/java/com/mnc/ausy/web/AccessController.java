@@ -3,6 +3,9 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.domain.GroupMenu;
 import com.mnc.ausy.domain.Menu;
 import com.mnc.ausy.repo.*;
+import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ConfigChangeService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -16,15 +19,18 @@ public class AccessController {
     private final GroupUserRepository groups;
     private final MenuRepository menus;
     private final GroupMenuRepository groupMenus;
+    private final ConfigChangeService configChange;
 
-    public AccessController(GroupUserRepository groups, MenuRepository menus, GroupMenuRepository groupMenus) {
-        this.groups = groups; this.menus = menus; this.groupMenus = groupMenus;
+    public AccessController(GroupUserRepository groups, MenuRepository menus, GroupMenuRepository groupMenus,
+                            ConfigChangeService configChange) {
+        this.groups = groups; this.menus = menus; this.groupMenus = groupMenus; this.configChange = configChange;
     }
 
     @GetMapping
     public String index(@RequestParam(required=false) Integer group, Model model) {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("selectedGroup", group);
+        model.addAttribute("pendingConfig", configChange.countPending());
         if (group != null) {
             Set<Integer> granted = new HashSet<>();
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
@@ -41,19 +47,13 @@ public class AccessController {
         return "access/index";
     }
 
+    // Simpan hak akses menu -> config dual control (butuh alasan + approval Admin Approval).
     @PostMapping("/save")
     public String save(@RequestParam Integer group,
                        @RequestParam(name="menu", required=false) List<Integer> menuIds,
-                       RedirectAttributes ra) {
-        Set<Integer> checked = menuIds == null ? Set.of() : new HashSet<>(menuIds);
-        for (Menu m : menus.findAllByOrderByParentAscUrutanAsc()) {
-            if (m.getParent() == 0) continue;            // only assign leaf menus
-            boolean want = checked.contains(m.getIdMenu());
-            boolean has  = groupMenus.existsByIdGroupAndIdMenu(group, m.getIdMenu());
-            if (want && !has) { GroupMenu gm = new GroupMenu(); gm.setIdGroup(group); gm.setIdMenu(m.getIdMenu()); groupMenus.save(gm); }
-            else if (!want && has) { groupMenus.deleteByIdGroupAndIdMenu(group, m.getIdMenu()); }
-        }
-        ra.addFlashAttribute("ok", "Hak akses menu berhasil disimpan.");
+                       @RequestParam(required=false) String note,
+                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitAccess(group, menuIds, me, note));
         return "redirect:/access?group=" + group;
     }
 }
