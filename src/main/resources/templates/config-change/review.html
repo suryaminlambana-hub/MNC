@@ -16,7 +16,7 @@
       <div class="d-flex align-items-center gap-2">
         <span class="badge fs-6"
               th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : 'bg-primary')"
-              th:text="${it.cr.op}">EDIT</span>
+              th:text="${it.opLabel}">UBAH</span>
         <span class="badge bg-secondary-subtle text-secondary" th:text="${it.entityLabel}">User</span>
         <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
         <span class="text-muted">· admin <b th:text="${it.cr.maker}"></b></span>

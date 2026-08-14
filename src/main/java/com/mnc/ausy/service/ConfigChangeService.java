@@ -60,6 +60,10 @@ public class ConfigChangeService {
     }
 
     private static String n(String s){ return s==null?"":s; }
+    /** Tampilkan operasi dalam Bahasa Indonesia (kode internal tetap ADD/EDIT/DELETE). */
+    public static String opLabel(String op){
+        switch (n(op)) { case "ADD": return "TAMBAH"; case "EDIT": return "UBAH"; case "DELETE": return "HAPUS"; default: return n(op); }
+    }
     private static final java.util.regex.Pattern EMAIL =
             java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static boolean invalidEmail(String e){ return e != null && !e.isBlank() && !EMAIL.matcher(e.trim()).matches(); }
@@ -84,8 +88,8 @@ public class ConfigChangeService {
     }
     private String saveReq(ConfigChangeRequest c, String entity, String op, String what){
         cr.save(c);
-        audit.transaction(c.getMaker(), "CONFIG_CHANGE_REQ", op + " " + entity + " " + what + " diajukan (CR#" + c.getId() + ")");
-        return "Permintaan " + op + " " + entityLabel(entity) + " diajukan (menunggu approval Admin Approval).";
+        audit.transaction(c.getMaker(), "CONFIG_CHANGE_REQ", opLabel(op) + " " + entityLabel(entity) + " " + what + " diajukan (CR#" + c.getId() + ")");
+        return "Permintaan " + opLabel(op) + " " + entityLabel(entity) + " diajukan (menunggu approval Admin Approval).";
     }
 
     // ================= USER =================
@@ -253,13 +257,13 @@ public class ConfigChangeService {
 
     // ================= Admin Approval (②) review =================
     public record Diff(String label, String before, String after, boolean changed) {}
-    public record ReviewItem(ConfigChangeRequest cr, List<Diff> diffs, String entityLabel) {}
+    public record ReviewItem(ConfigChangeRequest cr, List<Diff> diffs, String entityLabel, String opLabel) {}
 
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!approval.canApprove(approverGroup, c.getMaker())) continue;
-            out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity())));
+            out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
     }
@@ -281,11 +285,11 @@ public class ConfigChangeService {
     public long countPending(){ return cr.countByStatus("PENDING"); }
 
     /** Pending config changes for the Admin home "Perubahan Config Pending" section. */
-    public record PendingUser(ConfigChangeRequest cr, String targetLabel, String entityLabel) {}
+    public record PendingUser(ConfigChangeRequest cr, String targetLabel, String entityLabel, String opLabel) {}
     public List<PendingUser> pendingList() {
         List<PendingUser> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING"))
-            out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity())));
+            out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         return out;
     }
     private String targetLabel(ConfigChangeRequest c){
@@ -322,8 +326,8 @@ public class ConfigChangeService {
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
         audit.transaction(me.getUsername(), "CONFIG_CHANGE_APPROVE",
-                c.getOp() + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") di-approve & diterapkan");
-        return c.getOp() + " " + entityLabel(c.getEntity()) + " disetujui dan diterapkan.";
+                opLabel(c.getOp()) + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") di-approve & diterapkan");
+        return opLabel(c.getOp()) + " " + entityLabel(c.getEntity()) + " disetujui dan diterapkan.";
     }
 
     @Transactional
@@ -337,7 +341,7 @@ public class ConfigChangeService {
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
         audit.transaction(me.getUsername(), "CONFIG_CHANGE_REJECT",
-                c.getOp() + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
+                opLabel(c.getOp()) + " " + entityLabel(c.getEntity()) + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
         return "Permintaan ditolak. Data tidak diubah; alasan tercatat di audit trail.";
     }
 

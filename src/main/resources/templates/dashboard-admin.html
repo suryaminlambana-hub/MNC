@@ -42,7 +42,7 @@
                     <td><span class="badge bg-secondary-subtle text-secondary" th:text="${p.entityLabel}"></span></td>
                     <td><span class="badge"
                               th:classappend="${p.cr.op == 'ADD'} ? 'bg-success-subtle text-success' : (${p.cr.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
-                              th:text="${p.cr.op}"></span></td>
+                              th:text="${p.opLabel}"></span></td>
                     <td th:text="${p.targetLabel}"></td>
                     <td class="small text-muted" th:text="${p.cr.noteMaker}"></td>
                     <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU APPROVAL</span></td>
