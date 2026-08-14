@@ -34,7 +34,7 @@
         <td><span class="badge bg-primary-subtle text-primary" th:text="${r.approverName}"></span></td>
         <td><i class="fa-solid fa-arrow-right text-muted me-2"></i><span class="badge bg-secondary-subtle text-secondary" th:text="${r.targetName}"></span></td>
         <td>
-          <form th:action="@{/approval/delete}" method="post" class="d-inline" onsubmit="var x=prompt('Alasan hapus aturan? (dikirim ke Admin Approval)'); if(!x){return false;} this.note.value=x; return true;">
+          <form th:action="@{/approval/delete}" method="post" class="d-inline" onsubmit="var x=prompt('Alasan hapus aturan? (wajib diisi, dikirim ke Admin Approval)'); if(x===null){return false;} if(!x.trim()){alert('Alasan wajib diisi. Penghapusan dibatalkan.');return false;} this.note.value=x.trim(); return true;">
             <input type="hidden" name="id" th:value="${r.id}"><input type="hidden" name="note">
             <button class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>

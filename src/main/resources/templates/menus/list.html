@@ -21,7 +21,7 @@
           <button class="btn btn-sm btn-outline-secondary btn-edit"
             th:attr="data-id=${m.idMenu},data-nama=${m.namaMenu},data-url=${m.url},data-parent=${m.parent},data-urutan=${m.urutan}"
             data-bs-toggle="modal" data-bs-target="#editM">Ubah</button>
-          <form th:action="@{/menus/delete}" method="post" class="d-inline" onsubmit="var r=prompt('Alasan hapus menu? (dikirim ke Admin Approval)'); if(!r){return false;} this.note.value=r; return true;">
+          <form th:action="@{/menus/delete}" method="post" class="d-inline" onsubmit="var r=prompt('Alasan hapus menu? (wajib diisi, dikirim ke Admin Approval)'); if(r===null){return false;} if(!r.trim()){alert('Alasan wajib diisi. Penghapusan dibatalkan.');return false;} this.note.value=r.trim(); return true;">
             <input type="hidden" name="idMenu" th:value="${m.idMenu}"><input type="hidden" name="note">
             <button class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>

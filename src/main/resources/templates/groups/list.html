@@ -18,7 +18,7 @@
           <button class="btn btn-sm btn-outline-secondary btn-edit"
             th:attr="data-id=${g.idGroup},data-nama=${g.namaGroup},data-ini=${g.inisial},data-lvl=${g.level}"
             data-bs-toggle="modal" data-bs-target="#editG">Ubah</button>
-          <form th:action="@{/groups/delete}" method="post" class="d-inline" onsubmit="var r=prompt('Alasan hapus group? (dikirim ke Admin Approval)'); if(!r){return false;} this.note.value=r; return true;">
+          <form th:action="@{/groups/delete}" method="post" class="d-inline" onsubmit="var r=prompt('Alasan hapus group? (wajib diisi, dikirim ke Admin Approval)'); if(r===null){return false;} if(!r.trim()){alert('Alasan wajib diisi. Penghapusan dibatalkan.');return false;} this.note.value=r.trim(); return true;">
             <input type="hidden" name="idGroup" th:value="${g.idGroup}"><input type="hidden" name="note">
             <button class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>
