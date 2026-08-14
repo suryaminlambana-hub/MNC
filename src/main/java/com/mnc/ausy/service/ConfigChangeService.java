@@ -34,7 +34,7 @@ public class ConfigChangeService {
         return m;
     }
     private static String entityLabel(String e){
-        return switch (e==null?"":e){ case "GROUP"->"Group"; case "MENU"->"Menu"; case "ACCESS"->"Akses Menu";
+        return switch (e==null?"":e){ case "GROUP"->"Group User"; case "MENU"->"Menu"; case "ACCESS"->"Access Menu";
             case "APPROVAL"->"Approval Group"; default->"User"; };
     }
     /** Kept for backward compat (GL/user forms may reference it). */
@@ -266,6 +266,21 @@ public class ConfigChangeService {
             out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
+    }
+
+    /** One section per Master Data entity, fixed order; only non-empty sections returned. */
+    public record ReviewSection(String entity, String label, List<ReviewItem> items) {}
+    private static final String[] SECTION_ORDER = {"USER","GROUP","MENU","ACCESS","APPROVAL"};
+    public List<ReviewSection> pendingReviewSectionsFor(Integer approverGroup) {
+        Map<String,List<ReviewItem>> byEntity = new LinkedHashMap<>();
+        for (ReviewItem it : pendingReviewFor(approverGroup))
+            byEntity.computeIfAbsent(n(it.cr().getEntity()).isEmpty() ? "USER" : n(it.cr().getEntity()), k -> new ArrayList<>()).add(it);
+        List<ReviewSection> sections = new ArrayList<>();
+        for (String e : SECTION_ORDER)
+            if (byEntity.containsKey(e)) sections.add(new ReviewSection(e, entityLabel(e), byEntity.remove(e)));
+        // any unexpected entity codes appended at the end
+        for (var e : byEntity.entrySet()) sections.add(new ReviewSection(e.getKey(), entityLabel(e.getKey()), e.getValue()));
+        return sections;
     }
 
     private List<Diff> diffs(ConfigChangeRequest c) {
