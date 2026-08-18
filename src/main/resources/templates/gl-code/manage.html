@@ -7,7 +7,6 @@
       <h1 class="ausy-page-title">Manage GL Code</h1>
       <p class="text-muted mb-0">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
     </div>
-    <a class="btn btn-primary" th:href="@{/gl-code/export}"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>

@@ -1,10 +1,10 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
-<head><title>Legacy - List GL — AUSY</title></head>
+<head><title>List GL Aktif — AUSY</title></head>
 <main>
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
-      <h1 class="ausy-page-title">List Data GL</h1>
+      <h1 class="ausy-page-title">List GL Aktif</h1>
       <p class="text-muted mb-0">Total <b th:text="${total}">0</b> baris jurnal ·
         <span th:text="${totalRegistered}">0</span> terdaftar ·
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
