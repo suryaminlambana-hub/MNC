@@ -21,10 +21,11 @@
     <div class="tab-pane fade show active" id="tabUpload">
       <div class="ausy-card">
         <table class="table table-hover align-middle mb-0">
-          <thead><tr><th>No</th><th>Paket</th><th>Uploader</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>No</th><th>Tanggal</th><th>Paket</th><th>Uploader</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
           <tbody>
           <tr th:each="p,i : ${pakets}">
             <td th:text="${i.count}"></td>
+            <td class="text-nowrap text-muted small" th:text="${p.uploadedAt != null} ? ${#temporals.format(p.uploadedAt,'dd-MM-yyyy HH:mm')} : '—'"></td>
             <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p.paket}"></span></span></td>
             <td th:text="${p.inputer}"></td>
             <td class="text-end" th:text="${p.jml}"></td>
@@ -42,7 +43,7 @@
                       th:attr="data-paket=${p.paket},data-inputer=${p.inputer}"><i class="fa-solid fa-xmark"></i> Reject</button>
             </td>
           </tr>
-          <tr th:if="${pakets.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada paket upload yang menunggu otorisasi.</td></tr>
+          <tr th:if="${pakets.isEmpty()}"><td colspan="9" class="text-center text-muted py-3">Tidak ada paket upload yang menunggu otorisasi.</td></tr>
           </tbody>
         </table>
       </div>

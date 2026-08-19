@@ -20,7 +20,8 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
 
     @Query(value = "select no_paket, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
-                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0), " +
+                   "max(adddt) " +
                    "from gl_tabel where status_print='BELUM UPLOAD' " +
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> pendingPakets();

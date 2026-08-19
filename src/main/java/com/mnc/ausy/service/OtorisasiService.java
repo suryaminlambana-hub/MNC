@@ -30,7 +30,8 @@ public class OtorisasiService {
         this.gl = gl; this.approval = approval; this.audit = audit; this.ftp = ftp; this.transfers = transfers;
     }
 
-    public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced) {}
+    public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced,
+                        LocalDateTime uploadedAt) {}
 
     /** Pending pakets this approver-group is allowed to authorize. */
     public List<Paket> pendingFor(Integer approverGroup) {
@@ -41,7 +42,8 @@ public class OtorisasiService {
             if (!approval.canApprove(approverGroup, inputer)) continue;
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
-            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0));
+            LocalDateTime uploadedAt = (r[5] instanceof java.sql.Timestamp ts) ? ts.toLocalDateTime() : null;
+            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, uploadedAt));
         }
         return out;
     }
