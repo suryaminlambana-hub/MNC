@@ -24,11 +24,12 @@ public class SecurityConfig {
                 // (1) CONFIG/SETTING: user, group, menu, access, approval, GL Code (parameter)
                 .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**", "/admin/**").hasAuthority("GROUP_1")
                 // (3) BUSINESS MAKER: upload, GL data operations, & GL Code parameter (dipindah dari admin — BUG_00056)
-                .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**", "/gl-code/**").hasAuthority("GROUP_3")
+                .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**", "/gl-code/**",
+                                 "/gl-legacy/export-request").hasAuthority("GROUP_3")
                 // (2) CONFIG APPROVER (Admin Approval): authorize user/config change requests
                 .requestMatchers("/config-change/**").hasAuthority("GROUP_2")
                 // (4) BUSINESS APPROVER: otorisasi / approve (approve-only)
-                .requestMatchers("/otorisasi/**", "/otorisasi-gl/**", "/gl-change/**").hasAuthority("GROUP_4")
+                .requestMatchers("/otorisasi/**", "/otorisasi-gl/**", "/otorisasi-export/**", "/gl-change/**", "/gl-export/**").hasAuthority("GROUP_4")
                 // Audit Trail: only the approver roles — Config Approver (2) & Checker (4).
                 // Admin (1) and Maker (3) cannot view it (per role revisions).
                 .requestMatchers("/audit/**").hasAnyAuthority("GROUP_2", "GROUP_4")

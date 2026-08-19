@@ -8,7 +8,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-/** Manajemen Otorisasi GL — satu halaman: otorisasi upload paket (export GLTRRF) + otorisasi perubahan GL. */
+/** Manajemen Otorisasi GL — satu halaman: otorisasi upload paket + otorisasi perubahan GL. */
 @Controller
 public class OtorisasiGlController {
     private final OtorisasiService otorisasi;

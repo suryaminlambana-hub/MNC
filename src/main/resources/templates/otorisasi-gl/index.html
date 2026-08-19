@@ -35,7 +35,7 @@
                 <span th:unless="${p.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" th:href="@{'/report/jurnal/'+${p.paket}}" target="_blank"><i class="fa-solid fa-file-pdf"></i> PDF</a>
-              <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve &amp; export paket ini ke core banking?');">
+              <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve paket ini menjadi GL Aktif?');">
                 <input type="hidden" name="paket" th:value="${p.paket}"><input type="hidden" name="inputer" th:value="${p.inputer}">
                 <button class="btn btn-sm btn-success" th:disabled="${!p.balanced}"><i class="fa-solid fa-check"></i> Approve</button>
               </form>

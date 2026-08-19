@@ -2,7 +2,7 @@ package com.mnc.ausy.web;
 
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.FtpAdminService;
-import com.mnc.ausy.service.OtorisasiService;
+import com.mnc.ausy.service.GlExportService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,10 +14,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/ftp")
 public class FtpConfigController {
     private final FtpAdminService ftpAdmin;
-    private final OtorisasiService otorisasi;
+    private final GlExportService glExport;
 
-    public FtpConfigController(FtpAdminService ftpAdmin, OtorisasiService otorisasi) {
-        this.ftpAdmin = ftpAdmin; this.otorisasi = otorisasi;
+    public FtpConfigController(FtpAdminService ftpAdmin, GlExportService glExport) {
+        this.ftpAdmin = ftpAdmin; this.glExport = glExport;
     }
 
     @GetMapping
@@ -50,7 +50,7 @@ public class FtpConfigController {
 
     @PostMapping("/resend/{id}")
     public String resend(@PathVariable Long id, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = otorisasi.resend(id, me.getUsername());
+        String msg = glExport.resend(id, me.getUsername());
         ra.addFlashAttribute(msg.startsWith("Berhasil") ? "ok" : "warn", msg);
         return "redirect:/admin/ftp";
     }

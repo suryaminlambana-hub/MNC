@@ -5,8 +5,7 @@ import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AuditService;
-import com.mnc.ausy.service.ExcelExportService;
-import jakarta.servlet.http.HttpServletResponse;
+import com.mnc.ausy.service.GlExportService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,11 +20,11 @@ import java.util.stream.Collectors;
 public class GlDataController {
     private final GlTabelRepository gl;
     private final GlCodeRepository glCode;
-    private final ExcelExportService excel;
+    private final GlExportService glExport;
     private final AuditService audit;
 
-    public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, ExcelExportService excel, AuditService audit) {
-        this.gl = gl; this.glCode = glCode; this.excel = excel; this.audit = audit;
+    public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport, AuditService audit) {
+        this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
     }
 
     /** A GL row is "registered" when its NoGL + D/C exists in the GL Code master. */
@@ -53,34 +52,18 @@ public class GlDataController {
         model.addAttribute("total", rows.size());
         model.addAttribute("totalRegistered", registeredCount);
         model.addAttribute("totalAmount", totalAmount);
+        model.addAttribute("exportableCount", glExport.exportableCount());
         return "gl-legacy/list";
     }
 
-    /** Export List GL to Excel — only rows whose GL is registered; unregistered auto-filtered out. */
-    @GetMapping("/gl-legacy/export")
-    public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        List<GlTabel> all = gl.findAll();
-        Set<String> reg = registeredKeys();
-        // export only active, registered rows that have passed otorisasi (exclude PENDING & soft-deleted)
-        List<GlTabel> rows = all.stream()
-                .filter(r -> r.getActive() != null && r.getActive() == 1
-                        && !"PENDING".equals(r.getStatusDual()) && isRegistered(reg, r))
-                .collect(Collectors.toList());
-
-        List<String> head = List.of("No","ID","Paket","NoGL","D/C","GL Name","Description","Amount","Tgl","Uploader","GLTRRF","Registered");
-        List<List<Object>> data = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
-        int no = 1;
-        for (GlTabel g : rows) {
-            data.add(Arrays.asList(no++, g.getId(), n(g.getNoPaket()), n(g.getGltrac()), n(g.getGltrcd()), n(g.getGlName()),
-                    n(g.getGltrds()), g.getGltram() == null ? 0d : g.getGltram(), n(g.getGltrpd()),
-                    n(g.getGltrus()), n(g.getGltrrf()), "Terdaftar"));
-            total = total.add(g.getGltram() == null ? BigDecimal.ZERO : g.getGltram());
-        }
-        data.add(Arrays.asList("", "", "", "", "", "", "TOTAL (" + rows.size() + " data terdaftar)", total, "", "", "", ""));
-        excel.download(resp, "List GL", "List_GL", head, data, true);
-        audit.transaction(me.getUsername(), "EXPORT_GL",
-                "Export List GL ke Excel: " + rows.size() + " baris terdaftar (dari " + all.size() + " total)");
+    /**
+     * Maker "Ajukan Export": ajukan seluruh GL aktif yang belum di-export ke checker (Otorisasi Export GL).
+     * File ACCTXT tidak diunduh ke komputer — dikirim ke FTP setelah checker approve.
+     */
+    @PostMapping("/gl-legacy/export-request")
+    public String exportRequest(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", glExport.submitExport(me));
+        return "redirect:/gl-legacy";
     }
 
     @GetMapping("/gl-delete")

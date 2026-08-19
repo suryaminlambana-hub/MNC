@@ -34,6 +34,7 @@ public class GlTabel {
     private String gltrrf;   // reference
     @Column(name="status_dual") private String statusDual;
     private Short active = 1;   // 1=active, 0=soft-deleted (Workflow 8.3.e)
+    @Column(name="export_req_id") private Long exportReqId;   // link ke gl_export_request saat diajukan export
 
     // getters/setters
     public Short getActive(){return active;} public void setActive(Short v){active=v;}
@@ -63,4 +64,5 @@ public class GlTabel {
     public String getGlotcc(){return glotcc;} public void setGlotcc(String v){glotcc=v;}
     public String getGltrrf(){return gltrrf;} public void setGltrrf(String v){gltrrf=v;}
     public String getStatusDual(){return statusDual;} public void setStatusDual(String v){statusDual=v;}
+    public Long getExportReqId(){return exportReqId;} public void setExportReqId(Long v){exportReqId=v;}
 }

@@ -49,4 +49,30 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Modifying @Transactional
     @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u")
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
+
+    // ===== Export flow (maker Ajukan Export -> checker Otorisasi Export -> FTP) =====
+    /** GL aktif yang sudah lolos otorisasi upload tapi BELUM diajukan/diexport. */
+    @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED' " +
+           "and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null order by g.id")
+    List<GlTabel> findExportable();
+
+    long countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull(Short active, String statusDual, String statusPrint);
+
+    List<GlTabel> findByExportReqIdOrderById(Long exportReqId);
+
+    /** Tandai baris exportable ke sebuah request (dipanggil saat maker Ajukan Export). */
+    @Modifying @Transactional
+    @Query("update GlTabel g set g.exportReqId=:rid, g.statusPrint='PROSES EXPORT' " +
+           "where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null")
+    int markExportable(@Param("rid") Long reqId);
+
+    /** Approve export: baris request jadi SUDAH UPLOAD (terkirim ke core). */
+    @Modifying @Transactional
+    @Query("update GlTabel g set g.statusPrint='SUDAH UPLOAD' where g.exportReqId=:rid")
+    int markExported(@Param("rid") Long reqId);
+
+    /** Reject export: kembalikan baris agar bisa diajukan lagi. */
+    @Modifying @Transactional
+    @Query("update GlTabel g set g.statusPrint='BELUM UPLOAD', g.exportReqId=null where g.exportReqId=:rid")
+    int revertExport(@Param("rid") Long reqId);
 }
