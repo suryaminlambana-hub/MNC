@@ -22,7 +22,7 @@ public class SecurityConfig {
                 .requestMatchers("/login", "/webjars/**", "/css/**", "/js/**", "/img/**", "/favicon.ico").permitAll()
                 // --- Segregation of Duties (group authorities: GROUP_1..GROUP_4) ---
                 // (1) CONFIG/SETTING: user, group, menu, access, approval, GL Code (parameter)
-                .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**").hasAuthority("GROUP_1")
+                .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**", "/admin/**").hasAuthority("GROUP_1")
                 // (3) BUSINESS MAKER: upload, GL data operations, & GL Code parameter (dipindah dari admin — BUG_00056)
                 .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**", "/gl-code/**").hasAuthority("GROUP_3")
                 // (2) CONFIG APPROVER (Admin Approval): authorize user/config change requests
