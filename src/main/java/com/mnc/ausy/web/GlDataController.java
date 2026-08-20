@@ -37,7 +37,7 @@ public class GlDataController {
     private static String n(String s) { return s == null ? "" : s; }
 
     @GetMapping("/gl-legacy")
-    public String list(Model model) {
+    public String list(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         // Only GL yang aktif & sudah lolos otorisasi — exclude PENDING dan soft-deleted (active=0).
         List<GlTabel> rows = gl.findAll().stream()
                 .filter(r -> r.getActive() != null && r.getActive() == 1 && !"PENDING".equals(r.getStatusDual()))
@@ -53,7 +53,7 @@ public class GlDataController {
         model.addAttribute("totalRegistered", registeredCount);
         model.addAttribute("totalAmount", totalAmount);
         model.addAttribute("exportableCount", glExport.exportableCount());
-        model.addAttribute("pendingExportCount", glExport.pendingCount());
+        model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         return "gl-legacy/list";
     }
 
@@ -62,8 +62,8 @@ public class GlDataController {
      * File ACCTXT tidak diunduh ke komputer — dikirim ke FTP setelah checker approve.
      */
     @PostMapping("/gl-legacy/export-request")
-    public String exportRequest(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.submitExport(me);
+    public String exportRequest(@RequestParam String note, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        String msg = glExport.submitExport(me, note);
         ra.addFlashAttribute(msg.startsWith("Permintaan export diajukan") ? "ok" : "warn", msg);
         return "redirect:/gl-legacy";
     }

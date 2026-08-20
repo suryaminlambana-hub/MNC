@@ -1,10 +1,13 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.repo.*;
+import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.GlChangeService;
+import com.mnc.ausy.service.GlExportService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,19 +23,20 @@ public class DashboardController {
     private final TlogTransactionRepository tx;
     private final GlChangeService glChange;
     private final ConfigChangeService configChange;
+    private final GlExportService glExport;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
-                               ConfigChangeService configChange) {
+                               ConfigChangeService configChange, GlExportService glExport) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
-        this.glChange = glChange; this.configChange = configChange;
+        this.glChange = glChange; this.configChange = configChange; this.glExport = glExport;
     }
 
     @GetMapping("/")
     public String root() { return "redirect:/dashboard"; }
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model, Authentication auth) {
+    public String dashboard(Model model, Authentication auth, @AuthenticationPrincipal AusyUserDetails principal) {
         // --- Admin / Config (1): only user & group config + user-change history (no GL/business) ---
         if (hasGroup(auth, "GROUP_1")) {
             model.addAttribute("totalUsers", users.count());
@@ -68,9 +72,12 @@ public class DashboardController {
 
         // --- Checker (4): only what needs authorizing + audit-trail recent (scoped Maker+Checker) ---
         if (hasGroup(auth, "GROUP_4")) {
+            // "Paket Menunggu Otorisasi" = upload paket + export GL (keduanya di tab Otorisasi Upload/Export GL)
             List<Object[]> pendingPaketList = gl.pendingPakets();
+            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.pendingExportFor(principal.getIdGroup());
             model.addAttribute("pendingPaketList", pendingPaketList);
-            model.addAttribute("pendingPakets", pendingPaketList.size());
+            model.addAttribute("pendingExportList", pendingExportList);
+            model.addAttribute("pendingPakets", pendingPaketList.size() + pendingExportList.size());
             model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
             model.addAttribute("pendingChangeList", glChange.pendingVisible());
             model.addAttribute("recent", tx.findByUserGroups(List.of(3, 4), PageRequest.of(0, 10)));

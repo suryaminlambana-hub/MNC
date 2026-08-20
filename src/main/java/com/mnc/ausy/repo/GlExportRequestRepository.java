@@ -7,4 +7,5 @@ import java.util.List;
 public interface GlExportRequestRepository extends JpaRepository<GlExportRequest, Long> {
     List<GlExportRequest> findByStatusOrderByCreatedAtDesc(String status);
     long countByStatus(String status);
+    List<GlExportRequest> findByRequestedByAndStatusOrderByCreatedAtDesc(String requestedBy, String status);
 }

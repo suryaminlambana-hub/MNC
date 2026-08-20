@@ -56,12 +56,13 @@
     <div class="tab-pane fade" id="tabExport">
       <div class="ausy-card">
         <table class="table table-hover align-middle mb-0">
-          <thead><tr><th>No</th><th>Tanggal</th><th>Diajukan oleh</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>No</th><th>Tanggal</th><th>Diajukan oleh</th><th>Alasan</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
           <tbody>
           <tr th:each="e,i : ${exportReqs}">
             <td th:text="${i.count}"></td>
             <td class="text-nowrap text-muted small" th:text="${#temporals.format(e.createdAt,'dd-MM-yyyy HH:mm')}"></td>
             <td th:text="${e.requestedBy}"></td>
+            <td class="small text-muted" th:text="${e.noteMaker}"></td>
             <td class="text-end" th:text="${e.rowsCount}"></td>
             <td class="text-end" th:text="${#numbers.formatDecimal(e.debit,1,'POINT',2,'COMMA')}"></td>
             <td class="text-end" th:text="${#numbers.formatDecimal(e.credit,1,'POINT',2,'COMMA')}"></td>
@@ -76,7 +77,7 @@
                       th:attr="data-id=${e.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
             </td>
           </tr>
-          <tr th:if="${exportReqs.isEmpty()}"><td colspan="8" class="text-center text-muted py-4">Tidak ada permintaan export yang menunggu otorisasi.</td></tr>
+          <tr th:if="${exportReqs.isEmpty()}"><td colspan="9" class="text-center text-muted py-4">Tidak ada permintaan export yang menunggu otorisasi.</td></tr>
           </tbody>
         </table>
       </div>

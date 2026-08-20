@@ -9,28 +9,68 @@
         <span th:text="${totalRegistered}">0</span> terdaftar ·
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
     </div>
-    <form id="exportForm" method="post" th:action="@{/gl-legacy/export-request}">
-      <button type="submit" class="btn btn-primary" onclick="return confirmExport();">
-        <i class="fa-solid fa-paper-plane"></i> Ajukan Export
-        <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
-      </button>
-    </form>
+    <button type="button" class="btn btn-primary" id="btnAjukanExport">
+      <i class="fa-solid fa-paper-plane"></i> Ajukan Export
+      <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
+    </button>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
+  <!-- Ajukan Export modal -->
+  <div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" method="post" th:action="@{/gl-legacy/export-request}">
+        <div class="modal-header"><h5 class="modal-title">Ajukan Export GL ke Checker</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <p class="text-muted small">Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
+          <label class="form-label">Alasan pengajuan export <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required placeholder="Alasan pengajuan export (tercatat di audit trail)"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Ajukan ke Checker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Info modal: nothing to export / export already pending -->
+  <div class="modal fade" id="exportInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Ajukan Export GL</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div th:if="${not #lists.isEmpty(myPendingExports)}">
+            <p>Kamu masih punya pengajuan export yang belum di-approve checker:</p>
+            <ul class="mb-0">
+              <li th:each="p : ${myPendingExports}">
+                <span th:text="${#temporals.format(p.createdAt,'dd-MM-yyyy HH:mm')}"></span> —
+                <span th:text="${p.rowsCount}"></span> baris,
+                debit <span th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></span>
+              </li>
+            </ul>
+          </div>
+          <p th:if="${#lists.isEmpty(myPendingExports)}" class="mb-0">Tidak ada GL aktif yang belum di-export.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script th:inline="javascript">
-    function confirmExport() {
+    (function(){
       var exportableCount = /*[[${exportableCount}]]*/ 0;
-      var pendingExportCount = /*[[${pendingExportCount}]]*/ 0;
-      if (exportableCount === 0) {
-        alert(pendingExportCount > 0
-          ? 'Export sebelumnya sedang menunggu approval checker.'
-          : 'Tidak ada GL aktif yang belum di-export.');
-        return false;
-      }
-      return confirm('Ajukan export seluruh GL aktif yang belum di-export ke checker?');
-    }
+      var em = new bootstrap.Modal(document.getElementById('exportModal'));
+      var im = new bootstrap.Modal(document.getElementById('exportInfoModal'));
+      document.getElementById('btnAjukanExport').addEventListener('click', function(){
+        if (exportableCount > 0) { em.show(); } else { im.show(); }
+      });
+    })();
   </script>
   <p class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
      Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.

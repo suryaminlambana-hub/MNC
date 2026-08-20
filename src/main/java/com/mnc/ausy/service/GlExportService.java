@@ -44,6 +44,11 @@ public class GlExportService {
 
     public long pendingCount() { return requests.countByStatus("PENDING"); }
 
+    /** Maker's own pending export requests (still waiting on checker) — shown so they don't re-submit blindly. */
+    public List<GlExportRequest> myPending(String username) {
+        return requests.findByRequestedByAndStatusOrderByCreatedAtDesc(username, "PENDING");
+    }
+
     /** How many active GL rows are exportable right now (for the maker button state). */
     public long exportableCount() {
         return gl.countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull((short)1, "APPROVED", "BELUM UPLOAD");
@@ -51,7 +56,8 @@ public class GlExportService {
 
     // ---------- Maker: Ajukan Export ----------
     @Transactional
-    public String submitExport(AusyUserDetails me) {
+    public String submitExport(AusyUserDetails me, String note) {
+        if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
         List<GlTabel> rows = gl.findExportable();
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
@@ -64,7 +70,7 @@ public class GlExportService {
         GlExportRequest req = new GlExportRequest();
         req.setRequestedBy(me.getUsername()); req.setRequesterGroup(me.getIdGroup());
         req.setStatus("PENDING"); req.setRowsCount(rows.size()); req.setDebit(d); req.setCredit(c);
-        req.setCreatedAt(LocalDateTime.now());
+        req.setCreatedAt(LocalDateTime.now()); req.setNoteMaker(note);
         requests.save(req);
         gl.markExportable(req.getId());
         audit.transaction(me.getUsername(), "EXPORT_REQ",

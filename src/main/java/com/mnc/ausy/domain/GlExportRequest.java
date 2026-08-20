@@ -21,6 +21,7 @@ public class GlExportRequest {
     private BigDecimal credit = BigDecimal.ZERO;
     @Column(name = "file_name") private String fileName;
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "note_maker") private String noteMaker;
     private String checker;
     @Column(name = "decided_at") private LocalDateTime decidedAt;
     @Column(name = "note_checker") private String noteChecker;
@@ -44,6 +45,8 @@ public class GlExportRequest {
     public void setFileName(String fileName) { this.fileName = fileName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getNoteMaker() { return noteMaker; }
+    public void setNoteMaker(String noteMaker) { this.noteMaker = noteMaker; }
     public String getChecker() { return checker; }
     public void setChecker(String checker) { this.checker = checker; }
     public LocalDateTime getDecidedAt() { return decidedAt; }
