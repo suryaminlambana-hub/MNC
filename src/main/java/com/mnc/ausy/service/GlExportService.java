@@ -53,7 +53,10 @@ public class GlExportService {
     @Transactional
     public String submitExport(AusyUserDetails me) {
         List<GlTabel> rows = gl.findExportable();
-        if (rows.isEmpty()) return "Tidak ada GL aktif yang belum di-export.";
+        if (rows.isEmpty()) {
+            if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
+            return "Tidak ada GL aktif yang belum di-export.";
+        }
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : rows) {
             if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));

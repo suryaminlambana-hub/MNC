@@ -53,6 +53,7 @@ public class GlDataController {
         model.addAttribute("totalRegistered", registeredCount);
         model.addAttribute("totalAmount", totalAmount);
         model.addAttribute("exportableCount", glExport.exportableCount());
+        model.addAttribute("pendingExportCount", glExport.pendingCount());
         return "gl-legacy/list";
     }
 
@@ -62,7 +63,8 @@ public class GlDataController {
      */
     @PostMapping("/gl-legacy/export-request")
     public String exportRequest(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", glExport.submitExport(me));
+        String msg = glExport.submitExport(me);
+        ra.addFlashAttribute(msg.startsWith("Permintaan export diajukan") ? "ok" : "warn", msg);
         return "redirect:/gl-legacy";
     }
 

@@ -3,7 +3,7 @@
 <head><title>Manajemen Otorisasi GL — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Manajemen Otorisasi GL</h1>
-  <p class="text-muted">Otorisasi upload GL (export ke core banking) &amp; otorisasi perubahan GL — dalam satu halaman.</p>
+  <p class="text-muted">Otorisasi upload GL (export ke core banking), otorisasi perubahan GL &amp; otorisasi export GL — dalam satu halaman.</p>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
@@ -11,6 +11,9 @@
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabUpload" type="button">
       <i class="fa-solid fa-file-circle-check"></i> Otorisasi Upload GL
       <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(pakets)}">0</span></button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabExport" type="button">
+      <i class="fa-solid fa-file-export"></i> Otorisasi Export GL
+      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(exportReqs)}">0</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabChange" type="button">
       <i class="fa-solid fa-clipboard-check"></i> Otorisasi Perubahan GL
       <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(items)}">0</span></button></li>
@@ -49,7 +52,37 @@
       </div>
     </div>
 
-    <!-- ===== TAB 2: Otorisasi Perubahan GL ===== -->
+    <!-- ===== TAB 2: Otorisasi Export GL ===== -->
+    <div class="tab-pane fade" id="tabExport">
+      <div class="ausy-card">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>No</th><th>Tanggal</th><th>Diajukan oleh</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th><th>Aksi</th></tr></thead>
+          <tbody>
+          <tr th:each="e,i : ${exportReqs}">
+            <td th:text="${i.count}"></td>
+            <td class="text-nowrap text-muted small" th:text="${#temporals.format(e.createdAt,'dd-MM-yyyy HH:mm')}"></td>
+            <td th:text="${e.requestedBy}"></td>
+            <td class="text-end" th:text="${e.rowsCount}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(e.debit,1,'POINT',2,'COMMA')}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(e.credit,1,'POINT',2,'COMMA')}"></td>
+            <td><span th:if="${e.balanced}" class="badge bg-success-subtle text-success">Balance</span>
+                <span th:unless="${e.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+            <td class="text-nowrap">
+              <form th:action="@{/gl-export/approve}" method="post" class="d-inline" onsubmit="return confirm('Approve export ini &amp; kirim ACCTXT ke FTP?');">
+                <input type="hidden" name="reqId" th:value="${e.id}">
+                <button class="btn btn-sm btn-success" th:disabled="${!e.balanced}"><i class="fa-solid fa-check"></i> Approve</button>
+              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger btn-reject-export"
+                      th:attr="data-id=${e.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
+            </td>
+          </tr>
+          <tr th:if="${exportReqs.isEmpty()}"><td colspan="8" class="text-center text-muted py-4">Tidak ada permintaan export yang menunggu otorisasi.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== TAB 3: Otorisasi Perubahan GL ===== -->
     <div class="tab-pane fade" id="tabChange">
       <div class="ausy-review">
         <div th:if="${items.isEmpty()}" class="ausy-card text-center text-muted py-4">
@@ -149,6 +182,26 @@
     </div>
   </div>
 
+  <!-- Reject modal: export request -->
+  <div class="modal fade" id="rejectExportModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" th:action="@{/gl-export/reject}" method="post">
+        <div class="modal-header"><h5 class="modal-title">Tolak Export #<span id="exNo"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" name="reqId" id="exIdIn">
+          <label class="form-label">Catatan penolakan <span class="text-danger">*</span></label>
+          <textarea name="note" class="form-control" rows="3" required placeholder="Alasan penolakan (tercatat di audit trail)"></textarea>
+          <p class="text-muted small mt-2 mb-0">GL dikembalikan agar bisa diajukan lagi. Alasan tercatat di audit trail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">Tolak Export</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     (function(){
       var mp=new bootstrap.Modal(document.getElementById('rejectPaketModal'));
@@ -164,6 +217,13 @@
         b.addEventListener('click',function(){
           document.getElementById('crNo').textContent=b.dataset.cr;
           document.getElementById('crIdIn').value=b.dataset.cr; mc.show();
+        });
+      });
+      var me=new bootstrap.Modal(document.getElementById('rejectExportModal'));
+      document.querySelectorAll('.btn-reject-export').forEach(function(b){
+        b.addEventListener('click',function(){
+          document.getElementById('exNo').textContent=b.dataset.id;
+          document.getElementById('exIdIn').value=b.dataset.id; me.show();
         });
       });
     })();

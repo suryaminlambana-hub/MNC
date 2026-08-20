@@ -9,15 +9,29 @@
         <span th:text="${totalRegistered}">0</span> terdaftar ·
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
     </div>
-    <form method="post" th:action="@{/gl-legacy/export-request}"
-          onsubmit="return confirm('Ajukan export seluruh GL aktif yang belum di-export ke checker?');">
-      <button class="btn btn-primary" th:disabled="${exportableCount == 0}">
+    <form id="exportForm" method="post" th:action="@{/gl-legacy/export-request}">
+      <button type="submit" class="btn btn-primary" onclick="return confirmExport();">
         <i class="fa-solid fa-paper-plane"></i> Ajukan Export
         <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
       </button>
     </form>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <script th:inline="javascript">
+    function confirmExport() {
+      var exportableCount = /*[[${exportableCount}]]*/ 0;
+      var pendingExportCount = /*[[${pendingExportCount}]]*/ 0;
+      if (exportableCount === 0) {
+        alert(pendingExportCount > 0
+          ? 'Export sebelumnya sedang menunggu approval checker.'
+          : 'Tidak ada GL aktif yang belum di-export.');
+        return false;
+      }
+      return confirm('Ajukan export seluruh GL aktif yang belum di-export ke checker?');
+    }
+  </script>
   <p class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
      Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
      Hanya GL aktif yang belum di-export yang disertakan.</p>
