@@ -36,10 +36,17 @@ public class OtorisasiService {
             if (!approval.canApprove(approverGroup, inputer)) continue;
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
-            LocalDateTime uploadedAt = (r[5] instanceof java.sql.Timestamp ts) ? ts.toLocalDateTime() : null;
-            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, uploadedAt));
+            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, toLocalDateTime(r[5])));
         }
         return out;
+    }
+
+    /** Native queries may hand back max(adddt) as java.sql.Timestamp or java.time.LocalDateTime
+     *  depending on driver/Hibernate version — accept either. */
+    private static LocalDateTime toLocalDateTime(Object o) {
+        if (o instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+        if (o instanceof LocalDateTime ldt) return ldt;
+        return null;
     }
 
     public record ExportResult(boolean ok, String message, int rows, String file) {}
