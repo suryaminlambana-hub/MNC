@@ -51,10 +51,18 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
 
     // ===== Export flow (maker Ajukan Export -> checker Otorisasi Export -> FTP) =====
-    /** GL aktif yang sudah lolos otorisasi upload tapi BELUM diajukan/diexport. */
+    /** GL aktif yang sudah lolos otorisasi upload tapi BELUM diajukan/diexport, dibatasi paket pilihan maker. */
     @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED' " +
-           "and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null order by g.id")
-    List<GlTabel> findExportable();
+           "and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.noPaket in :pakets order by g.id")
+    List<GlTabel> findExportableByNoPaketIn(@Param("pakets") List<String> pakets);
+
+    /** Exportable rows grouped by paket, for the maker's "pilih paket" checklist. */
+    @Query(value = "select no_paket, count(*), " +
+                   "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
+                   "from gl_tabel where active=1 and status_dual='APPROVED' and status_print='BELUM UPLOAD' " +
+                   "and export_req_id is null group by no_paket order by no_paket", nativeQuery = true)
+    List<Object[]> exportablePakets();
 
     long countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull(Short active, String statusDual, String statusPrint);
 
@@ -63,8 +71,9 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     /** Tandai baris exportable ke sebuah request (dipanggil saat maker Ajukan Export). */
     @Modifying @Transactional
     @Query("update GlTabel g set g.exportReqId=:rid, g.statusPrint='PROSES EXPORT' " +
-           "where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null")
-    int markExportable(@Param("rid") Long reqId);
+           "where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null " +
+           "and g.noPaket in :pakets")
+    int markExportable(@Param("rid") Long reqId, @Param("pakets") List<String> pakets);
 
     /** Approve export: baris request jadi SUDAH UPLOAD (terkirim ke core). */
     @Modifying @Transactional

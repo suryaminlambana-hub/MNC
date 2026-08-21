@@ -20,11 +20,32 @@
   <!-- Ajukan Export modal -->
   <div class="modal fade" id="exportModal" tabindex="-1">
     <div class="modal-dialog">
-      <form class="modal-content" method="post" th:action="@{/gl-legacy/export-request}">
+      <form class="modal-content" id="exportForm" method="post" th:action="@{/gl-legacy/export-request}">
         <div class="modal-header"><h5 class="modal-title">Ajukan Export GL ke Checker</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <p class="text-muted small">Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
+
+          <label class="form-label">Pilih paket yang diajukan <span class="text-danger">*</span></label>
+          <div class="ausy-card mb-3" style="padding:0">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr>
+                <th class="ps-3"><input type="checkbox" id="paketAll"></th>
+                <th>Paket</th><th class="text-end">Jml Baris</th>
+                <th class="text-end">Debit</th><th class="text-end pe-3">Credit</th>
+              </tr></thead>
+              <tbody>
+              <tr th:each="p : ${exportablePakets}">
+                <td class="ps-3"><input type="checkbox" name="pakets" class="paket-cb" th:value="${p[0]}"></td>
+                <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p[0]}"></span></span></td>
+                <td class="text-end" th:text="${p[1]}"></td>
+                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[2],1,'POINT',2,'COMMA')}"></td>
+                <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+
           <label class="form-label">Alasan pengajuan export <span class="text-danger">*</span></label>
           <textarea name="note" class="form-control" rows="3" required placeholder="Alasan pengajuan export (tercatat di audit trail)"></textarea>
         </div>
@@ -69,6 +90,19 @@
       var im = new bootstrap.Modal(document.getElementById('exportInfoModal'));
       document.getElementById('btnAjukanExport').addEventListener('click', function(){
         if (exportableCount > 0) { em.show(); } else { im.show(); }
+      });
+
+      var paketAll = document.getElementById('paketAll');
+      var paketCbs = document.querySelectorAll('.paket-cb');
+      paketAll.addEventListener('change', function(){
+        paketCbs.forEach(function(cb){ cb.checked = paketAll.checked; });
+      });
+      document.getElementById('exportForm').addEventListener('submit', function(e){
+        var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; });
+        if (!anyChecked) {
+          e.preventDefault();
+          alert('Pilih minimal satu paket yang ingin diajukan export.');
+        }
       });
     })();
   </script>

@@ -53,17 +53,19 @@ public class GlDataController {
         model.addAttribute("totalRegistered", registeredCount);
         model.addAttribute("totalAmount", totalAmount);
         model.addAttribute("exportableCount", glExport.exportableCount());
+        model.addAttribute("exportablePakets", glExport.exportablePakets());
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         return "gl-legacy/list";
     }
 
     /**
-     * Maker "Ajukan Export": ajukan seluruh GL aktif yang belum di-export ke checker (Otorisasi Export GL).
+     * Maker "Ajukan Export": ajukan paket GL aktif pilihan maker ke checker (Otorisasi Export GL).
      * File ACCTXT tidak diunduh ke komputer — dikirim ke FTP setelah checker approve.
      */
     @PostMapping("/gl-legacy/export-request")
-    public String exportRequest(@RequestParam String note, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.submitExport(me, note);
+    public String exportRequest(@RequestParam String note, @RequestParam(required = false) List<String> pakets,
+                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        String msg = glExport.submitExport(me, note, pakets);
         ra.addFlashAttribute(msg.startsWith("Permintaan export diajukan") ? "ok" : "warn", msg);
         return "redirect:/gl-legacy";
     }

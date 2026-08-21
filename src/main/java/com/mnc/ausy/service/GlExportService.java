@@ -59,11 +59,15 @@ public class GlExportService {
         return gl.countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull((short)1, "APPROVED", "BELUM UPLOAD");
     }
 
+    /** Exportable rows grouped by paket, so the maker can pick which one(s) to submit. */
+    public List<Object[]> exportablePakets() { return gl.exportablePakets(); }
+
     // ---------- Maker: Ajukan Export ----------
     @Transactional
-    public String submitExport(AusyUserDetails me, String note) {
+    public String submitExport(AusyUserDetails me, String note, List<String> pakets) {
         if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
-        List<GlTabel> rows = gl.findExportable();
+        if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu paket untuk diajukan export.";
+        List<GlTabel> rows = gl.findExportableByNoPaketIn(pakets);
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
             return "Tidak ada GL aktif yang belum di-export.";
@@ -77,9 +81,9 @@ public class GlExportService {
         req.setStatus("PENDING"); req.setRowsCount(rows.size()); req.setDebit(d); req.setCredit(c);
         req.setCreatedAt(LocalDateTime.now()); req.setNoteMaker(note);
         requests.save(req);
-        gl.markExportable(req.getId());
+        gl.markExportable(req.getId(), pakets);
         audit.transaction(me.getUsername(), "EXPORT_REQ",
-                "Ajukan export GL aktif: " + rows.size() + " baris (CR#" + req.getId() + ")");
+                "Ajukan export paket " + String.join(",", pakets) + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
         return "Permintaan export diajukan (" + rows.size() + " baris) — menunggu otorisasi checker.";
     }
 
