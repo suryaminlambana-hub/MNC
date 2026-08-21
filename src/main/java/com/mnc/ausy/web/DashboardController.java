@@ -67,6 +67,7 @@ public class DashboardController {
             model.addAttribute("glActiveList", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING"));
             // "Perubahan GL Pending" = upload paket + change request (add/edit/delete) + export GL, menunggu otorisasi
             List<Object[]> pendingPaketList = gl.pendingPakets();
+            normalizeUploadedAt(pendingPaketList);
             List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible();
             List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.allPending();
             model.addAttribute("pendingPaketList", pendingPaketList);
@@ -110,5 +111,14 @@ public class DashboardController {
     private boolean hasGroup(Authentication auth, String authority) {
         return auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> authority.equals(a.getAuthority()));
+    }
+
+    /** pendingPakets()'s last column (max(adddt)) may come back as java.sql.Timestamp or
+     *  java.time.LocalDateTime depending on driver/Hibernate version — Thymeleaf's #temporals
+     *  only accepts the latter, so normalize it in place before it reaches the template. */
+    private static void normalizeUploadedAt(List<Object[]> rows) {
+        for (Object[] r : rows) {
+            if (r[5] instanceof java.sql.Timestamp ts) r[5] = ts.toLocalDateTime();
+        }
     }
 }
