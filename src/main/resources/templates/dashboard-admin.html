@@ -20,6 +20,11 @@
             <div class="dash-ico c-purple"><i class="fa-solid fa-user-clock"></i></div>
             <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">Perubahan Config Pending</div></div>
         </div>
+        <div class="dash-card" th:classappend="${ftpResendCount > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${ftpResendCount > 0}">PERLU KIRIM ULANG</span>
+            <div class="dash-ico c-warn"><i class="fa-solid fa-server"></i></div>
+            <div><div class="dash-num" th:text="${ftpResendCount}">0</div><div class="dash-label">Export FTP Gagal / Tertunda</div></div>
+        </div>
     </div>
 
     <!-- Perubahan Config Pending (collapsible) — User/Group/Menu/Akses/Approval -->
@@ -55,7 +60,33 @@
         </div>
     </div>
 
-    <!-- Riwayat User: add/edit/delete + approve/reject -->
+        <!-- Export FTP gagal/tertunda -- perlu kirim ulang dari Admin -->
+    <div class="ausy-card">
+        <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
+            <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-server text-muted"></i> Export FTP Gagal / Tertunda</h2>
+            <a class="btn btn-sm btn-primary" th:href="@{/admin/ftp}"><i class="fa-solid fa-rotate-right"></i> Kirim Ulang</a>
+        </div>
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead><tr>
+                <th class="ps-3">Waktu</th><th>File</th><th>Paket</th><th>Maker</th>
+                <th class="text-end">Baris</th><th>Status</th><th class="pe-3">Error</th>
+            </tr></thead>
+            <tbody>
+            <tr th:each="t : ${ftpResendList}">
+                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.createdAt,'dd-MM-yyyy HH:mm')}"></td>
+                <td class="font-monospace small" th:text="${t.fileName}"></td>
+                <td th:text="${t.paket}"></td>
+                <td th:text="${t.inputer}"></td>
+                <td class="text-end" th:text="${t.rowsCount}"></td>
+                <td><span class="badge" th:classappend="${t.status == 'FAILED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning'" th:text="${t.status}"></span></td>
+                <td class="small text-muted pe-3" th:text="${t.error}"></td>
+            </tr>
+            <tr th:if="${ftpResendList.isEmpty()}"><td colspan="7" class="text-center text-muted py-4">Tidak ada export FTP yang perlu dikirim ulang.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+<!-- Riwayat User: add/edit/delete + approve/reject -->
     <div class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat User

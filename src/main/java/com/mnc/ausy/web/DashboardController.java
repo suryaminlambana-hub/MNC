@@ -3,6 +3,7 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.ConfigChangeService;
+import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
 import org.springframework.data.domain.PageRequest;
@@ -24,12 +25,13 @@ public class DashboardController {
     private final GlChangeService glChange;
     private final ConfigChangeService configChange;
     private final GlExportService glExport;
+    private final FtpAdminService ftpAdmin;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
-                               ConfigChangeService configChange, GlExportService glExport) {
+                               ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
-        this.glChange = glChange; this.configChange = configChange; this.glExport = glExport;
+        this.glChange = glChange; this.configChange = configChange; this.glExport = glExport; this.ftpAdmin = ftpAdmin;
     }
 
     @GetMapping("/")
@@ -44,6 +46,10 @@ public class DashboardController {
             model.addAttribute("pendingUsers", configChange.countPending());
             model.addAttribute("pendingUserList", configChange.pendingList());
             model.addAttribute("userHistory", tx.byActivityPrefix("CONFIG_CHANGE%", PageRequest.of(0, 50)));
+            // FTP transfers stuck as PENDING/FAILED — Admin needs to resend from Konfigurasi FTP.
+            List<com.mnc.ausy.domain.ExportTransfer> ftpResendList = ftpAdmin.needsResend();
+            model.addAttribute("ftpResendList", ftpResendList);
+            model.addAttribute("ftpResendCount", ftpResendList.size());
             return "dashboard-admin";
         }
 

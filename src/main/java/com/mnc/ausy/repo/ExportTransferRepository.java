@@ -7,4 +7,5 @@ import java.util.List;
 public interface ExportTransferRepository extends JpaRepository<ExportTransfer, Long> {
     List<ExportTransfer> findTop50ByOrderByCreatedAtDesc();
     long countByStatus(String status);
+    List<ExportTransfer> findByStatusInOrderByCreatedAtDesc(List<String> statuses);
 }

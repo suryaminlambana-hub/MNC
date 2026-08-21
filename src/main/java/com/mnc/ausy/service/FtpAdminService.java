@@ -30,6 +30,9 @@ public class FtpAdminService {
     public List<ExportTransfer> recentTransfers() { return transfers.findTop50ByOrderByCreatedAtDesc(); }
     public long pendingCount() { return transfers.countByStatus("PENDING") + transfers.countByStatus("FAILED"); }
 
+    /** Transfers stuck as PENDING/FAILED — need Admin to resend from Konfigurasi FTP. */
+    public List<ExportTransfer> needsResend() { return transfers.findByStatusInOrderByCreatedAtDesc(List.of("PENDING", "FAILED")); }
+
     @Transactional
     public String saveConfig(String host, Integer port, String user, String pass, String dir,
                              boolean secure, boolean passive, boolean enabled, String admin) {
