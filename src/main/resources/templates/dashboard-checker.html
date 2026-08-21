@@ -63,7 +63,7 @@
             </tr></thead>
             <tbody>
             <tr th:each="c : ${pendingChangeList}">
-                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(c.createdAt,'dd-MM HH:mm')}"></td>
+                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(c.createdAt,'dd-MM-yyyy HH:mm')}"></td>
                 <td><span class="badge"
                           th:classappend="${c.op == 'ADD'} ? 'bg-success-subtle text-success' : (${c.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
                           th:text="${c.op}"></span></td>
@@ -87,7 +87,7 @@
             <thead><tr><th class="ps-3">Waktu</th><th>User</th><th>Aksi</th><th class="pe-3">Detail</th></tr></thead>
             <tbody>
             <tr th:each="t : ${recent}">
-                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM HH:mm')}"></td>
+                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
                 <td th:text="${t.userId}"></td>
                 <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
                 <td class="pe-3 small" th:text="${t.tinfo}"></td>
