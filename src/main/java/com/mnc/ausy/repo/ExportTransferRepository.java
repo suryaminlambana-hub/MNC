@@ -8,4 +8,5 @@ public interface ExportTransferRepository extends JpaRepository<ExportTransfer, 
     List<ExportTransfer> findTop50ByOrderByCreatedAtDesc();
     long countByStatus(String status);
     List<ExportTransfer> findByStatusInOrderByCreatedAtDesc(List<String> statuses);
+    List<ExportTransfer> findByInputerAndStatusOrderByCreatedAtDesc(String inputer, String status);
 }

@@ -76,6 +76,10 @@ public class DashboardController {
             model.addAttribute("pendingChanges", pendingPaketList.size() + pendingChangeList.size() + pendingExportList.size());
             String me = auth.getName();
             model.addAttribute("glHistory", tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
+            // Export yang sudah di-approve checker tapi gagal terkirim ke FTP — maker perlu tahu & minta Admin kirim ulang.
+            List<com.mnc.ausy.domain.ExportTransfer> ftpFailedList = ftpAdmin.failedFor(me);
+            model.addAttribute("ftpFailedList", ftpFailedList);
+            model.addAttribute("ftpFailedCount", ftpFailedList.size());
             return "dashboard-maker";
         }
 

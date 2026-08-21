@@ -6,6 +6,16 @@
     <h1 class="ausy-page-title">Beranda Maker</h1>
     <p class="text-muted">Ringkasan tugas upload &amp; perubahan GL.</p>
 
+    <div th:if="${ftpFailedCount > 0}" class="alert alert-danger py-2">
+        <b><i class="fa-solid fa-triangle-exclamation"></i> <span th:text="${ftpFailedCount}"></span> export yang sudah di-approve checker gagal terkirim ke FTP.</b>
+        Hubungi Admin untuk kirim ulang dari Konfigurasi FTP.
+        <ul class="mb-0 mt-1 small">
+            <li th:each="f : ${ftpFailedList}">
+                Paket <span th:text="${f.paket}"></span> (<span th:text="${f.fileName}"></span>) — <span th:text="${f.error}"></span>
+            </li>
+        </ul>
+    </div>
+
     <div class="dash-grid">
         <div class="dash-card">
             <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>

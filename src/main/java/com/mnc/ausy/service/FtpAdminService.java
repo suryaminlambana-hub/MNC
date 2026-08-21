@@ -33,6 +33,9 @@ public class FtpAdminService {
     /** Transfers stuck as PENDING/FAILED — need Admin to resend from Konfigurasi FTP. */
     public List<ExportTransfer> needsResend() { return transfers.findByStatusInOrderByCreatedAtDesc(List.of("PENDING", "FAILED")); }
 
+    /** A maker's own export transfers that failed to reach FTP — shown as an alert on their dashboard. */
+    public List<ExportTransfer> failedFor(String inputer) { return transfers.findByInputerAndStatusOrderByCreatedAtDesc(inputer, "FAILED"); }
+
     @Transactional
     public String saveConfig(String host, Integer port, String user, String pass, String dir,
                              boolean secure, boolean passive, boolean enabled, String admin) {
