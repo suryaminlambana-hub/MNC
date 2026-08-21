@@ -128,5 +128,43 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Riwayat Export: pengajuan export milik maker ini — pending, approved, rejected -->
+  <div class="ausy-card mt-3" style="padding:0">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat Export</h2>
+    <div class="px-3 pb-3">
+      <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="0" data-order-dir="desc">
+        <thead><tr>
+          <th>Tanggal</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th>
+          <th>Alasan</th><th>Status</th><th>Checker</th><th>Catatan Checker</th><th>Status FTP</th>
+        </tr></thead>
+        <tbody>
+        <tr th:each="h : ${exportHistory}">
+          <td class="text-nowrap text-muted small"
+              th:attr="data-order=${#temporals.format(h.req.createdAt,'yyyyMMddHHmm')}"
+              th:text="${#temporals.format(h.req.createdAt,'dd-MM-yyyy HH:mm')}"></td>
+          <td class="text-end" th:text="${h.req.rowsCount}"></td>
+          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(h.req.debit,1,'POINT',2,'COMMA')}"></td>
+          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(h.req.credit,1,'POINT',2,'COMMA')}"></td>
+          <td class="small text-muted" th:text="${h.req.noteMaker}"></td>
+          <td><span class="badge"
+                    th:classappend="${h.req.status == 'APPROVED'} ? 'bg-success-subtle text-success' : (${h.req.status == 'REJECTED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
+                    th:text="${h.req.status == 'PENDING'} ? 'MENUNGGU CHECKER' : ${h.req.status}"></span></td>
+          <td th:text="${h.req.checker}"></td>
+          <td class="small text-muted" th:text="${h.req.noteChecker}"></td>
+          <td>
+            <span th:if="${h.transfer != null}" class="badge"
+                  th:classappend="${h.transfer.status == 'SENT'} ? 'bg-success-subtle text-success' : (${h.transfer.status == 'FAILED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
+                  th:text="${h.transfer.status}"></span>
+            <span th:if="${h.transfer != null and h.transfer.error != null}" class="small text-muted d-block" th:text="${h.transfer.error}"></span>
+            <span th:if="${h.transfer == null}">—</span>
+          </td>
+        </tr>
+        <tr th:if="${exportHistory.isEmpty()}"><td colspan="9" class="text-center text-muted py-4">Belum ada riwayat export.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </main>
 </html>

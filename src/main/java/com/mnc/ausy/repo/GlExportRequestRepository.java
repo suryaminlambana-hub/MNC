@@ -8,4 +8,5 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
     List<GlExportRequest> findByStatusOrderByCreatedAtDesc(String status);
     long countByStatus(String status);
     List<GlExportRequest> findByRequestedByAndStatusOrderByCreatedAtDesc(String requestedBy, String status);
+    List<GlExportRequest> findByRequestedByOrderByCreatedAtDesc(String requestedBy);
 }

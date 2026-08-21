@@ -54,6 +54,19 @@ public class GlExportService {
         return requests.findByRequestedByAndStatusOrderByCreatedAtDesc(username, "PENDING");
     }
 
+    /** One export request + its FTP delivery outcome (if it got that far) — for the maker's "Riwayat Export". */
+    public record ExportHistoryItem(GlExportRequest req, ExportTransfer transfer) {}
+
+    /** Maker's full export history — pending, approved, and rejected — with FTP send status where applicable. */
+    public List<ExportHistoryItem> myHistory(String username) {
+        List<ExportHistoryItem> out = new ArrayList<>();
+        for (GlExportRequest r : requests.findByRequestedByOrderByCreatedAtDesc(username)) {
+            ExportTransfer t = r.getTransferId() != null ? transfers.findById(r.getTransferId()).orElse(null) : null;
+            out.add(new ExportHistoryItem(r, t));
+        }
+        return out;
+    }
+
     /** How many active GL rows are exportable right now (for the maker button state). */
     public long exportableCount() {
         return gl.countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull((short)1, "APPROVED", "BELUM UPLOAD");

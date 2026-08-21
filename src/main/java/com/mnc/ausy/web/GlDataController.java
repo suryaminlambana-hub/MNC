@@ -55,6 +55,7 @@ public class GlDataController {
         model.addAttribute("exportableCount", glExport.exportableCount());
         model.addAttribute("exportablePakets", glExport.exportablePakets());
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
+        model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
         return "gl-legacy/list";
     }
 
