@@ -59,12 +59,14 @@ public class DashboardController {
         if (hasGroup(auth, "GROUP_3")) {
             model.addAttribute("activeGl", gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
             model.addAttribute("glActiveList", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING"));
-            // "Perubahan GL Pending" = upload paket menunggu otorisasi + change request (add/edit/delete)
+            // "Perubahan GL Pending" = upload paket + change request (add/edit/delete) + export GL, menunggu otorisasi
             List<Object[]> pendingPaketList = gl.pendingPakets();
             List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible();
+            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.allPending();
             model.addAttribute("pendingPaketList", pendingPaketList);
             model.addAttribute("pendingChangeList", pendingChangeList);
-            model.addAttribute("pendingChanges", pendingPaketList.size() + pendingChangeList.size());
+            model.addAttribute("pendingExportList", pendingExportList);
+            model.addAttribute("pendingChanges", pendingPaketList.size() + pendingChangeList.size() + pendingExportList.size());
             String me = auth.getName();
             model.addAttribute("glHistory", tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
             return "dashboard-maker";

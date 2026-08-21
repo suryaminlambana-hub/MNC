@@ -44,6 +44,11 @@ public class GlExportService {
 
     public long pendingCount() { return requests.countByStatus("PENDING"); }
 
+    /** All pending export requests, unscoped — for the maker dashboard's "Perubahan GL Pending" overview. */
+    public List<GlExportRequest> allPending() {
+        return requests.findByStatusOrderByCreatedAtDesc("PENDING");
+    }
+
     /** Maker's own pending export requests (still waiting on checker) — shown so they don't re-submit blindly. */
     public List<GlExportRequest> myPending(String username) {
         return requests.findByRequestedByAndStatusOrderByCreatedAtDesc(username, "PENDING");

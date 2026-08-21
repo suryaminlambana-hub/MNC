@@ -19,8 +19,9 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
     /** A maker's full GL history: their own upload/add/edit/delete requests + the checker's
      *  approve/reject decisions on those requests. */
     @Query(value = "select t.* from tlog_transaction t where " +
-            "(t.user_id = :maker and t.name_activity in ('UPLOAD','GL_CHANGE_REQ')) or " +
-            "(t.name_activity in ('OTORISASI_APPROVE','OTORISASI_REJECT','GL_CHANGE_APPROVE','GL_CHANGE_REJECT') " +
+            "(t.user_id = :maker and t.name_activity in ('UPLOAD','GL_CHANGE_REQ','EXPORT_REQ')) or " +
+            "(t.name_activity in ('OTORISASI_APPROVE','OTORISASI_REJECT','GL_CHANGE_APPROVE','GL_CHANGE_REJECT'," +
+            " 'EXPORT_APPROVE','EXPORT_REJECT') " +
             " and t.tinfo like :makerLike) " +
             "order by t.time_activity desc", nativeQuery = true)
     List<TlogTransaction> glHistoryForMaker(@Param("maker") String maker, @Param("makerLike") String makerLike, Pageable page);
