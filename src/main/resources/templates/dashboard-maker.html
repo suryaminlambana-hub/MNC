@@ -11,7 +11,7 @@
         Hubungi Admin untuk kirim ulang dari Konfigurasi FTP.
         <ul class="mb-0 mt-1 small">
             <li th:each="f : ${ftpFailedList}">
-                Paket <span th:text="${f.paket}"></span> (<span th:text="${f.fileName}"></span>) — <span th:text="${f.error}"></span>
+                Batch <span th:text="${f.paket}"></span> (<span th:text="${f.fileName}"></span>) — <span th:text="${f.error}"></span>
             </li>
         </ul>
     </div>
@@ -39,15 +39,15 @@
         <div class="collapse show" id="pendingChangeBox">
             <table class="table table-sm table-hover align-middle mb-0">
                 <thead><tr>
-                    <th class="ps-3">Waktu</th><th>Operasi</th><th>Target GL / Paket</th>
+                    <th class="ps-3">Waktu</th><th>Operasi</th><th>Target GL / Batch</th>
                     <th>Catatan Maker</th><th class="pe-3">Status</th>
                 </tr></thead>
                 <tbody>
-                <!-- Upload paket yang menunggu otorisasi checker -->
+                <!-- Upload batch yang menunggu otorisasi checker -->
                 <tr th:each="p : ${pendingPaketList}">
                     <td class="ps-3 text-muted small text-nowrap" th:text="${p[5] != null} ? ${#temporals.format(p[5],'dd-MM-yyyy HH:mm')} : '—'"></td>
                     <td><span class="badge bg-info-subtle text-info">UPLOAD</span></td>
-                    <td class="small">Paket <span th:text="${p[0]}"></span> · <span th:text="${p[2]}"></span> baris</td>
+                    <td class="small">Batch <span th:text="${p[0]}"></span> · <span th:text="${p[2]}"></span> baris</td>
                     <td class="small text-muted">Upload GL menunggu otorisasi</td>
                     <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU CHECKER</span></td>
                 </tr>
@@ -92,7 +92,7 @@
             <table class="table table-sm table-hover align-middle mb-0 dt">
                 <thead><tr>
                     <th>Tgl Posting</th><th>D/C</th><th>Kode GL</th><th>Nama GL</th>
-                    <th>Deskripsi</th><th>Cabang</th><th class="text-end">Nominal</th><th>Paket</th>
+                    <th>Deskripsi</th><th>Cabang</th><th class="text-end">Nominal</th><th>Batch</th>
                 </tr></thead>
                 <tbody>
                 <tr th:each="g : ${glActiveList}">

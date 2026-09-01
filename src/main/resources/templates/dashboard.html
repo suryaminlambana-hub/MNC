@@ -22,7 +22,7 @@
         <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingPakets > 0}">PERLU AKSI</span>
             <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
-            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Paket Menunggu Otorisasi</div></div>
+            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Batch Menunggu Otorisasi</div></div>
         </div>
         <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU AKSI</span>

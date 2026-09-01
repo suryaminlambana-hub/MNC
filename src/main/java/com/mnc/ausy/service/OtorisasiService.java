@@ -55,17 +55,17 @@ public class OtorisasiService {
     @Transactional
     public ExportResult export(String paket, String inputer, Integer approverGroup, String checker) {
         if (!approval.canApprove(approverGroup, inputer))
-            return new ExportResult(false, "Group Anda tidak berwenang meng-approve paket dari group tersebut.", 0, null);
+            return new ExportResult(false, "Group Anda tidak berwenang meng-approve batch dari group tersebut.", 0, null);
 
         List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
-        if (rows.isEmpty()) return new ExportResult(false, "Paket tidak ditemukan.", 0, null);
+        if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
 
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : rows) {
             if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));
         }
         if (d.compareTo(c) != 0)
-            return new ExportResult(false, "Paket tidak balance (Debit != Credit). Otorisasi dibatalkan.", 0, null);
+            return new ExportResult(false, "Batch tidak balance (Debit != Credit). Otorisasi dibatalkan.", 0, null);
 
         // Tandai lolos otorisasi upload → jadi GL Aktif. status_print tetap 'BELUM UPLOAD'
         // (artinya: belum di-export ke core). Export ke FTP dilakukan lewat flow export maker.
@@ -75,8 +75,8 @@ public class OtorisasiService {
         }
         gl.saveAll(rows);
         audit.transaction(checker, "OTORISASI_APPROVE",
-                "Paket " + paket + " (maker=" + inputer + ") di-approve, " + rows.size() + " baris jadi GL Aktif.");
-        return new ExportResult(true, "Otorisasi upload berhasil — Paket " + paket + " kini menjadi GL Aktif ("
+                "Batch " + paket + " (maker=" + inputer + ") di-approve, " + rows.size() + " baris jadi GL Aktif.");
+        return new ExportResult(true, "Otorisasi upload berhasil — Batch " + paket + " kini menjadi GL Aktif ("
                 + rows.size() + " baris). Export ke core dilakukan lewat menu Export oleh maker.", rows.size(), null);
     }
 
@@ -84,17 +84,17 @@ public class OtorisasiService {
     @Transactional
     public ExportResult reject(String paket, String inputer, Integer approverGroup, String checker, String note) {
         if (!approval.canApprove(approverGroup, inputer))
-            return new ExportResult(false, "Group Anda tidak berwenang menolak paket dari group tersebut.", 0, null);
+            return new ExportResult(false, "Group Anda tidak berwenang menolak batch dari group tersebut.", 0, null);
         if (note == null || note.isBlank())
             return new ExportResult(false, "Catatan penolakan wajib diisi.", 0, null);
 
         List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
-        if (rows.isEmpty()) return new ExportResult(false, "Paket tidak ditemukan.", 0, null);
+        if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
 
         gl.deletePaket(paket, inputer);   // reject -> removed from temp table (gl_tabel)
         audit.transaction(checker, "OTORISASI_REJECT",
-                "Paket " + paket + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
-        return new ExportResult(true, "Paket " + paket + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
+                "Batch " + paket + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
+        return new ExportResult(true, "Batch " + paket + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }

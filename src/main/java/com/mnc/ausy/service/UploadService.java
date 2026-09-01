@@ -133,10 +133,10 @@ public class UploadService {
             t.setAdddt(LocalDateTime.now());
             tUploads.save(t);
 
-            audit.transaction(username, "UPLOAD", "Paket " + paket + " — " + n + " baris (D=" + res.debit + ", C=" + res.credit + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
+            audit.transaction(username, "UPLOAD", "Batch " + paket + " — " + n + " baris (D=" + res.debit + ", C=" + res.credit + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
 
             res.success = true;
-            res.message = "Upload berhasil — Paket " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
+            res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
                           (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!");
             return res;
         }

@@ -79,7 +79,7 @@ public class GlExportService {
     @Transactional
     public String submitExport(AusyUserDetails me, String note, List<String> pakets) {
         if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
-        if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu paket untuk diajukan export.";
+        if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu batch untuk diajukan export.";
         List<GlTabel> rows = gl.findExportableByNoPaketIn(pakets);
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
@@ -96,7 +96,7 @@ public class GlExportService {
         requests.save(req);
         gl.markExportable(req.getId(), pakets);
         audit.transaction(me.getUsername(), "EXPORT_REQ",
-                "Ajukan export paket " + String.join(",", pakets) + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
+                "Ajukan export batch " + String.join(",", pakets) + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
         return "Permintaan export diajukan (" + rows.size() + " baris) — menunggu otorisasi checker.";
     }
 

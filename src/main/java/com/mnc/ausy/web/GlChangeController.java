@@ -19,7 +19,7 @@ import java.util.*;
 /** Workflow 8.3 — Update GL: maker page (/gl-data) + checker review (/gl-change/review). */
 @Controller
 public class GlChangeController {
-    private static final List<String> BULK_HEAD = List.of("ID","GL Code","D/C","Amount","Description","Paket");
+    private static final List<String> BULK_HEAD = List.of("ID","GL Code","D/C","Amount","Description","Batch");
     private final GlChangeService service;
     private final GlTabelRepository gl;
     private final ExcelExportService excel;

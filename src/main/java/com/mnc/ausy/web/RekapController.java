@@ -27,7 +27,7 @@ public class RekapController {
 
     @GetMapping("/rekap/export")
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        List<String> head = List.of("Paket","Uploader","Jumlah Baris","Debit","Credit","Balance");
+        List<String> head = List.of("Batch","Uploader","Jumlah Baris","Debit","Credit","Balance");
         List<List<Object>> data = new ArrayList<>();
         long totJml = 0; BigDecimal totD = BigDecimal.ZERO, totC = BigDecimal.ZERO;
         for (Object[] r : gl.approvedPakets()) {

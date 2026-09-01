@@ -10,7 +10,7 @@
         <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingPakets > 0}">PERLU OTORISASI</span>
             <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
-            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Paket Menunggu Otorisasi</div></div>
+            <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Batch Menunggu Otorisasi</div></div>
         </div>
         <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU APPROVE</span>
@@ -19,20 +19,20 @@
         </div>
     </div>
 
-    <!-- Paket menunggu otorisasi -->
+    <!-- Batch menunggu otorisasi -->
     <div class="ausy-card">
         <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
-            <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-file-circle-check text-muted"></i> Paket Menunggu Otorisasi</h2>
+            <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-file-circle-check text-muted"></i> Batch Menunggu Otorisasi</h2>
             <a class="btn btn-sm btn-primary" th:href="@{/otorisasi-gl}"><i class="fa-solid fa-check-double"></i> Buka Otorisasi</a>
         </div>
         <table class="table table-sm table-hover align-middle mb-0">
             <thead><tr>
-                <th class="ps-3">Paket</th><th>Diinput oleh (Maker)</th><th class="text-end">Jml Baris</th>
+                <th class="ps-3">Batch</th><th>Diinput oleh (Maker)</th><th class="text-end">Jml Baris</th>
                 <th class="text-end">Total Debit</th><th class="text-end pe-3">Total Credit</th>
             </tr></thead>
             <tbody>
             <tr th:each="p : ${pendingPaketList}">
-                <td class="ps-3"><span class="badge bg-warning-subtle text-warning" th:text="'Paket ' + ${p[0]}"></span></td>
+                <td class="ps-3"><span class="badge bg-warning-subtle text-warning" th:text="'Batch ' + ${p[0]}"></span></td>
                 <td th:text="${p[1]}"></td>
                 <td class="text-end" th:text="${p[2]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(p[3],1,'POINT')}"></td>
@@ -45,7 +45,7 @@
                 <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(e.debit,1,'POINT',2,'COMMA')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(e.credit,1,'POINT',2,'COMMA')}"></td>
             </tr>
-            <tr th:if="${pendingPaketList.isEmpty() and pendingExportList.isEmpty()}"><td colspan="5" class="text-center text-muted py-4">Tidak ada paket yang menunggu otorisasi.</td></tr>
+            <tr th:if="${pendingPaketList.isEmpty() and pendingExportList.isEmpty()}"><td colspan="5" class="text-center text-muted py-4">Tidak ada batch yang menunggu otorisasi.</td></tr>
             </tbody>
         </table>
     </div>
@@ -58,7 +58,7 @@
         </div>
         <table class="table table-sm table-hover align-middle mb-0">
             <thead><tr>
-                <th class="ps-3">Waktu</th><th>Operasi</th><th>Target GL / Paket</th>
+                <th class="ps-3">Waktu</th><th>Operasi</th><th>Target GL / Batch</th>
                 <th>Maker</th><th class="pe-3">Catatan</th>
             </tr></thead>
             <tbody>

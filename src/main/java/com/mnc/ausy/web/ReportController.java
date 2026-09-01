@@ -31,7 +31,7 @@ public class ReportController {
         Font sm = new Font(Font.HELVETICA, 8);
         Font smb = new Font(Font.HELVETICA, 8, Font.BOLD);
         doc.add(new Paragraph("MNC BANK — Jurnal GL", h));
-        doc.add(new Paragraph("Paket: " + paket, sm));
+        doc.add(new Paragraph("Batch: " + paket, sm));
         doc.add(new Paragraph(" "));
 
         PdfPTable t = new PdfPTable(new float[]{2,3,1,2,3,3});

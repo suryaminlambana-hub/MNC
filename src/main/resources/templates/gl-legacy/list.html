@@ -26,18 +26,18 @@
         <div class="modal-body">
           <p class="text-muted small">Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
 
-          <label class="form-label">Pilih paket yang diajukan <span class="text-danger">*</span></label>
+          <label class="form-label">Pilih batch yang diajukan <span class="text-danger">*</span></label>
           <div class="ausy-card mb-3" style="padding:0">
             <table class="table table-sm align-middle mb-0">
               <thead><tr>
                 <th class="ps-3"><input type="checkbox" id="paketAll"></th>
-                <th>Paket</th><th class="text-end">Jml Baris</th>
+                <th>Batch</th><th class="text-end">Jml Baris</th>
                 <th class="text-end">Debit</th><th class="text-end pe-3">Credit</th>
               </tr></thead>
               <tbody>
               <tr th:each="p : ${exportablePakets}">
                 <td class="ps-3"><input type="checkbox" name="pakets" class="paket-cb" th:value="${p[0]}"></td>
-                <td><span class="badge bg-primary-subtle text-primary">PAKET <span th:text="${p[0]}"></span></span></td>
+                <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${p[0]}"></span></span></td>
                 <td class="text-end" th:text="${p[1]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[2],1,'POINT',2,'COMMA')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
@@ -101,7 +101,7 @@
         var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; });
         if (!anyChecked) {
           e.preventDefault();
-          alert('Pilih minimal satu paket yang ingin diajukan export.');
+          alert('Pilih minimal satu batch yang ingin diajukan export.');
         }
       });
     })();
@@ -112,7 +112,7 @@
 
   <div class="ausy-card">
     <table class="table table-sm table-hover align-middle mb-0 dt">
-      <thead><tr><th>ID</th><th>Paket</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
+      <thead><tr><th>ID</th><th>Batch</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
       <tbody>
       <tr th:each="g : ${rows}">
         <td><code class="ausy-glid" th:text="${g.id}"></code></td>
