@@ -6,6 +6,9 @@ import java.util.List;
 
 public interface GlChangeRequestRepository extends JpaRepository<GlChangeRequest, Long> {
     List<GlChangeRequest> findByStatusOrderByCreatedAtDesc(String status);
+    List<GlChangeRequest> findByStatusAndTarget(String status, String target);
+    boolean existsByStatusAndTargetAndRefId(String status, String target, Long refId);
+    boolean existsByStatusAndTargetAndNoPaketAndInputer(String status, String target, String noPaket, String inputer);
     List<GlChangeRequest> findByMakerOrderByCreatedAtDesc(String maker);
     long countByStatus(String status);
 }

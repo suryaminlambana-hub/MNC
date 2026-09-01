@@ -10,7 +10,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GlCodeService {
@@ -30,6 +33,10 @@ public class GlCodeService {
     }
 
     public boolean used(String code) { return glTabel.existsByGltrac(code); }
+
+    public GlCode find(Long id) { return glCodes.findById(id).orElse(null); }
+
+    public boolean exists(String code, String pos) { return glCodes.existsByCodeAndPosition(code, pos); }
 
     public List<GlCode> listWithUsage() {
         List<GlCode> rows = glCodes.findAllByOrderByCodeAscPositionAsc();
@@ -78,8 +85,13 @@ public class GlCodeService {
         return null;
     }
 
-    public int[] importCsv(InputStream in, String by) throws Exception {
-        int added = 0, dup = 0, bad = 0, line = 0;
+    /** Rows a CSV would add, plus how many were duplicates / invalid. Nothing is written. */
+    public record CsvParse(List<Map<String,String>> rows, int dup, int bad) {}
+
+    /** Parse only — shared by the direct path and by the maker→checker request path. */
+    public CsvParse parseCsv(InputStream in) throws Exception {
+        List<Map<String,String>> rows = new ArrayList<>();
+        int dup = 0, bad = 0, line = 0;
         try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String row;
             while ((row = r.readLine()) != null) {
@@ -91,14 +103,39 @@ public class GlCodeService {
                 String pos  = normPos(c.length > 1 ? c[1] : "");
                 String desc = c.length > 2 ? c[2].trim() : "";
                 if (code.isEmpty() || pos.isEmpty()) { bad++; continue; }
-                if (glCodes.existsByCodeAndPosition(code, pos)) { dup++; continue; }
-                GlCode g = new GlCode();
-                g.setCode(code); g.setPosition(pos); g.setDescription(desc);
-                g.setStatus((short)1); g.setCreatedBy(by); g.setCreatedDate(LocalDateTime.now());
-                glCodes.save(g); added++;
+                if (glCodes.existsByCodeAndPosition(code, pos) || listed(rows, code, pos)) { dup++; continue; }
+                Map<String,String> m = new LinkedHashMap<>();
+                m.put("code", code); m.put("position", pos); m.put("description", desc);
+                rows.add(m);
             }
         }
-        return new int[]{added, dup, bad};
+        return new CsvParse(rows, dup, bad);
+    }
+
+    private static boolean listed(List<Map<String,String>> rows, String code, String pos) {
+        return rows.stream().anyMatch(m -> code.equals(m.get("code")) && pos.equals(m.get("position")));
+    }
+
+    /** Insert parsed rows, skipping any that became duplicates meanwhile. @return rows added. */
+    public int applyImport(List<Map<String,String>> rows, String by) {
+        int added = 0;
+        if (rows == null) return 0;
+        for (Map<String,String> m : rows) {
+            String code = m.get("code"), pos = normPos(m.get("position"));
+            if (code == null || code.isBlank() || pos.isEmpty()) continue;
+            if (glCodes.existsByCodeAndPosition(code, pos)) continue;
+            GlCode g = new GlCode();
+            g.setCode(code); g.setPosition(pos); g.setDescription(m.get("description"));
+            g.setStatus((short)1); g.setCreatedBy(by); g.setCreatedDate(LocalDateTime.now());
+            glCodes.save(g); added++;
+        }
+        return added;
+    }
+
+    /** @return {added, duplicate, invalid} */
+    public int[] importCsv(InputStream in, String by) throws Exception {
+        CsvParse p = parseCsv(in);
+        return new int[]{ applyImport(p.rows(), by), p.dup(), p.bad() };
     }
 
     public static class DuplicateGl extends RuntimeException {}

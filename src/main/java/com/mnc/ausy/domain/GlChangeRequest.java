@@ -9,7 +9,10 @@ import java.time.LocalDateTime;
 public class GlChangeRequest {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String op;                          // ADD / EDIT / DELETE
+    private String op;                          // ADD / EDIT / DELETE / BULK_EDIT / IMPORT
+    private String target = "GL_ROW";           // GL_ROW / GL_CODE / PAKET
+    @Column(name="ref_id")      private Long refId;      // gl_code.id (target GL_CODE)
+    private String inputer;                     // gl_tabel.gltrus (target PAKET)
     @Column(name="gl_id")       private Long glId;
     @Column(name="no_paket")    private String noPaket;
     private String maker;
@@ -25,6 +28,9 @@ public class GlChangeRequest {
 
     public Long getId(){return id;}
     public String getOp(){return op;} public void setOp(String v){op=v;}
+    public String getTarget(){return target;} public void setTarget(String v){target=v;}
+    public Long getRefId(){return refId;} public void setRefId(Long v){refId=v;}
+    public String getInputer(){return inputer;} public void setInputer(String v){inputer=v;}
     public Long getGlId(){return glId;} public void setGlId(Long v){glId=v;}
     public String getNoPaket(){return noPaket;} public void setNoPaket(String v){noPaket=v;}
     public String getMaker(){return maker;} public void setMaker(String v){maker=v;}

@@ -18,9 +18,11 @@
         <span class="badge fs-6"
               th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : (${it.cr.op == 'BULK_EDIT'} ? 'bg-info text-dark' : 'bg-primary'))"
               th:text="${it.cr.op == 'BULK_EDIT' ? 'BULK EDIT' : it.cr.op}">EDIT</span>
+        <span class="badge bg-secondary-subtle text-secondary" th:text="${it.targetLabel}">Data GL</span>
         <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
         <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
         <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
+        <span class="text-muted" th:if="${it.cr.target == 'PAKET'}">· batch <b th:text="${it.cr.noPaket}"></b></span>
       </div>
       <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
     </div>
@@ -36,6 +38,21 @@
     </div>
 
     <!-- ADD: only the new values (no empty Before column) -->
+    <div th:if="${it.cr.op == 'IMPORT'}" class="mb-2">
+      <p class="mb-2"><i class="fa-solid fa-file-csv text-muted"></i>
+        Import CSV — <b th:text="${#lists.size(it.rows)}">0</b> Kode GL akan ditambahkan:</p>
+      <table class="table table-sm align-middle mb-0 ausy-diff">
+        <thead><tr><th style="width:20%">NoGL</th><th style="width:20%">Debit/Credit</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr th:each="r : ${it.rows}">
+            <td><code th:text="${r.code}"></code></td>
+            <td th:text="${r.position == 'C' ? 'Credit' : 'Debit'}"></td>
+            <td th:text="${r.description}"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
       <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
       <tbody>

@@ -2,6 +2,7 @@ package com.mnc.ausy.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mnc.ausy.domain.GlChangeRequest;
+import com.mnc.ausy.domain.GlCode;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlChangeRequestRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
@@ -14,12 +15,21 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Workflow 8.3 — Update GL (Add/Edit/Delete) under dual control.
- * Maker submits a change request (data unchanged until approval); Checker approves/rejects
- * after seeing before/after. Delete is a soft-delete (active=0). Every step is audited.
+ * Workflow 8.3 — every maker-initiated change under dual control. The maker submits a request
+ * (live data untouched); the Checker approves/rejects after seeing before/after. Three targets:
+ *
+ * <ul>
+ *   <li>{@code GL_ROW}  — Add/Edit/Delete/Bulk-edit a GL row (Kelola Data GL). Delete = soft-delete.</li>
+ *   <li>{@code GL_CODE} — Add/Edit/Delete/Import on the GL Code master (Manage GL Code).</li>
+ *   <li>{@code PAKET}   — delete a whole batch (Hapus Batch).</li>
+ * </ul>
+ *
+ * Every step is written to the audit trail.
  */
 @Service
 public class GlChangeService {
+
+    public static final String T_GL_ROW = "GL_ROW", T_GL_CODE = "GL_CODE", T_PAKET = "PAKET";
 
     /** Editable fields, in display order: key -> label. */
     public static final LinkedHashMap<String,String> FIELDS = new LinkedHashMap<>();
@@ -28,17 +38,53 @@ public class GlChangeService {
         FIELDS.put("gltrcd", "D/C");
         FIELDS.put("gltram", "Amount");
         FIELDS.put("gltrds", "Description");
-        FIELDS.put("noPaket", "Paket");
+        FIELDS.put("noPaket", "Batch");
     }
+
+    /** GL Code master fields. */
+    public static final LinkedHashMap<String,String> GLCODE_FIELDS = new LinkedHashMap<>();
+    static {
+        GLCODE_FIELDS.put("code", "NoGL");
+        GLCODE_FIELDS.put("position", "Debit/Credit");
+        GLCODE_FIELDS.put("description", "Description");
+        GLCODE_FIELDS.put("status", "Status");
+    }
+
+    /** Batch summary fields (delete request). */
+    public static final LinkedHashMap<String,String> PAKET_FIELDS = new LinkedHashMap<>();
+    static {
+        PAKET_FIELDS.put("noPaket", "Batch");
+        PAKET_FIELDS.put("inputer", "Uploader");
+        PAKET_FIELDS.put("rows", "Jumlah Baris");
+        PAKET_FIELDS.put("debit", "Total Debit");
+        PAKET_FIELDS.put("credit", "Total Credit");
+    }
+
+    private static LinkedHashMap<String,String> fieldsOf(String target) {
+        if (T_GL_CODE.equals(target)) return GLCODE_FIELDS;
+        if (T_PAKET.equals(target))   return PAKET_FIELDS;
+        return FIELDS;
+    }
+
+    public static String targetLabel(String target) {
+        if (T_GL_CODE.equals(target)) return "Kode GL";
+        if (T_PAKET.equals(target))   return "Batch";
+        return "Data GL";
+    }
+
+    /** Outcome of a maker/checker action: accepted or not, plus the message to flash. */
+    public record Res(boolean ok, String message) {}
 
     private final GlTabelRepository gl;
     private final GlChangeRequestRepository cr;
     private final ApprovalService approval;
     private final AuditService audit;
+    private final GlCodeService glCodeService;
     private final ObjectMapper json = new ObjectMapper();
 
-    public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval, AuditService audit) {
-        this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit;
+    public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
+                           AuditService audit, GlCodeService glCodeService) {
+        this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
     }
 
     // ---- maps & json helpers ----
@@ -75,7 +121,7 @@ public class GlChangeService {
     // ---- maker actions: create pending request, do NOT touch live data ----
     @Transactional
     public String submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
-        GlChangeRequest c = base("ADD", null, me, note);
+        GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
         cr.save(c);
@@ -87,7 +133,7 @@ public class GlChangeService {
     public String submitEdit(Long glId, Map<String,String> f, AusyUserDetails me, String note) {
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return "Baris GL tidak ditemukan.";
-        GlChangeRequest c = base("EDIT", glId, me, note);
+        GlChangeRequest c = base("EDIT", T_GL_ROW, glId, me, note);
         c.setNoPaket(g.getNoPaket());
         c.setBeforeJson(toJson(rowMap(g)));
         c.setAfterJson(toJson(formMap(f)));
@@ -128,7 +174,7 @@ public class GlChangeService {
             }
         }
         if (after.isEmpty()) return "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini).";
-        GlChangeRequest c = base("BULK_EDIT", null, me, note);
+        GlChangeRequest c = base("BULK_EDIT", T_GL_ROW, null, me, note);
         c.setBeforeJson(toJsonList(before));
         c.setAfterJson(toJsonList(after));
         cr.save(c);
@@ -149,7 +195,7 @@ public class GlChangeService {
     public String submitDelete(Long glId, AusyUserDetails me, String note) {
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return "Baris GL tidak ditemukan.";
-        GlChangeRequest c = base("DELETE", glId, me, note);
+        GlChangeRequest c = base("DELETE", T_GL_ROW, glId, me, note);
         c.setNoPaket(g.getNoPaket());
         c.setBeforeJson(toJson(rowMap(g)));
         cr.save(c);
@@ -157,26 +203,179 @@ public class GlChangeService {
         return "Permintaan HAPUS data GL diajukan (menunggu approval Checker).";
     }
 
-    private GlChangeRequest base(String op, Long glId, AusyUserDetails me, String note) {
+    // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
+    @Transactional
+    public Res submitGlCodeAdd(String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+        String p = GlCodeService.normPos(pos);
+        if (code == null || code.isBlank() || p.isEmpty()) return new Res(false, "NoGL dan Debit/Credit wajib diisi.");
+        code = code.trim();
+        if (glCodeService.exists(code, p)) return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
+        if (pendingCombo(code, p)) return new Res(false, "Sudah ada permintaan untuk NoGL tersebut yang menunggu otorisasi Checker.");
+        GlChangeRequest c = base("ADD", T_GL_CODE, null, me, note);
+        c.setAfterJson(toJson(glCodeMap(code, p, desc, status)));
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ",
+                "TAMBAH Kode GL " + code + "-" + p + " diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan TAMBAH Kode GL diajukan (menunggu otorisasi Checker).");
+    }
+
+    @Transactional
+    public Res submitGlCodeEdit(Long id, String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+        GlCode g = glCodeService.find(id);
+        if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
+        if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
+
+        String newCode, newPos;
+        if (glCodeService.used(g.getCode())) {          // used codes: NoGL + D/C stay locked
+            newCode = g.getCode(); newPos = g.getPosition();
+        } else {
+            newPos = GlCodeService.normPos(pos);
+            newCode = code == null ? "" : code.trim();
+            if (newCode.isBlank() || newPos.isEmpty()) return new Res(false, "NoGL dan Debit/Credit wajib diisi.");
+            boolean moved = !newCode.equals(g.getCode()) || !newPos.equals(g.getPosition());
+            if (moved && glCodeService.exists(newCode, newPos))
+                return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
+        }
+        GlChangeRequest c = base("EDIT", T_GL_CODE, null, me, note);
+        c.setRefId(id);
+        c.setBeforeJson(toJson(glCodeMap(g)));
+        c.setAfterJson(toJson(glCodeMap(newCode, newPos, desc, status)));
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ", "UBAH Kode GL #" + id + " diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan UBAH Kode GL diajukan (menunggu otorisasi Checker).");
+    }
+
+    @Transactional
+    public Res submitGlCodeDelete(Long id, AusyUserDetails me, String note) {
+        GlCode g = glCodeService.find(id);
+        if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
+        if (glCodeService.used(g.getCode()))
+            return new Res(false, "Kode GL sudah dipakai pada transaksi, tidak dapat dihapus.");
+        if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
+        GlChangeRequest c = base("DELETE", T_GL_CODE, null, me, note);
+        c.setRefId(id);
+        c.setBeforeJson(toJson(glCodeMap(g)));
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ",
+                "HAPUS Kode GL #" + id + " (" + g.getCode() + "-" + g.getPosition() + ") diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan HAPUS Kode GL diajukan (menunggu otorisasi Checker).");
+    }
+
+    /** Bulk CSV import is an Add too — one request holding every new row. */
+    @Transactional
+    public Res submitGlCodeImport(List<Map<String,String>> rows, AusyUserDetails me, String note) {
+        if (rows == null || rows.isEmpty()) return new Res(false, "Tidak ada baris baru yang bisa diajukan dari CSV.");
+        List<Map<String,String>> fresh = new ArrayList<>();
+        int held = 0;
+        for (Map<String,String> m : rows) {
+            if (pendingCombo(m.get("code"), m.get("position"))) { held++; continue; }
+            fresh.add(m);
+        }
+        if (fresh.isEmpty()) return new Res(false, "Semua baris CSV sudah ada pada permintaan yang menunggu otorisasi.");
+        GlChangeRequest c = base("IMPORT", T_GL_CODE, null, me, note);
+        c.setAfterJson(toJsonList(fresh));
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ",
+                "IMPORT " + fresh.size() + " Kode GL diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan IMPORT " + fresh.size() + " Kode GL diajukan (menunggu otorisasi Checker)."
+                + (held > 0 ? " " + held + " baris dilewati karena sudah menunggu otorisasi." : ""));
+    }
+
+    // ---- maker action on a whole batch (BUG_AUSY_00082) ----
+    @Transactional
+    public Res submitPaketDelete(String paket, String inputer, AusyUserDetails me, String note) {
+        List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
+        if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
+        if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))
+            return new Res(false, "Batch tersebut sudah diajukan untuk dihapus dan menunggu otorisasi Checker.");
+
+        BigDecimal d = BigDecimal.ZERO, k = BigDecimal.ZERO;
+        for (GlTabel g : rows) {
+            BigDecimal a = g.getGltram() == null ? BigDecimal.ZERO : g.getGltram();
+            if ("C".equalsIgnoreCase(n(g.getGltrcd()))) k = k.add(a); else d = d.add(a);
+        }
+        Map<String,String> before = new LinkedHashMap<>();
+        before.put("noPaket", paket); before.put("inputer", inputer);
+        before.put("rows", String.valueOf(rows.size()));
+        before.put("debit", d.toPlainString()); before.put("credit", k.toPlainString());
+
+        GlChangeRequest c = base("DELETE", T_PAKET, null, me, note);
+        c.setNoPaket(paket); c.setInputer(inputer);
+        c.setBeforeJson(toJson(before));
+        cr.save(c);
+        audit.transaction(me.getUsername(), "BATCH_DELETE_REQ",
+                "HAPUS Batch " + paket + " (uploader=" + inputer + ", " + rows.size() + " baris) diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan HAPUS Batch " + paket + " diajukan (menunggu otorisasi Checker).");
+    }
+
+    // ---- pending lookups: the maker screens lock what is already submitted ----
+    public Set<Long> pendingGlCodeIds() {
+        Set<Long> ids = new HashSet<>();
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_CODE))
+            if (c.getRefId() != null) ids.add(c.getRefId());
+        return ids;
+    }
+
+    public Set<String> pendingPaketKeys() {
+        Set<String> keys = new HashSet<>();
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
+            keys.add(n(c.getNoPaket()) + "|" + n(c.getInputer()));
+        return keys;
+    }
+
+    private boolean pendingForGlCode(Long glCodeId) {
+        return cr.existsByStatusAndTargetAndRefId("PENDING", T_GL_CODE, glCodeId);
+    }
+
+    /** Is an ADD/IMPORT for this NoGL + D/C already waiting? */
+    private boolean pendingCombo(String code, String pos) {
+        if (code == null || pos == null) return false;
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_CODE)) {
+            if ("IMPORT".equals(c.getOp())) {
+                for (Map<String,String> m : parseList(c.getAfterJson()))
+                    if (code.equals(m.get("code")) && pos.equals(m.get("position"))) return true;
+            } else {
+                Map<String,String> a = parse(c.getAfterJson());
+                if (a != null && code.equals(a.get("code")) && pos.equals(a.get("position"))) return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<String,String> glCodeMap(String code, String pos, String desc, Short status) {
+        Map<String,String> m = new LinkedHashMap<>();
+        m.put("code", n(code)); m.put("position", n(pos)); m.put("description", n(desc));
+        m.put("status", status == null ? "1" : String.valueOf(status));
+        return m;
+    }
+    private Map<String,String> glCodeMap(GlCode g) {
+        return glCodeMap(g.getCode(), g.getPosition(), g.getDescription(), g.getStatus());
+    }
+
+    private GlChangeRequest base(String op, String target, Long glId, AusyUserDetails me, String note) {
         GlChangeRequest c = new GlChangeRequest();
-        c.setOp(op); c.setGlId(glId); c.setMaker(me.getUsername());
+        c.setOp(op); c.setTarget(target); c.setGlId(glId); c.setMaker(me.getUsername());
         c.setMakerGroup(me.getIdGroup()); c.setNoteMaker(note); c.setStatus("PENDING");
         return c;
     }
 
     // ---- checker review ----
     public record Diff(String label, String before, String after, boolean changed) {}
-    public record ReviewItem(GlChangeRequest cr, List<Diff> diffs, int bulkCount) {}
+    public record ReviewItem(GlChangeRequest cr, List<Diff> diffs, int bulkCount,
+                             List<Map<String,String>> rows, String targetLabel) {}
 
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!approval.canApprove(approverGroup, c.getMaker())) continue;
             if (isStale(c)) continue;
+            String label = targetLabel(c.getTarget());
             if ("BULK_EDIT".equals(c.getOp()))
-                out.add(new ReviewItem(c, List.of(), parseList(c.getAfterJson()).size()));
+                out.add(new ReviewItem(c, List.of(), parseList(c.getAfterJson()).size(), List.of(), label));
+            else if ("IMPORT".equals(c.getOp()))
+                out.add(new ReviewItem(c, List.of(), 0, parseList(c.getAfterJson()), label));
             else
-                out.add(new ReviewItem(c, diffs(c), 0));
+                out.add(new ReviewItem(c, diffs(c), 0, List.of(), label));
         }
         return out;
     }
@@ -216,21 +415,59 @@ public class GlChangeService {
     private List<Diff> diffs(GlChangeRequest c) {
         Map<String,String> b = parse(c.getBeforeJson()), a = parse(c.getAfterJson());
         List<Diff> list = new ArrayList<>();
-        for (var e : FIELDS.entrySet()) {
+        for (var e : fieldsOf(c.getTarget()).entrySet()) {
             String bv = b==null?null:b.get(e.getKey());
             String av = a==null?null:a.get(e.getKey());
-            list.add(new Diff(e.getValue(), bv==null?"—":bv, av==null?"—":av, !Objects.equals(bv,av)));
+            list.add(new Diff(e.getValue(),
+                    bv==null?"—":fmt(c.getTarget(), e.getKey(), bv),
+                    av==null?"—":fmt(c.getTarget(), e.getKey(), av),
+                    !Objects.equals(bv,av)));
         }
         return list;
     }
 
-    @Transactional
-    public String approve(Long crId, AusyUserDetails me, String note) {
-        GlChangeRequest c = cr.findById(crId).orElse(null);
-        if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
-        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
-            return "Group Anda tidak berwenang meng-approve permintaan dari maker tersebut.";
+    /** Raw stored value -> what the Checker should read. */
+    private static String fmt(String target, String key, String v) {
+        if (T_GL_CODE.equals(target)) {
+            if (key.equals("position")) return "C".equals(v) ? "Credit" : ("D".equals(v) ? "Debit" : v);
+            if (key.equals("status"))   return "1".equals(v) ? "Active" : ("0".equals(v) ? "Non Active" : v);
+        }
+        return v;
+    }
 
+    @Transactional
+    public Res approve(Long crId, AusyUserDetails me, String note) {
+        GlChangeRequest c = cr.findById(crId).orElse(null);
+        if (c == null || !"PENDING".equals(c.getStatus()))
+            return new Res(false, "Permintaan tidak ditemukan / sudah diproses.");
+        if (me.getUsername().equals(c.getMaker()))
+            return new Res(false, "Maker tidak boleh mengotorisasi permintaannya sendiri.");
+        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
+            return new Res(false, "Group Anda tidak berwenang meng-approve permintaan dari maker tersebut.");
+
+        String err = apply(c);
+        if (err != null) return new Res(false, err);
+
+        c.setStatus("APPROVED"); c.setChecker(me.getUsername());
+        c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GL_CHANGE_APPROVE",
+                c.getOp() + " " + targetLabel(c.getTarget()) + " CR#" + c.getId()
+                + " (maker=" + c.getMaker() + ") di-approve & diterapkan ke DB");
+        return new Res(true, c.getOp() + " " + targetLabel(c.getTarget()) + " disetujui dan diterapkan.");
+    }
+
+    // ---- apply to live data: null on success, else the message to show the Checker ----
+    private String apply(GlChangeRequest c) {
+        String target = c.getTarget() == null ? T_GL_ROW : c.getTarget();
+        return switch (target) {
+            case T_GL_CODE -> applyGlCode(c);
+            case T_PAKET   -> applyPaketDelete(c);
+            default        -> applyGlRow(c);
+        };
+    }
+
+    private String applyGlRow(GlChangeRequest c) {
         switch (c.getOp()) {
             case "ADD" -> applyAdd(parse(c.getAfterJson()), c.getMaker());
             case "EDIT" -> applyEdit(c.getGlId(), parse(c.getAfterJson()));
@@ -238,18 +475,59 @@ public class GlChangeService {
             case "BULK_EDIT" -> applyBulkEdit(parseList(c.getAfterJson()));
             default -> { return "Operasi tidak dikenal."; }
         }
-        c.setStatus("APPROVED"); c.setChecker(me.getUsername());
-        c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
-        cr.save(c);
-        audit.transaction(me.getUsername(), "GL_CHANGE_APPROVE",
-                c.getOp() + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") di-approve & diterapkan ke DB");
-        return c.getOp() + " disetujui dan diterapkan ke database GL.";
+        return null;
+    }
+
+    private String applyGlCode(GlChangeRequest c) {
+        Map<String,String> a = parse(c.getAfterJson());
+        try {
+            switch (c.getOp()) {
+                case "ADD" -> {
+                    if (a == null) return "Data permintaan tidak terbaca.";
+                    String e = glCodeService.add(a.get("code"), a.get("position"), a.get("description"),
+                                                 shortOf(a.get("status")), c.getMaker());
+                    if ("exists".equals(e)) return "Tidak dapat diterapkan: NoGL + Debit/Credit sudah terdaftar.";
+                    if (e != null) return "Tidak dapat diterapkan: data Kode GL tidak valid.";
+                }
+                case "EDIT" -> {
+                    if (a == null || c.getRefId() == null) return "Data permintaan tidak terbaca.";
+                    String e = glCodeService.edit(c.getRefId(), a.get("code"), a.get("position"), a.get("description"),
+                                                  shortOf(a.get("status")), c.getMaker());
+                    if (e != null) return "Tidak dapat diterapkan: Kode GL tidak ditemukan / tidak valid.";
+                }
+                case "DELETE" -> {
+                    if (c.getRefId() == null) return "Data permintaan tidak terbaca.";
+                    String e = glCodeService.delete(c.getRefId());
+                    if ("inuse".equals(e)) return "Tidak dapat diterapkan: Kode GL sudah dipakai pada transaksi.";
+                    if (e != null) return "Tidak dapat diterapkan: Kode GL tidak ditemukan.";
+                }
+                case "IMPORT" -> glCodeService.applyImport(parseList(c.getAfterJson()), c.getMaker());
+                default -> { return "Operasi tidak dikenal."; }
+            }
+        } catch (GlCodeService.DuplicateGl e) {
+            return "Tidak dapat diterapkan: NoGL + Debit/Credit sudah terdaftar.";
+        }
+        return null;
+    }
+
+    private String applyPaketDelete(GlChangeRequest c) {
+        if (!"DELETE".equals(c.getOp())) return "Operasi tidak dikenal.";
+        if (gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()).isEmpty())
+            return "Batch sudah tidak ada / sudah diproses.";
+        gl.deletePaket(c.getNoPaket(), c.getInputer());
+        return null;
+    }
+
+    private static Short shortOf(String s) {
+        try { return Short.valueOf(s); } catch (Exception e) { return 1; }
     }
 
     @Transactional
     public String reject(Long crId, AusyUserDetails me, String note) {
         GlChangeRequest c = cr.findById(crId).orElse(null);
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
+        if (me.getUsername().equals(c.getMaker()))
+            return "Maker tidak boleh memutuskan permintaannya sendiri.";
         if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
             return "Group Anda tidak berwenang menolak permintaan dari maker tersebut.";
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
@@ -258,8 +536,9 @@ public class GlChangeService {
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REJECT",
-                c.getOp() + " CR#" + c.getId() + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
-        return "Permintaan ditolak. Data GL tidak diubah; alasan tercatat di audit trail.";
+                c.getOp() + " " + targetLabel(c.getTarget()) + " CR#" + c.getId()
+                + " (maker=" + c.getMaker() + ") DITOLAK. Catatan: " + note);
+        return "Permintaan ditolak. Data tidak diubah; alasan tercatat di audit trail.";
     }
 
     // ---- apply to live data ----

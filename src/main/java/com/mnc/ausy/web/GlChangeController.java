@@ -120,7 +120,8 @@ public class GlChangeController {
     @PostMapping("/gl-change/approve")
     public String approve(@RequestParam Long crId, @RequestParam(required=false) String note,
                           @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", service.approve(crId, me, note));
+        GlChangeService.Res r = service.approve(crId, me, note);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/otorisasi-gl";
     }
 

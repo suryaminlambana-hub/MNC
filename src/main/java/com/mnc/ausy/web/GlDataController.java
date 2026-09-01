@@ -4,7 +4,9 @@ import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.AuditService;
+import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -22,9 +24,13 @@ public class GlDataController {
     private final GlCodeRepository glCode;
     private final GlExportService glExport;
     private final AuditService audit;
+    private final GlChangeService changes;
+    private final ApprovalService approval;
 
-    public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport, AuditService audit) {
+    public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport,
+                            AuditService audit, GlChangeService changes, ApprovalService approval) {
         this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
+        this.changes = changes; this.approval = approval;
     }
 
     /** A GL row is "registered" when its NoGL + D/C exists in the GL Code master. */
@@ -72,18 +78,27 @@ public class GlDataController {
     }
 
     @GetMapping("/gl-delete")
-    public String deletePage(Model model) {
-        // Sinkron dengan List GL: tampilkan paket GL aktif (sudah diotorisasi) agar bisa dihapus
+    public String deletePage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
+        // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus
         model.addAttribute("pakets", gl.approvedPakets());
+        model.addAttribute("needApproval", approval.requiresApproval(me == null ? null : me.getIdGroup()));
+        model.addAttribute("pendingKeys", changes.pendingPaketKeys());
         return "gl-delete/index";
     }
 
+    /** BUG_AUSY_00082 — a maker's batch delete waits for the Checker; nothing is deleted until approved. */
     @PostMapping("/gl-delete/process")
     public String delete(@RequestParam String paket, @RequestParam String inputer,
+                         @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        if (approval.requiresApproval(me.getIdGroup())) {
+            GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+            return "redirect:/gl-delete";
+        }
         gl.deletePaket(paket, inputer);
-        audit.transaction(me.getUsername(), "DELETE_PAKET", "Paket " + paket + " (maker=" + inputer + ") dihapus");
-        ra.addFlashAttribute("ok", "Paket " + paket + " berhasil dihapus.");
+        audit.transaction(me.getUsername(), "BATCH_DELETE", "Batch " + paket + " (maker=" + inputer + ") dihapus");
+        ra.addFlashAttribute("ok", "Batch " + paket + " berhasil dihapus.");
         return "redirect:/gl-delete";
     }
 }

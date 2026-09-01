@@ -58,8 +58,12 @@
                               th:classappend="${c.op == 'ADD'} ? 'bg-success-subtle text-success' : (${c.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
                               th:text="${c.op}"></span></td>
                     <td class="small">
-                        <span th:if="${c.glId != null}" th:text="'GL #' + ${c.glId}"></span>
-                        <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Paket ' + ${c.noPaket}"></span>
+                        <span th:if="${c.target == 'GL_CODE'}">Kode GL</span>
+                        <span th:if="${c.target == 'PAKET'}" th:text="'Batch ' + ${c.noPaket}"></span>
+                        <span th:if="${c.target == null or c.target == 'GL_ROW'}">
+                            <span th:if="${c.glId != null}" th:text="'GL #' + ${c.glId}"></span>
+                            <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Batch ' + ${c.noPaket}"></span>
+                        </span>
                     </td>
                     <td class="small text-muted" th:text="${c.noteMaker}"></td>
                     <td class="pe-3"><span class="badge bg-warning-subtle text-warning">MENUNGGU CHECKER</span></td>

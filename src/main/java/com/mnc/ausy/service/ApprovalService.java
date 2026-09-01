@@ -25,4 +25,13 @@ public class ApprovalService {
         if (approverGroup.equals(targetGroup)) return false;   // cannot approve own group
         return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup);
     }
+
+    /**
+     * Must a change made by a user in {@code makerGroup} wait for a Checker?
+     * True when the approval_group matrix names some group as checker for it — so who needs
+     * approval follows the Approval Group screen, never a hard-coded role list.
+     */
+    public boolean requiresApproval(Integer makerGroup) {
+        return makerGroup != null && rules.existsByTargetGroup(makerGroup);
+    }
 }
