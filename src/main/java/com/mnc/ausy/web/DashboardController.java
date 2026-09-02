@@ -13,6 +13,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Controller
@@ -70,10 +73,9 @@ public class DashboardController {
             normalizeUploadedAt(pendingPaketList);
             List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible();
             List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.allPending();
-            model.addAttribute("pendingPaketList", pendingPaketList);
-            model.addAttribute("pendingChangeList", pendingChangeList);
-            model.addAttribute("pendingExportList", pendingExportList);
-            model.addAttribute("pendingChanges", pendingPaketList.size() + pendingChangeList.size() + pendingExportList.size());
+            List<PendingRow> pendingList = pendingRows(pendingPaketList, pendingChangeList, pendingExportList);
+            model.addAttribute("pendingList", pendingList);
+            model.addAttribute("pendingChanges", pendingList.size());
             String me = auth.getName();
             model.addAttribute("glHistory", tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
             // Export yang sudah di-approve checker tapi gagal terkirim ke FTP — maker perlu tahu & minta Admin kirim ulang.
@@ -120,6 +122,47 @@ public class DashboardController {
     /** pendingPakets()'s last column (max(adddt)) may come back as java.sql.Timestamp or
      *  java.time.LocalDateTime depending on driver/Hibernate version — Thymeleaf's #temporals
      *  only accepts the latter, so normalize it in place before it reaches the template. */
+    /** One row of the maker's "Perubahan GL Pending" list, whatever kind of request it came from. */
+    public record PendingRow(LocalDateTime time, String kind, String badge, String target, String note) {}
+
+    /**
+     * Upload batches, GL change requests and export requests shown as ONE list, newest first —
+     * three separately-sorted blocks used to read as jumbled dates (BUG_AUSY_00092).
+     */
+    private static List<PendingRow> pendingRows(List<Object[]> pakets,
+                                                List<com.mnc.ausy.domain.GlChangeRequest> changes,
+                                                List<com.mnc.ausy.domain.GlExportRequest> exports) {
+        List<PendingRow> out = new ArrayList<>();
+        if (pakets != null) for (Object[] p : pakets) {
+            out.add(new PendingRow(p[5] instanceof LocalDateTime t ? t : null, "UPLOAD", "bg-info-subtle text-info",
+                    "Batch " + p[0] + " · " + p[2] + " baris", "Upload GL menunggu otorisasi"));
+        }
+        if (changes != null) for (var c : changes) {
+            String kind = "BULK_EDIT".equals(c.getOp()) ? "BULK EDIT" : c.getOp();
+            String badge = switch (kind) {
+                case "ADD", "IMPORT" -> "bg-success-subtle text-success";
+                case "DELETE"        -> "bg-danger-subtle text-danger";
+                default              -> "bg-warning-subtle text-warning";
+            };
+            String target;
+            if ("GL_CODE".equals(c.getTarget())) target = "Kode GL";
+            else if ("PAKET".equals(c.getTarget())) target = "Batch " + c.getNoPaket();
+            else {
+                target = c.getGlId() != null ? "GL #" + c.getGlId() : "Data GL";
+                if (c.getNoPaket() != null && !c.getNoPaket().isBlank()) target += " · Batch " + c.getNoPaket();
+            }
+            out.add(new PendingRow(c.getCreatedAt(), kind, badge, target, c.getNoteMaker()));
+        }
+        if (exports != null) for (var e : exports) {
+            out.add(new PendingRow(e.getCreatedAt(), "EXPORT", "bg-info-subtle text-info",
+                    "Export #" + e.getId() + " · " + e.getRowsCount() + " baris", e.getNoteMaker()));
+        }
+        // terbaru dulu; yang tanpa waktu ditaruh paling bawah
+        out.sort(Comparator.comparing(PendingRow::time,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return out;
+    }
+
     private static void normalizeUploadedAt(List<Object[]> rows) {
         for (Object[] r : rows) {
             if (r[5] instanceof java.sql.Timestamp ts) r[5] = ts.toLocalDateTime();
