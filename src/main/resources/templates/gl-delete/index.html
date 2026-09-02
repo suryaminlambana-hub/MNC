@@ -7,11 +7,6 @@
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
-  <div th:if="${needApproval}" class="alert alert-info py-2">
-    <i class="fa-solid fa-user-shield"></i>
-    Penghapusan batch memerlukan <b>otorisasi Checker</b>. Batch baru terhapus setelah Checker menyetujui
-    permintaan Anda pada menu <b>Manajemen Otorisasi GL</b>.
-  </div>
   <div class="ausy-card">
     <table class="table table-hover align-middle mb-0">
       <thead><tr><th>No</th><th>Batch</th><th>Uploader</th><th class="text-end">Jml Baris</th><th>Aksi</th></tr></thead>
@@ -25,18 +20,42 @@
           <span th:if="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}" class="badge bg-info-subtle text-info">
             <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
           </span>
-          <form th:unless="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}"
-                th:action="@{/gl-delete/process}" method="post" class="d-inline"
-                onsubmit="return confirm('Lanjutkan hapus batch ini?');">
-            <input type="hidden" name="paket" th:value="${p[0]}"><input type="hidden" name="inputer" th:value="${p[1]}">
-            <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i>
-              <span th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</span></button>
-          </form>
+          <button th:unless="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}"
+                  type="button" class="btn btn-sm btn-outline-danger btn-del-batch"
+                  th:attr="data-paket=${p[0]},data-inputer=${p[1]}"><i class="fa-solid fa-trash"></i>
+            <span th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</span></button>
         </td>
       </tr>
       <tr th:if="${pakets.isEmpty()}"><td colspan="5" class="text-center text-muted py-3">Tidak ada batch.</td></tr>
       </tbody>
     </table>
   </div>
+
+  <div class="modal fade" id="delBatch" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form th:action="@{/gl-delete/process}" method="post">
+      <div class="modal-header"><h5 class="modal-title">Hapus Batch <span id="db_label"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="paket" id="db_paket"><input type="hidden" name="inputer" id="db_inputer">
+        <div th:if="${needApproval}"><label class="form-label">Alasan <span class="text-danger">*</span></label>
+          <textarea class="form-control" name="note" rows="2" placeholder="Alasan penghapusan batch" required></textarea></div>
+        <p class="text-muted small mb-0 mt-2">Seluruh baris GL pada batch ini akan dihapus.</p>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button class="btn btn-danger" th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</button></div>
+    </form>
+  </div></div></div>
+
+  <script>
+    (function(){
+      var m=new bootstrap.Modal(document.getElementById('delBatch'));
+      document.querySelectorAll('.btn-del-batch').forEach(function(b){b.addEventListener('click',function(){
+        document.getElementById('db_paket').value=b.dataset.paket;
+        document.getElementById('db_inputer').value=b.dataset.inputer;
+        document.getElementById('db_label').textContent=b.dataset.paket;
+        m.show();
+      });});
+    })();
+  </script>
 </main>
 </html>

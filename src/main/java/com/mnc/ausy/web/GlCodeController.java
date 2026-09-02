@@ -123,8 +123,9 @@ public class GlCodeController {
             if (needsApproval(me)) {
                 GlCodeService.CsvParse p = service.parseCsv(file.getInputStream());
                 GlChangeService.Res r = changes.submitGlCodeImport(p.rows(), me, note);
-                flash(ra, new GlChangeService.Res(r.ok(), r.message()
-                        + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)"));
+                // hitungan duplikat/invalid hanya relevan kalau pengajuannya diterima
+                flash(ra, r.ok() ? new GlChangeService.Res(true, r.message()
+                        + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)") : r);
                 return "redirect:/gl-code";
             }
             int[] r = service.importCsv(file.getInputStream(), me.getUsername());

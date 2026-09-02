@@ -117,6 +117,7 @@ public class GlChangeService {
         try { return json.readValue(s, List.class); } catch (Exception e) { return java.util.Collections.emptyList(); }
     }
     private static String n(String s){ return s==null?"":s; }
+    private static boolean blank(String s){ return s == null || s.isBlank(); }
 
     // ---- maker actions: create pending request, do NOT touch live data ----
     @Transactional
@@ -206,6 +207,7 @@ public class GlChangeService {
     // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
     @Transactional
     public Res submitGlCodeAdd(String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         String p = GlCodeService.normPos(pos);
         if (code == null || code.isBlank() || p.isEmpty()) return new Res(false, "NoGL dan Debit/Credit wajib diisi.");
         code = code.trim();
@@ -221,6 +223,7 @@ public class GlChangeService {
 
     @Transactional
     public Res submitGlCodeEdit(Long id, String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
         if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
@@ -236,10 +239,14 @@ public class GlChangeService {
             if (moved && glCodeService.exists(newCode, newPos))
                 return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
         }
+        Map<String,String> before = glCodeMap(g), after = glCodeMap(newCode, newPos, desc, status);
+        if (before.equals(after))
+            return new Res(false, "Tidak ada perubahan pada Kode GL — permintaan tidak diajukan.");
+
         GlChangeRequest c = base("EDIT", T_GL_CODE, null, me, note);
         c.setRefId(id);
-        c.setBeforeJson(toJson(glCodeMap(g)));
-        c.setAfterJson(toJson(glCodeMap(newCode, newPos, desc, status)));
+        c.setBeforeJson(toJson(before));
+        c.setAfterJson(toJson(after));
         cr.save(c);
         audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ", "UBAH Kode GL #" + id + " diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Permintaan UBAH Kode GL diajukan (menunggu otorisasi Checker).");
@@ -247,6 +254,7 @@ public class GlChangeService {
 
     @Transactional
     public Res submitGlCodeDelete(Long id, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
         if (glCodeService.used(g.getCode()))
@@ -264,6 +272,7 @@ public class GlChangeService {
     /** Bulk CSV import is an Add too — one request holding every new row. */
     @Transactional
     public Res submitGlCodeImport(List<Map<String,String>> rows, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (rows == null || rows.isEmpty()) return new Res(false, "Tidak ada baris baru yang bisa diajukan dari CSV.");
         List<Map<String,String>> fresh = new ArrayList<>();
         int held = 0;
@@ -284,6 +293,7 @@ public class GlChangeService {
     // ---- maker action on a whole batch (BUG_AUSY_00082) ----
     @Transactional
     public Res submitPaketDelete(String paket, String inputer, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
         if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
         if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))
