@@ -29,10 +29,18 @@
         <td class="text-end" th:text="${r.gltram != null ? #numbers.formatDecimal(r.gltram,1,'POINT',2,'COMMA') : ''}"></td>
         <td th:text="${r.gltrds}"></td>
         <td th:text="${r.noPaket}"></td>
-        <td><span class="badge bg-secondary-subtle text-secondary" th:text="${r.statusDual}"></span></td>
+        <td>
+          <span th:if="${pendingIds != null and pendingIds.contains(r.id)}" class="badge bg-warning-subtle text-warning">
+            <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
+          <span th:unless="${pendingIds != null and pendingIds.contains(r.id)}"
+                class="badge bg-secondary-subtle text-secondary" th:text="${r.statusDual}"></span>
+        </td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-secondary btn-edit" title="Ubah"><i class="fa-solid fa-pen"></i> Ubah</button>
-          <button class="btn btn-sm btn-outline-danger btn-del" title="Hapus"><i class="fa-solid fa-trash"></i> Hapus</button>
+          <th:block th:unless="${pendingIds != null and pendingIds.contains(r.id)}">
+            <button class="btn btn-sm btn-outline-secondary btn-edit" title="Ubah"><i class="fa-solid fa-pen"></i> Ubah</button>
+            <button class="btn btn-sm btn-outline-danger btn-del" title="Hapus"><i class="fa-solid fa-trash"></i> Hapus</button>
+          </th:block>
+          <span th:if="${pendingIds != null and pendingIds.contains(r.id)}" class="text-muted small">—</span>
         </td>
       </tr>
       <tr th:if="${rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>

@@ -121,26 +121,35 @@ public class GlChangeService {
 
     // ---- maker actions: create pending request, do NOT touch live data ----
     @Transactional
-    public String submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
+    public Res submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ", "ADD diajukan (CR#" + c.getId() + ")");
-        return "Permintaan TAMBAH data GL diajukan (menunggu approval Checker).";
+        return new Res(true, "Permintaan TAMBAH data GL diajukan (menunggu approval Checker).");
     }
 
     @Transactional
-    public String submitEdit(Long glId, Map<String,String> f, AusyUserDetails me, String note) {
+    public Res submitEdit(Long glId, Map<String,String> f, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlTabel g = gl.findById(glId).orElse(null);
-        if (g == null) return "Baris GL tidak ditemukan.";
+        if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
+        if (pendingGlRowIds().contains(glId))
+            return new Res(false, "Baris GL tersebut masih menunggu otorisasi Checker.");
+
+        Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
+        if (before.equals(after))
+            return new Res(false, "Tidak ada perubahan pada data GL — permintaan tidak diajukan.");
+
         GlChangeRequest c = base("EDIT", T_GL_ROW, glId, me, note);
         c.setNoPaket(g.getNoPaket());
-        c.setBeforeJson(toJson(rowMap(g)));
-        c.setAfterJson(toJson(formMap(f)));
+        c.setBeforeJson(toJson(before));
+        c.setAfterJson(toJson(after));
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ", "EDIT baris #" + glId + " diajukan (CR#" + c.getId() + ")");
-        return "Permintaan UBAH data GL diajukan (menunggu approval Checker).";
+        return new Res(true, "Permintaan UBAH data GL diajukan (menunggu approval Checker).");
     }
 
     /**
@@ -150,14 +159,16 @@ public class GlChangeService {
      * checker can export/compare the Excel before & after, then approve/reject.
      */
     @Transactional
-    public String submitBulkEditExcel(List<Map<String,String>> uploaded, AusyUserDetails me, String note) {
-        if (note == null || note.isBlank()) return "Alasan/justifikasi wajib diisi.";
-        if (uploaded == null || uploaded.isEmpty()) return "File kosong / tidak ada baris data.";
+    public Res submitBulkEditExcel(List<Map<String,String>> uploaded, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (uploaded == null || uploaded.isEmpty()) return new Res(false, "File kosong / tidak ada baris data.");
+        Set<Long> pending = pendingGlRowIds();
         List<Map<String,String>> before = new ArrayList<>(), after = new ArrayList<>();
-        int skipped = 0;
+        int skipped = 0, held = 0;
         for (Map<String,String> row : uploaded) {
             Long id;
             try { id = Long.valueOf(row.get("id")); } catch (Exception e) { skipped++; continue; }
+            if (pending.contains(id)) { held++; continue; }     // sedang menunggu otorisasi
             GlTabel g = gl.findById(id).orElse(null);
             if (g == null) { skipped++; continue; }
             Map<String,String> cur = rowMap(g);
@@ -174,15 +185,17 @@ public class GlChangeService {
                 before.add(b); after.add(a);
             }
         }
-        if (after.isEmpty()) return "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini).";
+        if (after.isEmpty()) return new Res(false, "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini)."
+                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : ""));
         GlChangeRequest c = base("BULK_EDIT", T_GL_ROW, null, me, note);
         c.setBeforeJson(toJsonList(before));
         c.setAfterJson(toJsonList(after));
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ",
                 "BULK EDIT (Excel) " + after.size() + " baris diajukan (CR#" + c.getId() + ")");
-        return "Bulk edit " + after.size() + " baris GL diajukan via Excel (menunggu approval Checker)"
-                + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".");
+        return new Res(true, "Bulk edit " + after.size() + " baris GL diajukan via Excel (menunggu approval Checker)"
+                + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".")
+                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : ""));
     }
 
     /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
@@ -193,15 +206,18 @@ public class GlChangeService {
     }
 
     @Transactional
-    public String submitDelete(Long glId, AusyUserDetails me, String note) {
+    public Res submitDelete(Long glId, AusyUserDetails me, String note) {
+        if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlTabel g = gl.findById(glId).orElse(null);
-        if (g == null) return "Baris GL tidak ditemukan.";
+        if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
+        if (pendingGlRowIds().contains(glId))
+            return new Res(false, "Baris GL tersebut masih menunggu otorisasi Checker.");
         GlChangeRequest c = base("DELETE", T_GL_ROW, glId, me, note);
         c.setNoPaket(g.getNoPaket());
         c.setBeforeJson(toJson(rowMap(g)));
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ", "DELETE baris #" + glId + " diajukan (CR#" + c.getId() + ")");
-        return "Permintaan HAPUS data GL diajukan (menunggu approval Checker).";
+        return new Res(true, "Permintaan HAPUS data GL diajukan (menunggu approval Checker).");
     }
 
     // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
@@ -324,6 +340,28 @@ public class GlChangeService {
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_CODE))
             if (c.getRefId() != null) ids.add(c.getRefId());
         return ids;
+    }
+
+    /** GL rows with a pending change request — EDIT/DELETE targets plus every row inside a bulk edit. */
+    public Set<Long> pendingGlRowIds() {
+        Set<Long> ids = new HashSet<>();
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
+            if (c.getGlId() != null) ids.add(c.getGlId());
+            if ("BULK_EDIT".equals(c.getOp()))
+                for (Map<String,String> m : parseList(c.getAfterJson()))
+                    try { ids.add(Long.valueOf(m.get("id"))); } catch (Exception ignored) {}
+        }
+        return ids;
+    }
+
+    /** Canonical form of a GL row map, so "250000.00" vs " 250000 " isn't read as a change. */
+    private static Map<String,String> normRow(Map<String,String> m) {
+        Map<String,String> out = new LinkedHashMap<>();
+        for (var e : m.entrySet()) {
+            String v = n(e.getValue()).trim();
+            out.put(e.getKey(), e.getKey().equals("gltram") ? normAmt(v) : v);
+        }
+        return out;
     }
 
     public Set<String> pendingPaketKeys() {

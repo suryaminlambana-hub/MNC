@@ -34,27 +34,31 @@ public class GlChangeController {
         // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif)
         model.addAttribute("rows", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
         model.addAttribute("fields", GlChangeService.FIELDS);
+        model.addAttribute("pendingIds", service.pendingGlRowIds());
         return "gl-data/index";
     }
 
     @PostMapping("/gl-data/add")
     public String add(@RequestParam Map<String,String> form, @RequestParam(required=false) String note,
                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", service.submitAdd(form, me, note));
+        GlChangeService.Res r = service.submitAdd(form, me, note);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/gl-data";
     }
 
     @PostMapping("/gl-data/edit")
     public String edit(@RequestParam Long glId, @RequestParam Map<String,String> form, @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", service.submitEdit(glId, form, me, note));
+        GlChangeService.Res r = service.submitEdit(glId, form, me, note);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/gl-data";
     }
 
     @PostMapping("/gl-data/delete")
     public String delete(@RequestParam Long glId, @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", service.submitDelete(glId, me, note));
+        GlChangeService.Res r = service.submitDelete(glId, me, note);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/gl-data";
     }
 
@@ -91,7 +95,8 @@ public class GlChangeController {
                 m.put("noPaket", cell(row, 5));
                 rows.add(m);
             }
-            ra.addFlashAttribute("ok", service.submitBulkEditExcel(rows, me, note));
+            GlChangeService.Res r = service.submitBulkEditExcel(rows, me, note);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         } catch (Exception e) {
             ra.addFlashAttribute("warn", "Gagal membaca file Excel: " + e.getMessage());
         }
