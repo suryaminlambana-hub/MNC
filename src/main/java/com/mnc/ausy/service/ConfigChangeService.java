@@ -79,6 +79,26 @@ public class ConfigChangeService {
     }
     private static Integer toInt(String s){ try { return Integer.valueOf(s.trim()); } catch (Exception e){ return null; } }
 
+    /** Target ids of this entity that already have a request waiting for Admin Approval. */
+    public Set<String> pendingIds(String entity){
+        Set<String> ids = new HashSet<>();
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING"))
+            if (n(entity).equals(n(c.getEntity())) && c.getTargetId() != null) ids.add(c.getTargetId());
+        return ids;
+    }
+    private boolean isPending(String entity, Object targetId){
+        return targetId != null && pendingIds(entity).contains(String.valueOf(targetId));
+    }
+    private static String pendingMsg(String entity){
+        return entityLabel(entity) + " tersebut masih menunggu otorisasi Admin Approval.";
+    }
+    /** Same values on both sides? Internal keys (ids, password) are ignored. */
+    private static boolean unchanged(Map<String,String> before, Map<String,String> after, String... keys){
+        for (String k : keys) if (!Objects.equals(n(before.get(k)).trim(), n(after.get(k)).trim())) return false;
+        return true;
+    }
+    private static final String NO_CHANGE = "Tidak ada perubahan data — permintaan tidak diajukan.";
+
     private ConfigChangeRequest base(String entity, String op, String targetId, AusyUserDetails me, String note){
         ConfigChangeRequest c = new ConfigChangeRequest();
         c.setEntity(entity); c.setOp(op); c.setTargetId(targetId);
@@ -116,13 +136,19 @@ public class ConfigChangeService {
         if (invalidEmail(email)) return "Format email tidak valid.";
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
+        if (isPending("USER", userId)) return pendingMsg("USER");
         Map<String,String> after = new LinkedHashMap<>();
         after.put("userId", n(u.getUserId())); after.put("nama", n(nama)); after.put("email", n(email));
         after.put("group", groupName(idGroup)); after.put("status", statusLabel(status));
         after.put("idGroup", String.valueOf(idGroup));
         if (rawPass != null && !rawPass.isBlank()) { after.put("pass", encoder.encode(rawPass)); after.put("passChanged", "1"); }
+        Map<String,String> before = userMap(u);
+        boolean passChanged = "1".equals(after.get("passChanged"));
+        if (!passChanged && unchanged(before, after, "userId","nama","email","group","status","idGroup"))
+            return NO_CHANGE;
+
         ConfigChangeRequest c = base("USER","EDIT", userId, me, note);
-        c.setBeforeJson(toJson(userMap(u))); c.setAfterJson(toJson(after));
+        c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
         return saveReq(c, "USER", "EDIT", "'" + userId + "'");
     }
 
@@ -132,6 +158,7 @@ public class ConfigChangeService {
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
+        if (isPending("USER", userId)) return pendingMsg("USER");
         ConfigChangeRequest c = base("USER","DELETE", userId, me, note); c.setBeforeJson(toJson(userMap(u)));
         return saveReq(c, "USER", "DELETE", "'" + userId + "'");
     }
@@ -161,14 +188,18 @@ public class ConfigChangeService {
     public String submitGroupEdit(Integer idGroup, String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",n(namaGroup)); a.put("inisial",n(inisial)); a.put("level",n(level));
-        ConfigChangeRequest c=base("GROUP","EDIT",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g))); c.setAfterJson(toJson(a));
+        Map<String,String> b=groupMap(g);
+        if (unchanged(b, a, "namaGroup","inisial","level")) return NO_CHANGE;
+        ConfigChangeRequest c=base("GROUP","EDIT",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(b)); c.setAfterJson(toJson(a));
         return saveReq(c,"GROUP","EDIT","'"+g.getNamaGroup()+"'");
     }
     @Transactional
     public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         ConfigChangeRequest c=base("GROUP","DELETE",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g)));
         return saveReq(c,"GROUP","DELETE","'"+g.getNamaGroup()+"'");
     }
@@ -194,15 +225,19 @@ public class ConfigChangeService {
     public String submitMenuEdit(Integer idMenu, String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
+        if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",n(namaMenu)); a.put("url",n(url));
         a.put("parent",String.valueOf(parent==null?0:parent)); a.put("urutan",String.valueOf(urutan==null?0:urutan));
-        ConfigChangeRequest c=base("MENU","EDIT",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m))); c.setAfterJson(toJson(a));
+        Map<String,String> b=menuMap(m);
+        if (unchanged(b, a, "namaMenu","url","parent","urutan")) return NO_CHANGE;
+        ConfigChangeRequest c=base("MENU","EDIT",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(b)); c.setAfterJson(toJson(a));
         return saveReq(c,"MENU","EDIT","'"+m.getNamaMenu()+"'");
     }
     @Transactional
     public String submitMenuDelete(Integer idMenu, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
+        if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         ConfigChangeRequest c=base("MENU","DELETE",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m)));
         return saveReq(c,"MENU","DELETE","'"+m.getNamaMenu()+"'");
     }
@@ -212,12 +247,14 @@ public class ConfigChangeService {
     public String submitAccess(Integer group, List<Integer> menuIds, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         if (group==null) return "Group belum dipilih.";
+        if (isPending("ACCESS", group)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
         // current granted (leaf menus)
         List<Integer> cur = new ArrayList<>();
         for (GroupMenu gm : groupMenus.findByIdGroup(group)) cur.add(gm.getIdMenu());
         Map<String,String> before = accessMap(group, cur);
         Map<String,String> after  = accessMap(group, new ArrayList<>(want));
+        if (unchanged(before, after, "menuIds")) return NO_CHANGE;
         ConfigChangeRequest c=base("ACCESS","EDIT",String.valueOf(group),me,note);
         c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
         return saveReq(c,"ACCESS","EDIT","'"+groupName(group)+"'");

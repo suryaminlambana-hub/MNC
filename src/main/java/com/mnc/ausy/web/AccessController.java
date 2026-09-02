@@ -31,6 +31,7 @@ public class AccessController {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("selectedGroup", group);
         model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingIds", configChange.pendingIds("ACCESS"));
         if (group != null) {
             Set<Integer> granted = new HashSet<>();
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());

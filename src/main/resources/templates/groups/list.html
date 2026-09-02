@@ -14,7 +14,10 @@
       <tr th:each="g,i : ${groups}">
         <td th:text="${i.count}">1</td><td><b th:text="${g.namaGroup}"></b></td>
         <td th:text="${g.inisial}"></td><td th:text="${g.level}"></td>
-        <td>
+        <td th:with="pending=${pendingIds != null and pendingIds.contains('' + g.idGroup)}">
+          <span th:if="${pending}" class="badge bg-warning-subtle text-warning">
+            <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
+          <th:block th:unless="${pending}">
           <button class="btn btn-sm btn-outline-secondary btn-edit"
             th:attr="data-id=${g.idGroup},data-nama=${g.namaGroup},data-ini=${g.inisial},data-lvl=${g.level}"
             data-bs-toggle="modal" data-bs-target="#editG">Ubah</button>
@@ -22,6 +25,7 @@
             <input type="hidden" name="idGroup" th:value="${g.idGroup}"><input type="hidden" name="note">
             <button class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>
+          </th:block>
         </td>
       </tr>
       </tbody>

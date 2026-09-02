@@ -26,6 +26,7 @@ public class UserController {
         model.addAttribute("users", users.findAll());
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";
     }
 

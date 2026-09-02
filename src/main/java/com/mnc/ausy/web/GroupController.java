@@ -22,6 +22,7 @@ public class GroupController {
     public String list(Model model) {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingIds", configChange.pendingIds("GROUP"));
         return "groups/list";
     }
 

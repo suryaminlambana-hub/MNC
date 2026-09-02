@@ -17,7 +17,16 @@
     </form>
   </div>
 
-  <div class="ausy-card" th:if="${selectedGroup != null}" style="padding:18px">
+  <div class="ausy-card" th:if="${selectedGroup != null and pendingIds != null and pendingIds.contains('' + selectedGroup)}"
+       style="padding:18px">
+    <span class="badge bg-warning-subtle text-warning">
+      <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
+    <p class="text-muted mb-0 mt-2">Perubahan akses group ini sedang menunggu otorisasi Admin Approval —
+      belum dapat diubah lagi sampai permintaan tersebut diputuskan.</p>
+  </div>
+
+  <div class="ausy-card" th:if="${selectedGroup != null and (pendingIds == null or !pendingIds.contains('' + selectedGroup))}"
+       style="padding:18px">
     <form method="post" th:action="@{/access/save}">
       <input type="hidden" name="group" th:value="${selectedGroup}">
       <div th:each="p : ${parents}" class="mb-3">

@@ -31,6 +31,7 @@ public class MenuAdminController {
         model.addAttribute("parentName", parentName);
         model.addAttribute("parents", all.stream().filter(m -> m.getParent()==0).toList());
         model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingIds", configChange.pendingIds("MENU"));
         return "menus/list";
     }
 

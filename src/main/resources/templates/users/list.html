@@ -24,16 +24,21 @@
                 <td th:text="${u.nama}">Nama</td>
                 <td th:text="${u.level}">ROLE</td>
                 <td th:text="${u.email}">email</td>
-                <td>
-                    <span th:if="${u.statusAccount == 1}" class="badge bg-success-subtle text-success">Active</span>
-                    <span th:unless="${u.statusAccount == 1}" class="badge bg-secondary-subtle text-secondary">Non Active</span>
+                <td th:with="pending=${pendingIds != null and pendingIds.contains(u.userId)}">
+                    <span th:if="${pending}" class="badge bg-warning-subtle text-warning">
+                        <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
+                    <span th:if="${!pending and u.statusAccount == 1}" class="badge bg-success-subtle text-success">Active</span>
+                    <span th:if="${!pending and u.statusAccount != 1}" class="badge bg-secondary-subtle text-secondary">Non Active</span>
                 </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-secondary btn-edit"
-                            th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
-                            data-bs-toggle="modal" data-bs-target="#editUser">Ubah</button>
-                    <button class="btn btn-sm btn-outline-danger btn-del"
-                            th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
+                <td th:with="pending=${pendingIds != null and pendingIds.contains(u.userId)}">
+                    <th:block th:unless="${pending}">
+                        <button class="btn btn-sm btn-outline-secondary btn-edit"
+                                th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
+                                data-bs-toggle="modal" data-bs-target="#editUser">Ubah</button>
+                        <button class="btn btn-sm btn-outline-danger btn-del"
+                                th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
+                    </th:block>
+                    <span th:if="${pending}" class="text-muted small">—</span>
                 </td>
             </tr>
             </tbody>
