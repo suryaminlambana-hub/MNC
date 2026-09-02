@@ -50,7 +50,7 @@
         <td th:text="${g.description}"></td>
         <td><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
         <td>
-          <span th:if="${pendingIds != null and pendingIds.contains(g.id)}" class="badge bg-info-subtle text-info">
+          <span th:if="${pendingIds != null and pendingIds.contains(g.id)}" class="badge bg-warning-subtle text-warning">
             <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
           </span>
           <th:block th:unless="${pendingIds != null and pendingIds.contains(g.id)}">

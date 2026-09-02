@@ -17,7 +17,7 @@
         <td th:text="${p[1]}"></td>
         <td class="text-end" th:text="${p[2]}"></td>
         <td>
-          <span th:if="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}" class="badge bg-info-subtle text-info">
+          <span th:if="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}" class="badge bg-warning-subtle text-warning">
             <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
           </span>
           <button th:unless="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}"
