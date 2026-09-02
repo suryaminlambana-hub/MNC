@@ -314,6 +314,10 @@ public class GlChangeService {
         if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
         if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))
             return new Res(false, "Batch tersebut sudah diajukan untuk dihapus dan menunggu otorisasi Checker.");
+        List<Long> pendingRows = pendingRowIdsInPaket(paket, inputer);
+        if (!pendingRows.isEmpty())
+            return new Res(false, "Batch " + paket + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
+                    + idList(pendingRows) + "). Selesaikan otorisasi data tersebut lebih dulu.");
 
         BigDecimal d = BigDecimal.ZERO, k = BigDecimal.ZERO;
         for (GlTabel g : rows) {
@@ -362,6 +366,35 @@ public class GlChangeService {
             out.put(e.getKey(), e.getKey().equals("gltram") ? normAmt(v) : v);
         }
         return out;
+    }
+
+    /**
+     * GL rows inside one batch that still have a request waiting for the Checker.
+     * A batch holding such rows must not be deleted (BUG_AUSY_00096).
+     */
+    public List<Long> pendingRowIdsInPaket(String paket, String inputer) {
+        Set<Long> pending = pendingGlRowIds();
+        List<Long> out = new ArrayList<>();
+        if (pending.isEmpty()) return out;
+        for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(paket, inputer))
+            if (pending.contains(g.getId())) out.add(g.getId());
+        return out;
+    }
+
+    /** Same thing for the whole Hapus Batch page: "paket|inputer" -> pending row ids. */
+    public Map<String,List<Long>> pendingRowsByPaket() {
+        Map<String,List<Long>> out = new LinkedHashMap<>();
+        for (Long id : pendingGlRowIds())
+            gl.findById(id).ifPresent(g ->
+                    out.computeIfAbsent(n(g.getNoPaket()) + "|" + n(g.getGltrus()), k -> new ArrayList<>()).add(id));
+        for (List<Long> ids : out.values()) Collections.sort(ids);
+        return out;
+    }
+
+    private static String idList(List<Long> ids) {
+        StringBuilder sb = new StringBuilder();
+        for (Long id : ids) sb.append(sb.length() == 0 ? "" : ", ").append(id);
+        return sb.toString();
     }
 
     public Set<String> pendingPaketKeys() {

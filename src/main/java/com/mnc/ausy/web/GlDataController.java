@@ -83,6 +83,7 @@ public class GlDataController {
         model.addAttribute("pakets", gl.approvedPakets());
         model.addAttribute("needApproval", approval.requiresApproval(me == null ? null : me.getIdGroup()));
         model.addAttribute("pendingKeys", changes.pendingPaketKeys());
+        model.addAttribute("pendingRows", changes.pendingRowsByPaket());
         return "gl-delete/index";
     }
 
@@ -94,6 +95,12 @@ public class GlDataController {
         if (approval.requiresApproval(me.getIdGroup())) {
             GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
             ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+            return "redirect:/gl-delete";
+        }
+        java.util.List<Long> pendingRows = changes.pendingRowIdsInPaket(paket, inputer);
+        if (!pendingRows.isEmpty()) {
+            ra.addFlashAttribute("warn", "Batch " + paket + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
+                    + pendingRows.toString().replaceAll("[\\[\\]]", "") + ").");
             return "redirect:/gl-delete";
         }
         gl.deletePaket(paket, inputer);

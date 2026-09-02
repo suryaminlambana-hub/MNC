@@ -17,13 +17,23 @@
         <td th:text="${p[1]}"></td>
         <td class="text-end" th:text="${p[2]}"></td>
         <td>
-          <span th:if="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}" class="badge bg-warning-subtle text-warning">
-            <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
-          </span>
-          <button th:unless="${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])}"
-                  type="button" class="btn btn-sm btn-outline-danger btn-del-batch"
-                  th:attr="data-paket=${p[0]},data-inputer=${p[1]}"><i class="fa-solid fa-trash"></i>
-            <span th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</span></button>
+          <th:block th:with="key=${p[0] + '|' + p[1]},
+                             diajukan=${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])},
+                             dataPending=${pendingRows != null ? pendingRows.get(p[0] + '|' + p[1]) : null}">
+            <span th:if="${diajukan}" class="badge bg-warning-subtle text-warning">
+              <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
+            </span>
+            <!-- BUG_AUSY_00096: batch dengan baris GL yang masih menunggu otorisasi tidak bisa dihapus -->
+            <span th:if="${!diajukan and dataPending != null and !dataPending.isEmpty()}"
+                  class="badge bg-warning-subtle text-warning">
+              <i class="fa-solid fa-hourglass-half"></i> Ada Data Menunggu Otorisasi (ID
+              <span th:text="${#strings.listJoin(dataPending, ', ')}"></span>)
+            </span>
+            <button th:if="${!diajukan and (dataPending == null or dataPending.isEmpty())}"
+                    type="button" class="btn btn-sm btn-outline-danger btn-del-batch"
+                    th:attr="data-paket=${p[0]},data-inputer=${p[1]}"><i class="fa-solid fa-trash"></i>
+              <span th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</span></button>
+          </th:block>
         </td>
       </tr>
       <tr th:if="${pakets.isEmpty()}"><td colspan="5" class="text-center text-muted py-3">Tidak ada batch.</td></tr>
