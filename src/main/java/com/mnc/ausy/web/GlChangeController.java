@@ -34,7 +34,8 @@ public class GlChangeController {
         // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif)
         model.addAttribute("rows", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
         model.addAttribute("fields", GlChangeService.FIELDS);
-        model.addAttribute("pendingIds", service.pendingGlRowIds());
+        // BUG_AUSY_00099 follow-up: kunci baris + alasannya ("… Hapus Batch 01"), bukan cuma "Menunggu Otorisasi"
+        model.addAttribute("pendingLabels", service.pendingGlRowLabels());
         return "gl-data/index";
     }
 

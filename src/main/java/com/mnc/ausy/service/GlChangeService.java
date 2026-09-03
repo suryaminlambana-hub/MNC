@@ -352,17 +352,33 @@ public class GlChangeService {
      * awaiting a delete authorisation.
      */
     public Set<Long> pendingGlRowIds() {
-        Set<Long> ids = new HashSet<>();
+        return pendingGlRowLabels().keySet();
+    }
+
+    /**
+     * Same rows as {@link #pendingGlRowIds()}, each mapped to the reason it is locked, so the maker
+     * screens can say WHY otorisasi is pending instead of a bare "Menunggu Otorisasi"
+     * (BUG_AUSY_00099 follow-up). A pending batch deletion wins over a row-level request: it is the
+     * broader hold, and the two cannot coexist anyway (BUG_AUSY_00096 blocks the other order).
+     */
+    public Map<Long,String> pendingGlRowLabels() {
+        Map<Long,String> out = new LinkedHashMap<>();
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
-            if (c.getGlId() != null) ids.add(c.getGlId());
+            String label = switch (n(c.getOp())) {
+                case "EDIT"      -> "Menunggu Otorisasi Ubah Data";
+                case "DELETE"    -> "Menunggu Otorisasi Hapus Data";
+                case "BULK_EDIT" -> "Menunggu Otorisasi Bulk Edit";
+                default          -> "Menunggu Otorisasi";
+            };
+            if (c.getGlId() != null) out.put(c.getGlId(), label);
             if ("BULK_EDIT".equals(c.getOp()))
                 for (Map<String,String> m : parseList(c.getAfterJson()))
-                    try { ids.add(Long.valueOf(m.get("id"))); } catch (Exception ignored) {}
+                    try { out.put(Long.valueOf(m.get("id")), label); } catch (Exception ignored) {}
         }
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
             for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()))
-                ids.add(g.getId());
-        return ids;
+                out.put(g.getId(), "Menunggu Otorisasi Hapus Batch " + n(c.getNoPaket()));
+        return out;
     }
 
     /** Why a row is locked: its own request, or the pending deletion of the whole batch. */

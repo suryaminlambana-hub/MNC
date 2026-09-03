@@ -21,7 +21,7 @@
                              diajukan=${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])},
                              dataPending=${pendingRows != null ? pendingRows.get(p[0] + '|' + p[1]) : null}">
             <span th:if="${diajukan}" class="badge bg-warning-subtle text-warning">
-              <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi
+              <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi Hapus Batch <span th:text="${p[0]}"></span>
             </span>
             <!-- BUG_AUSY_00096: batch dengan baris GL yang masih menunggu otorisasi tidak bisa dihapus -->
             <span th:if="${!diajukan and dataPending != null and !dataPending.isEmpty()}"
