@@ -32,7 +32,16 @@ public class GlCodeService {
         return "";
     }
 
-    public boolean used(String code) { return glTabel.existsByGltrac(code); }
+    /**
+     * A GL code counts as used only on the side (D/C) it was actually posted on — BUG_AUSY_00100:
+     * if 100-D appears in a transaction, 100-C is still free to edit or delete.
+     */
+    public boolean used(String code, String position) {
+        String p = normPos(position);
+        if (code == null || p.isEmpty()) return false;
+        return glTabel.existsByGltracAndPosition(code, p);
+    }
+    public boolean used(GlCode g) { return g != null && used(g.getCode(), g.getPosition()); }
 
     public GlCode find(Long id) { return glCodes.findById(id).orElse(null); }
 
@@ -40,7 +49,7 @@ public class GlCodeService {
 
     public List<GlCode> listWithUsage() {
         List<GlCode> rows = glCodes.findAllByOrderByCodeAscPositionAsc();
-        for (GlCode g : rows) g.setUsed(used(g.getCode()));
+        for (GlCode g : rows) g.setUsed(used(g));
         return rows;
     }
 
@@ -61,7 +70,7 @@ public class GlCodeService {
         GlCode g = glCodes.findById(id).orElse(null);
         if (g == null) return "error";
         pos = normPos(pos);
-        if (used(g.getCode())) {
+        if (used(g)) {
             // locked: only description + status
             g.setDescription(desc); g.setStatus(status);
         } else {
@@ -80,7 +89,7 @@ public class GlCodeService {
     public String delete(Long id) {
         GlCode g = glCodes.findById(id).orElse(null);
         if (g == null) return "error";
-        if (used(g.getCode())) return "inuse";
+        if (used(g)) return "inuse";
         glCodes.delete(g);
         return null;
     }

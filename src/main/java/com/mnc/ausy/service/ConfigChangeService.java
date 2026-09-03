@@ -86,6 +86,17 @@ public class ConfigChangeService {
             if (n(entity).equals(n(c.getEntity())) && c.getTargetId() != null) ids.add(c.getTargetId());
         return ids;
     }
+    /** Is the same approval rule already queued as a pending ADD? */
+    private boolean pendingApprovalAdd(Integer approverGroup, Integer targetGroup){
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            if (!"APPROVAL".equals(c.getEntity()) || !"ADD".equals(c.getOp())) continue;
+            Map<String,String> a = parse(c.getAfterJson());
+            if (a != null && String.valueOf(approverGroup).equals(a.get("approverGroup"))
+                          && String.valueOf(targetGroup).equals(a.get("targetGroup"))) return true;
+        }
+        return false;
+    }
+
     private boolean isPending(String entity, Object targetId){
         return targetId != null && pendingIds(entity).contains(String.valueOf(targetId));
     }
@@ -276,6 +287,8 @@ public class ConfigChangeService {
         if (approverGroup==null||targetGroup==null) return "Group belum lengkap.";
         if (approverGroup.equals(targetGroup)) return "Approver dan target tidak boleh group yang sama.";
         if (approvalRules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) return "Aturan tersebut sudah ada.";
+        if (pendingApprovalAdd(approverGroup, targetGroup))
+            return "Aturan tersebut sudah diajukan dan menunggu otorisasi Admin Approval.";
         Map<String,String> a=new LinkedHashMap<>();
         a.put("approver", groupName(approverGroup)); a.put("target", groupName(targetGroup));
         a.put("approverGroup", String.valueOf(approverGroup)); a.put("targetGroup", String.valueOf(targetGroup));
@@ -286,6 +299,7 @@ public class ConfigChangeService {
     public String submitApprovalDelete(Long ruleId, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         ApprovalGroup r=approvalRules.findById(ruleId).orElse(null); if(r==null) return "Aturan tidak ditemukan.";
+        if (isPending("APPROVAL", ruleId)) return pendingMsg("APPROVAL");
         Map<String,String> b=new LinkedHashMap<>();
         b.put("approver", groupName(r.getApproverGroup())); b.put("target", groupName(r.getTargetGroup()));
         ConfigChangeRequest c=base("APPROVAL","DELETE",String.valueOf(ruleId),me,note); c.setBeforeJson(toJson(b));

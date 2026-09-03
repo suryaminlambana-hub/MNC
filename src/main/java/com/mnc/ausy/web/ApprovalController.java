@@ -37,6 +37,7 @@ public class ApprovalController {
         model.addAttribute("rules", rows);
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingIds", configChange.pendingIds("APPROVAL"));
         return "approval/list";
     }
 

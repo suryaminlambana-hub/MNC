@@ -10,6 +10,10 @@ import java.util.List;
 public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     boolean existsByGltrac(String gltrac);
 
+    /** Is this GL code used on that side (D/C)? 100-D being used says nothing about 100-C. */
+    @Query("select count(g) > 0 from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos")
+    boolean existsByGltracAndPosition(@Param("code") String code, @Param("pos") String pos);
+
     // Hanya cast baris yang no_paket-nya angka murni; hindari error "invalid input syntax
     // for type integer" saat ada no_paket kosong/non-numerik (BUG_00069).
     @Query(value = "select coalesce(max(no_paket::int),0) from gl_tabel where no_paket ~ '^[0-9]+$'", nativeQuery = true)

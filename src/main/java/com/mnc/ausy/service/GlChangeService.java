@@ -137,7 +137,7 @@ public class GlChangeService {
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
         if (pendingGlRowIds().contains(glId))
-            return new Res(false, "Baris GL tersebut masih menunggu otorisasi Checker.");
+            return new Res(false, lockReason(g));
 
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
         if (before.equals(after))
@@ -211,7 +211,7 @@ public class GlChangeService {
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
         if (pendingGlRowIds().contains(glId))
-            return new Res(false, "Baris GL tersebut masih menunggu otorisasi Checker.");
+            return new Res(false, lockReason(g));
         GlChangeRequest c = base("DELETE", T_GL_ROW, glId, me, note);
         c.setNoPaket(g.getNoPaket());
         c.setBeforeJson(toJson(rowMap(g)));
@@ -245,7 +245,7 @@ public class GlChangeService {
         if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
 
         String newCode, newPos;
-        if (glCodeService.used(g.getCode())) {          // used codes: NoGL + D/C stay locked
+        if (glCodeService.used(g)) {                    // used codes: NoGL + D/C stay locked
             newCode = g.getCode(); newPos = g.getPosition();
         } else {
             newPos = GlCodeService.normPos(pos);
@@ -273,7 +273,7 @@ public class GlChangeService {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
-        if (glCodeService.used(g.getCode()))
+        if (glCodeService.used(g))
             return new Res(false, "Kode GL sudah dipakai pada transaksi, tidak dapat dihapus.");
         if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
         GlChangeRequest c = base("DELETE", T_GL_CODE, null, me, note);
@@ -346,7 +346,11 @@ public class GlChangeService {
         return ids;
     }
 
-    /** GL rows with a pending change request — EDIT/DELETE targets plus every row inside a bulk edit. */
+    /**
+     * GL rows the maker must leave alone until a checker decides: EDIT/DELETE targets, every row
+     * inside a pending bulk edit, and — BUG_AUSY_00099 — every row of a batch that is itself
+     * awaiting a delete authorisation.
+     */
     public Set<Long> pendingGlRowIds() {
         Set<Long> ids = new HashSet<>();
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
@@ -355,7 +359,18 @@ public class GlChangeService {
                 for (Map<String,String> m : parseList(c.getAfterJson()))
                     try { ids.add(Long.valueOf(m.get("id"))); } catch (Exception ignored) {}
         }
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
+            for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()))
+                ids.add(g.getId());
         return ids;
+    }
+
+    /** Why a row is locked: its own request, or the pending deletion of the whole batch. */
+    private String lockReason(GlTabel g) {
+        if (g != null && cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, g.getNoPaket(), g.getGltrus()))
+            return "Batch " + g.getNoPaket() + " sedang diajukan untuk dihapus — data di dalamnya tidak dapat diubah"
+                    + " sampai Checker memutuskan.";
+        return "Baris GL tersebut masih menunggu otorisasi Checker.";
     }
 
     /** Canonical form of a GL row map, so "250000.00" vs " 250000 " isn't read as a change. */
