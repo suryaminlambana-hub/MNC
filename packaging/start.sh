@@ -40,6 +40,16 @@ db_ok() { PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -
 
 if ! db_ok; then
   echo ">> Database '$DB_NAME' belum siap / tidak bisa diakses."
+  # DB di server lain (deploy 2 server): setup-db.sql harus dijalankan DI SERVER DB, bukan di sini.
+  case "$DB_HOST" in
+    127.0.0.1|localhost|::1) ;;
+    *)
+      echo "ERROR: DB_HOST=$DB_HOST (server lain) tidak bisa dihubungi."
+      echo "       Jalankan di server DB:  sudo -u postgres psql -f setup-db.sql"
+      echo "       Lalu pastikan: listen_addresses & pg_hba.conf mengizinkan IP app server,"
+      echo "       port 5432 terbuka, dan DB_USER/DB_PASS di .env sudah benar."
+      exit 1 ;;
+  esac
   if ! command -v psql >/dev/null 2>&1; then
     echo "ERROR: 'psql' tidak ada. Install PostgreSQL client, atau jalankan manual:"
     echo "       psql -U postgres -f setup-db.sql"

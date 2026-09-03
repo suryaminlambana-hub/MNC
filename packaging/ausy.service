@@ -1,0 +1,29 @@
+# ============================================================
+# AUSY — systemd unit (app server). Pasang di /etc/systemd/system/ausy.service
+#   sudo cp ausy.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ausy
+#   sudo systemctl status ausy          # cek
+#   sudo journalctl -u ausy -f          # log berjalan
+# Sesuaikan User= dan path JAR bila folder instalasinya berbeda.
+# ============================================================
+[Unit]
+Description=AUSY - MNC Bank Accounting Upload System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ausy
+Group=ausy
+WorkingDirectory=/opt/ausy
+# Konfigurasi (port, context path, koneksi DB) dibaca dari /opt/ausy/.env
+EnvironmentFile=/opt/ausy/.env
+ExecStart=/usr/bin/java -jar /opt/ausy/ausy-2.0.0.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10
+# File GLTRRF/ACCTXT & upload sementara ditulis di bawah WorkingDirectory
+ReadWritePaths=/opt/ausy
+
+[Install]
+WantedBy=multi-user.target
