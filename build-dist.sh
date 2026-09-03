@@ -14,7 +14,7 @@ echo ">> [2/3] Menyusun folder distribusi..."
 STAGE=target/app-dist
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 cp "$JAR" "$STAGE"/
-cp packaging/setup-db.sql packaging/.env.example packaging/start.sh packaging/README.txt "$STAGE"/
+cp packaging/setup-db.sql packaging/.env.example packaging/start.sh packaging/README.txt packaging/ausy.service "$STAGE"/
 chmod +x "$STAGE"/start.sh
 
 echo ">> [3/3] Membuat app-dist.zip..."
