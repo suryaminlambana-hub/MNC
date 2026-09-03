@@ -105,8 +105,10 @@
   document.querySelectorAll('.btn-edit').forEach(function(b){b.addEventListener('click',function(){
     gl_id.value=b.dataset.id; gl_code.value=b.dataset.code||''; gl_pos.value=b.dataset.pos||'D';
     gl_desc.value=b.dataset.desc||''; gl_status.value=b.dataset.status||'1';
+    // Kode terpakai: NoGL & D/C dikunci — pakai disabled (abu-abu, tidak bisa diklik)
+    // supaya jelas tidak dapat diubah. BUG_AUSY_00101.
     var used=b.dataset.used==='true';
-    gl_code.readOnly=used; gl_pos.disabled=used; gl_lockmsg.style.display=used?'block':'none';
+    gl_code.disabled=used; gl_pos.disabled=used; gl_lockmsg.style.display=used?'block':'none';
   });});
   (function(){
     var m=new bootstrap.Modal(document.getElementById('delGl'));
