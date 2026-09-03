@@ -27,7 +27,9 @@
   <div class="ausy-card mb-3" style="padding:18px">
     <b class="d-block mb-2"><i class="fa-solid fa-plus"></i> Tambah Kode GL</b>
     <form th:action="@{/gl-code/add}" method="post" class="row g-2 align-items-end">
-      <div class="col-auto"><label class="form-label">NoGL</label><input class="form-control" name="code" required></div>
+      <div class="col-auto"><label class="form-label">NoGL</label>
+        <input class="form-control" name="code" required inputmode="numeric" pattern="[0-9]{1,50}"
+               title="NoGL hanya boleh berisi angka" placeholder="cth. 100"></div>
       <div class="col-auto"><label class="form-label">Debit/Credit</label>
         <select class="form-select" name="position"><option value="D">Debit</option><option value="C">Credit</option></select></div>
       <div class="col"><label class="form-label">Description</label><input class="form-control" name="description"></div>
@@ -72,7 +74,9 @@
       <div class="modal-header"><h5 class="modal-title">Ubah Kode GL</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <input type="hidden" name="id" id="gl_id">
-        <div class="mb-2"><label class="form-label">NoGL</label><input class="form-control" name="code" id="gl_code"></div>
+        <div class="mb-2"><label class="form-label">NoGL <span class="text-danger">*</span></label>
+          <input class="form-control" name="code" id="gl_code" required inputmode="numeric" pattern="[0-9]{1,50}"
+                 title="NoGL wajib diisi dan hanya boleh berisi angka"></div>
         <div class="mb-2"><label class="form-label">Debit/Credit</label>
           <select class="form-select" name="position" id="gl_pos"><option value="D">Debit</option><option value="C">Credit</option></select></div>
         <div class="mb-2"><label class="form-label">Description</label><input class="form-control" name="description" id="gl_desc"></div>

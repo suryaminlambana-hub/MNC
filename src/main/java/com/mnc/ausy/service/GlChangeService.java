@@ -225,7 +225,8 @@ public class GlChangeService {
     public Res submitGlCodeAdd(String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         String p = GlCodeService.normPos(pos);
-        if (code == null || code.isBlank() || p.isEmpty()) return new Res(false, "NoGL dan Debit/Credit wajib diisi.");
+        Res bad = checkCode(code, p);
+        if (bad != null) return bad;
         code = code.trim();
         if (glCodeService.exists(code, p)) return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
         if (pendingCombo(code, p)) return new Res(false, "Sudah ada permintaan untuk NoGL tersebut yang menunggu otorisasi Checker.");
@@ -250,7 +251,8 @@ public class GlChangeService {
         } else {
             newPos = GlCodeService.normPos(pos);
             newCode = code == null ? "" : code.trim();
-            if (newCode.isBlank() || newPos.isEmpty()) return new Res(false, "NoGL dan Debit/Credit wajib diisi.");
+            Res bad = checkCode(newCode, newPos);
+            if (bad != null) return bad;
             boolean moved = !newCode.equals(g.getCode()) || !newPos.equals(g.getPosition());
             if (moved && glCodeService.exists(newCode, newPos))
                 return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
@@ -266,6 +268,19 @@ public class GlChangeService {
         cr.save(c);
         audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ", "UBAH Kode GL #" + id + " diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Permintaan UBAH Kode GL diajukan (menunggu otorisasi Checker).");
+    }
+
+    /**
+     * NoGL / D-C validation shared by the add + edit request paths: an empty NoGL is rejected with a
+     * message that names the field (BUG_AUSY_00105) and a NoGL with anything but digits is rejected
+     * outright (BUG_AUSY_00104). @return the failure, or null when the input is acceptable.
+     */
+    private static Res checkCode(String code, String normPos) {
+        if (blank(code))                       return new Res(false, "NoGL wajib diisi.");
+        if (normPos == null || normPos.isEmpty()) return new Res(false, "Debit/Credit wajib dipilih.");
+        if (!GlCodeService.validCode(code))
+            return new Res(false, "NoGL hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
+        return null;
     }
 
     @Transactional
@@ -409,6 +424,17 @@ public class GlChangeService {
         if (pending.isEmpty()) return out;
         for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(paket, inputer))
             if (pending.contains(g.getId())) out.add(g.getId());
+        return out;
+    }
+
+    /**
+     * Batch numbers that still hold GL rows waiting on a checker — such a batch must not be
+     * submitted for export until the pending change is decided (BUG_AUSY_00102).
+     */
+    public Set<String> pendingRowPakets() {
+        Set<String> out = new LinkedHashSet<>();
+        for (Long id : pendingGlRowIds())
+            gl.findById(id).ifPresent(g -> out.add(n(g.getNoPaket()).trim()));
         return out;
     }
 

@@ -33,6 +33,14 @@ public class GlCodeService {
     }
 
     /**
+     * NoGL is an account number, so it may only contain digits — BUG_AUSY_00104. The cap follows
+     * gl_code.code (VARCHAR(50)) so a value that passes here always fits the column.
+     */
+    public static boolean validCode(String code) {
+        return code != null && code.trim().matches("[0-9]{1,50}");
+    }
+
+    /**
      * A GL code counts as used only on the side (D/C) it was actually posted on — BUG_AUSY_00100:
      * if 100-D appears in a transaction, 100-C is still free to edit or delete.
      */
@@ -56,7 +64,9 @@ public class GlCodeService {
     /** @return null on success, or an error key (exists/error). */
     public String add(String code, String pos, String desc, Short status, String by) {
         pos = normPos(pos);
-        if (code == null || code.isBlank() || pos.isEmpty()) return "error";
+        if (code == null || code.isBlank()) return "nocode";
+        if (pos.isEmpty()) return "nopos";
+        if (!validCode(code)) return "badcode";
         code = code.trim();
         if (glCodes.existsByCodeAndPosition(code, pos)) return "exists";
         GlCode g = new GlCode();
@@ -74,7 +84,9 @@ public class GlCodeService {
             // locked: only description + status
             g.setDescription(desc); g.setStatus(status);
         } else {
-            if (code == null || code.isBlank() || pos.isEmpty()) return "error";
+            if (code == null || code.isBlank()) return "nocode";
+            if (pos.isEmpty()) return "nopos";
+            if (!validCode(code)) return "badcode";
             code = code.trim();
             glCodes.findByCodeAndPosition(code, pos)
                    .filter(other -> !other.getId().equals(id))
@@ -111,7 +123,7 @@ public class GlCodeService {
                 String code = c.length > 0 ? c[0].trim() : "";
                 String pos  = normPos(c.length > 1 ? c[1] : "");
                 String desc = c.length > 2 ? c[2].trim() : "";
-                if (code.isEmpty() || pos.isEmpty()) { bad++; continue; }
+                if (code.isEmpty() || pos.isEmpty() || !validCode(code)) { bad++; continue; }
                 if (glCodes.existsByCodeAndPosition(code, pos) || listed(rows, code, pos)) { dup++; continue; }
                 Map<String,String> m = new LinkedHashMap<>();
                 m.put("code", code); m.put("position", pos); m.put("description", desc);
@@ -131,7 +143,7 @@ public class GlCodeService {
         if (rows == null) return 0;
         for (Map<String,String> m : rows) {
             String code = m.get("code"), pos = normPos(m.get("position"));
-            if (code == null || code.isBlank() || pos.isEmpty()) continue;
+            if (!validCode(code) || pos.isEmpty()) continue;
             if (glCodes.existsByCodeAndPosition(code, pos)) continue;
             GlCode g = new GlCode();
             g.setCode(code); g.setPosition(pos); g.setDescription(m.get("description"));

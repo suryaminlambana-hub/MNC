@@ -119,21 +119,52 @@ public class GlCodeController {
     @PostMapping("/import")
     public String importCsv(@RequestParam("file") MultipartFile file, @RequestParam(required=false) String note,
                             @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        if (file == null || file.isEmpty()) {
+            ra.addFlashAttribute("warn", "File CSV belum dipilih.");
+            return "redirect:/gl-code";
+        }
         try {
+            GlCodeService.CsvParse p = service.parseCsv(file.getInputStream());
+            // BUG_AUSY_00103: kalau tidak ada satu pun baris yang bisa dipakai, sebutkan sebabnya
+            // (template salah / semua duplikat / file kosong) — jangan cuma "tidak ada baris baru".
+            String issue = csvIssue(p);
+            if (issue != null) {
+                ra.addFlashAttribute("warn", issue);
+                return "redirect:/gl-code";
+            }
             if (needsApproval(me)) {
-                GlCodeService.CsvParse p = service.parseCsv(file.getInputStream());
                 GlChangeService.Res r = changes.submitGlCodeImport(p.rows(), me, note);
                 // hitungan duplikat/invalid hanya relevan kalau pengajuannya diterima
                 flash(ra, r.ok() ? new GlChangeService.Res(true, r.message()
                         + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)") : r);
                 return "redirect:/gl-code";
             }
-            int[] r = service.importCsv(file.getInputStream(), me.getUsername());
-            ra.addFlashAttribute("ok", "Import selesai — " + r[0] + " ditambahkan, " + r[1] + " duplikat, " + r[2] + " tidak valid.");
+            int added = service.applyImport(p.rows(), me.getUsername());
+            ra.addFlashAttribute("ok", "Import selesai — " + added + " ditambahkan, " + p.dup()
+                    + " duplikat, " + p.bad() + " tidak valid.");
         } catch (Exception e) {
-            ra.addFlashAttribute("warn", "Gagal membaca CSV.");
+            ra.addFlashAttribute("warn", "Gagal membaca CSV — pastikan file berformat CSV sesuai template"
+                    + " (kolom: NoGL, Debit/Credit, Description).");
         }
         return "redirect:/gl-code";
+    }
+
+    /**
+     * Why a CSV produced nothing importable, or null when it did. Splitting the cases is the whole
+     * point of BUG_AUSY_00103: an invalid template used to be reported as "tidak ada baris baru".
+     */
+    private static String csvIssue(GlCodeService.CsvParse p) {
+        if (!p.rows().isEmpty()) return null;
+        if (p.bad() == 0 && p.dup() == 0)
+            return "File CSV tidak berisi baris data — pastikan memakai template Kode GL"
+                    + " (kolom: NoGL, Debit/Credit, Description).";
+        if (p.dup() == 0)
+            return "Format CSV tidak sesuai template: " + p.bad() + " baris tidak valid (NoGL harus angka dan"
+                    + " Debit/Credit harus D atau C). Unduh template Kode GL lalu coba lagi.";
+        if (p.bad() == 0)
+            return "Semua " + p.dup() + " baris pada CSV sudah terdaftar sebagai Kode GL — tidak ada yang diimport.";
+        return "Tidak ada baris yang bisa diimport: " + p.bad() + " baris tidak sesuai template dan "
+                + p.dup() + " baris sudah terdaftar.";
     }
 
     @GetMapping("/template")
@@ -153,6 +184,10 @@ public class GlCodeController {
         if (err == null) ra.addFlashAttribute("ok", okMsg);
         else if (err.equals("exists")) ra.addFlashAttribute("warn", "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
         else if (err.equals("inuse")) ra.addFlashAttribute("warn", "Kode GL sudah dipakai pada transaksi, tidak dapat dihapus.");
+        else if (err.equals("nocode")) ra.addFlashAttribute("warn", "NoGL wajib diisi.");
+        else if (err.equals("nopos")) ra.addFlashAttribute("warn", "Debit/Credit wajib dipilih.");
+        else if (err.equals("badcode")) ra.addFlashAttribute("warn",
+                "NoGL hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
         else ra.addFlashAttribute("warn", "Terjadi kesalahan.");
     }
 }

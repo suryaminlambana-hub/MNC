@@ -31,13 +31,14 @@ public class GlExportService {
     private final ApprovalService approval;
     private final AuditService audit;
     private final FtpService ftp;
+    private final GlChangeService changes;
 
     @Value("${ausy.txt-dir:data/txt}") private String txtDir;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
-                           ApprovalService approval, AuditService audit, FtpService ftp) {
+                           ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes) {
         this.gl = gl; this.requests = requests; this.transfers = transfers;
-        this.approval = approval; this.audit = audit; this.ftp = ftp;
+        this.approval = approval; this.audit = audit; this.ftp = ftp; this.changes = changes;
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
@@ -80,6 +81,12 @@ public class GlExportService {
     public String submitExport(AusyUserDetails me, String note, List<String> pakets) {
         if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
         if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu batch untuk diajukan export.";
+        // BUG_AUSY_00102: data yang masih menunggu otorisasi belum final — batch-nya tidak boleh diexport
+        // dulu, kalau tidak file ACCTXT terkirim ke core dengan nilai yang mungkin masih berubah.
+        List<String> held = pendingPakets(pakets);
+        if (!held.isEmpty())
+            return "Batch " + String.join(", ", held) + " tidak dapat diajukan export: masih ada data yang"
+                    + " menunggu otorisasi Checker. Selesaikan otorisasi tersebut lebih dulu.";
         List<GlTabel> rows = gl.findExportableByNoPaketIn(pakets);
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
@@ -99,6 +106,22 @@ public class GlExportService {
                 "Ajukan export batch " + String.join(",", pakets) + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
         return "Permintaan export diajukan (" + rows.size() + " baris) — menunggu otorisasi checker.";
     }
+
+    /** Which of the batches the maker picked still hold rows awaiting a checker (BUG_AUSY_00102). */
+    public List<String> pendingPakets(List<String> pakets) {
+        Set<String> pending = changes.pendingRowPakets();
+        List<String> out = new ArrayList<>();
+        if (pakets == null || pending.isEmpty()) return out;
+        for (String p : pakets) {
+            String key = p == null ? "" : p.trim();
+            if (pending.contains(key) && !out.contains(key)) out.add(key);
+        }
+        Collections.sort(out);
+        return out;
+    }
+
+    /** Batches with pending data, so the picklist can grey them out instead of failing on submit. */
+    public Set<String> pendingPaketKeys() { return changes.pendingRowPakets(); }
 
     // ---------- Checker: Otorisasi Export ----------
     public List<GlExportRequest> pendingExportFor(Integer approverGroup) {

@@ -35,9 +35,14 @@
                 <th class="text-end">Debit</th><th class="text-end pe-3">Credit</th>
               </tr></thead>
               <tbody>
-              <tr th:each="p : ${exportablePakets}">
-                <td class="ps-3"><input type="checkbox" name="pakets" class="paket-cb" th:value="${p[0]}"></td>
-                <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${p[0]}"></span></span></td>
+              <!--/* BUG_AUSY_00102: batch yang masih punya data menunggu otorisasi tidak bisa dipilih */-->
+              <tr th:each="p : ${exportablePakets}"
+                  th:with="held=${pendingPakets != null and pendingPakets.contains(p[0])}">
+                <td class="ps-3"><input type="checkbox" name="pakets" class="paket-cb" th:value="${p[0]}"
+                                        th:disabled="${held}"></td>
+                <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${p[0]}"></span></span>
+                  <span th:if="${held}" class="badge bg-warning-subtle text-warning">
+                    <i class="fa-solid fa-hourglass-half"></i> Ada Data Menunggu Otorisasi</span></td>
                 <td class="text-end" th:text="${p[1]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[2],1,'POINT',2,'COMMA')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
@@ -95,7 +100,7 @@
       var paketAll = document.getElementById('paketAll');
       var paketCbs = document.querySelectorAll('.paket-cb');
       paketAll.addEventListener('change', function(){
-        paketCbs.forEach(function(cb){ cb.checked = paketAll.checked; });
+        paketCbs.forEach(function(cb){ if (!cb.disabled) cb.checked = paketAll.checked; });
       });
       document.getElementById('exportForm').addEventListener('submit', function(e){
         var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; });
