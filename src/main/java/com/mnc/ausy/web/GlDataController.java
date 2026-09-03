@@ -42,6 +42,16 @@ public class GlDataController {
     }
     private static String n(String s) { return s == null ? "" : s; }
 
+    /**
+     * Only the Business Maker (group 3) may request an export — same rule SecurityConfig applies to
+     * /gl-legacy/export-request. The Checker shares this read-only page but has no export rights
+     * (BUG_AUSY_00097), so the button and the export history stay hidden for them.
+     */
+    private static boolean canExport(AusyUserDetails me) {
+        return me != null && me.getAuthorities().stream()
+                .anyMatch(a -> "GROUP_3".equals(a.getAuthority()));
+    }
+
     @GetMapping("/gl-legacy")
     public String list(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         // Only GL yang aktif & sudah lolos otorisasi — exclude PENDING dan soft-deleted (active=0).
@@ -58,6 +68,8 @@ public class GlDataController {
         model.addAttribute("total", rows.size());
         model.addAttribute("totalRegistered", registeredCount);
         model.addAttribute("totalAmount", totalAmount);
+        boolean canExport = canExport(me);
+        model.addAttribute("canExport", canExport);
         model.addAttribute("exportableCount", glExport.exportableCount());
         model.addAttribute("exportablePakets", glExport.exportablePakets());
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));

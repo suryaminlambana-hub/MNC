@@ -9,7 +9,7 @@
         <span th:text="${totalRegistered}">0</span> terdaftar ·
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
     </div>
-    <button type="button" class="btn btn-primary" id="btnAjukanExport">
+    <button th:if="${canExport}" type="button" class="btn btn-primary" id="btnAjukanExport">
       <i class="fa-solid fa-paper-plane"></i> Ajukan Export
       <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
     </button>
@@ -17,8 +17,8 @@
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
-  <!-- Ajukan Export modal -->
-  <div class="modal fade" id="exportModal" tabindex="-1">
+  <!--/* Ajukan Export modal — maker only (BUG_AUSY_00097) */-->
+  <div th:if="${canExport}" class="modal fade" id="exportModal" tabindex="-1">
     <div class="modal-dialog">
       <form class="modal-content" id="exportForm" method="post" th:action="@{/gl-legacy/export-request}">
         <div class="modal-header"><h5 class="modal-title">Ajukan Export GL ke Checker</h5>
@@ -58,7 +58,7 @@
   </div>
 
   <!-- Info modal: nothing to export / export already pending -->
-  <div class="modal fade" id="exportInfoModal" tabindex="-1">
+  <div th:if="${canExport}" class="modal fade" id="exportInfoModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header"><h5 class="modal-title">Ajukan Export GL</h5>
@@ -83,7 +83,7 @@
     </div>
   </div>
 
-  <script th:inline="javascript">
+  <script th:if="${canExport}" th:inline="javascript">
     (function(){
       var exportableCount = /*[[${exportableCount}]]*/ 0;
       var em = new bootstrap.Modal(document.getElementById('exportModal'));
@@ -106,7 +106,7 @@
       });
     })();
   </script>
-  <p class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
+  <p th:if="${canExport}" class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
      Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
      Hanya GL aktif yang belum di-export yang disertakan.</p>
 
@@ -129,8 +129,8 @@
     </table>
   </div>
 
-  <!-- Riwayat Export: pengajuan export milik maker ini — pending, approved, rejected -->
-  <div class="ausy-card mt-3" style="padding:0">
+  <!--/* Riwayat Export: pengajuan export milik maker ini — pending, approved, rejected (maker only) */-->
+  <div th:if="${canExport}" class="ausy-card mt-3" style="padding:0">
     <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
       <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat Export</h2>
     <div class="px-3 pb-3">
