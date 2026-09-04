@@ -99,6 +99,29 @@ sudo firewall-cmd --permanent --add-port=8080/tcp && sudo firewall-cmd --reload
 Skema tabel + data awal dibuat **otomatis** oleh Flyway saat aplikasi start pertama
 (V1…V17) — tidak ada import SQL skema manual.
 
+### Catatan dari deploy pertama (4 Sep 2026, server DEV MNC)
+
+Dua hal yang berbeda dari asumsi paket, ditemukan saat deploy lewat portal Safous:
+
+1. **SCP diblokir policy Safous** — `scp` ditutup gateway ("Connection closed"), padahal SSH biasa
+   jalan. File dikirim lewat pipe di sesi SSH, dan ini berhasil untuk paket 76 MB:
+   ```bash
+   ssh <token>@ssh.cyolo.io 'cat > /tmp/app-dist.zip' < target/app-dist.zip
+   # lalu cocokkan sha256sum di server dengan di lokal
+   ```
+   Grant akses Safous berumur pendek — kalau sesi putus di tengah, file yang sudah mendarat di
+   `/tmp` tetap aman, tinggal request akses lagi.
+
+2. **User `ausy` sudah ada di server tapi grup utamanya `users`** (bukan grup `ausy`), sehingga
+   `ausy.service` gagal dengan `status=216/GROUP`. Selalu samakan `Group=` dengan grup nyata:
+   ```bash
+   sudo sed -i "s/^Group=.*/Group=$(id -gn ausy)/" /etc/systemd/system/ausy.service
+   sudo chown -R "ausy:$(id -gn ausy)" /opt/ausy && sudo systemctl daemon-reload && sudo systemctl restart ausy
+   ```
+
+PostgreSQL di server DB dipasang dari modul Satellite: `dnf module enable -y postgresql:16` lalu
+`dnf install -y postgresql-server` (server tidak punya akses internet, hanya repo internal).
+
 ## 3. Verifikasi
 
 ```bash
