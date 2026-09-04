@@ -35,36 +35,8 @@
         <button type="submit" class="btn btn-primary w-100">Masuk</button>
     </form>
 
-    <div class="ausy-quicklogin">
-        <div class="ausy-quicklogin-title"><i class="fa-solid fa-bolt"></i> Quick login <span>(demo)</span></div>
-        <div class="ausy-quicklogin-grid">
-            <button type="button" class="ausy-ql" data-u="admin"    data-p="admin123">
-                <span class="ausy-ql-role">Admin</span>
-                <span class="ausy-ql-user">admin</span>
-            </button>
-            <button type="button" class="ausy-ql" data-u="adminapv" data-p="admin123">
-                <span class="ausy-ql-role">Admin Approver</span>
-                <span class="ausy-ql-user">adminapv</span>
-            </button>
-            <button type="button" class="ausy-ql" data-u="user"     data-p="user123">
-                <span class="ausy-ql-role">Maker</span>
-                <span class="ausy-ql-user">user</span>
-            </button>
-            <button type="button" class="ausy-ql" data-u="spv"      data-p="spv123">
-                <span class="ausy-ql-role">Approver</span>
-                <span class="ausy-ql-user">spv</span>
-            </button>
-        </div>
-    </div>
 </div>
 <script>
-    document.querySelectorAll('.ausy-ql').forEach(function(b){
-        b.addEventListener('click', function(){
-            document.getElementById('username').value = b.dataset.u;
-            document.getElementById('password').value = b.dataset.p;
-            document.getElementById('password').focus();   // isi field saja; user klik "Masuk" sendiri
-        });
-    });
     (function(){
         var pw=document.getElementById('password'), tg=document.getElementById('pwToggle');
         tg.addEventListener('click', function(){
@@ -75,7 +47,7 @@
         });
     })();
     // Pesan error bahasa Indonesia bila username/password kosong (BUG_00047) — di-reset otomatis
-    // supaya tidak "nyangkut" setelah field diisi via autofill/quick-login/paste (BUG_00053).
+    // supaya tidak "nyangkut" setelah field diisi via autofill/paste (BUG_00053).
     (function(){
         document.addEventListener('invalid', function(e){
             var el = e.target;
