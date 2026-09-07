@@ -35,7 +35,8 @@ REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip | cut -d" " -f1')
 echo "   checksum cocok"
 
 echo ">> [4/5] Pasang & restart service (minta password sudo ausyapp_dev)"
-read -rsp "   password sudo: " PW; echo
+PW="${AUSY_SUDO_PASS:-}"
+if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
 "${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
   S systemctl stop ausy
   S unzip -o -x .env -d /opt/ausy /tmp/app-dist.zip | tail -2
