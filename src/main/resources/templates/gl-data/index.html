@@ -59,7 +59,9 @@
         <div class="modal-body">
           <input type="hidden" name="glId" id="fGlId">
           <div class="row g-3">
-            <div class="col-6"><label class="form-label">GL Code <span class="text-danger">*</span></label><input name="gltrac" id="fGltrac" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">GL Code <span class="text-danger">*</span></label>
+              <input name="gltrac" id="fGltrac" class="form-control" required inputmode="numeric"
+                     pattern="[0-9]{1,50}" title="GL Code hanya boleh berisi angka" placeholder="cth. 100"></div>
             <div class="col-6"><label class="form-label">D/C</label>
               <select name="gltrcd" id="fGltrcd" class="form-select"><option value="D">D — Debit</option><option value="C">C — Credit</option></select></div>
             <div class="col-6"><label class="form-label">Amount <span class="text-danger">*</span></label><input name="gltram" id="fGltram" type="number" step="0.01" class="form-control" required></div>

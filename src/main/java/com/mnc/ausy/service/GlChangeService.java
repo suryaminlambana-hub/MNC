@@ -130,6 +130,8 @@ public class GlChangeService {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         String lock = batchLockReason(n(f.get("noPaket")));      // BUG_AUSY_00106
         if (lock != null) return new Res(false, lock);
+        Res badCode = checkGlCodeInput(f.get("gltrac"));         // BUG_AUSY_00104
+        if (badCode != null) return badCode;
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
@@ -146,6 +148,11 @@ public class GlChangeService {
         if (pendingGlRowIds().contains(glId))
             return new Res(false, lockReason(g));
 
+        String newCode = n(f.get("gltrac")).trim();
+        if (!newCode.equals(n(g.getGltrac()).trim())) {          // BUG_AUSY_00104
+            Res badCode = checkGlCodeInput(newCode);
+            if (badCode != null) return badCode;
+        }
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
         if (before.equals(after))
             return new Res(false, "Tidak ada perubahan pada data GL — permintaan tidak diajukan.");
@@ -160,6 +167,19 @@ public class GlChangeService {
     }
 
     /**
+     * GL Code on a GL row follows the same rule as NoGL on the master: digits only — BUG_AUSY_00104.
+     * On edit this is checked only when the value actually changes, so a legacy row that arrived from
+     * an upload with a non-numeric code can still have its other fields corrected.
+     * @return the failure, or null when the input is acceptable.
+     */
+    private static Res checkGlCodeInput(String code) {
+        if (blank(code)) return new Res(false, "GL Code wajib diisi.");
+        if (!GlCodeService.validCode(code))
+            return new Res(false, "GL Code hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
+        return null;
+    }
+
+    /**
      * Bulk edit via Excel round-trip: maker exports GL, edits offline, re-uploads.
      * We match each uploaded row to a live GL row by ID, keep only the rows that actually
      * changed, and store the whole batch (before + after) in ONE change request so the
@@ -171,7 +191,7 @@ public class GlChangeService {
         if (uploaded == null || uploaded.isEmpty()) return new Res(false, "File kosong / tidak ada baris data.");
         Set<Long> pending = pendingGlRowIds();
         List<Map<String,String>> before = new ArrayList<>(), after = new ArrayList<>();
-        int skipped = 0, held = 0;
+        int skipped = 0, held = 0, badCode = 0;
         for (Map<String,String> row : uploaded) {
             Long id;
             try { id = Long.valueOf(row.get("id")); } catch (Exception e) { skipped++; continue; }
@@ -183,6 +203,9 @@ public class GlChangeService {
             for (String k : FIELDS.keySet()) if (row.get(k) != null) {
                 neu.put(k, row.get(k).trim());
             }
+            // BUG_AUSY_00104: GL Code hasil edit di Excel juga harus angka
+            String code = n(neu.get("gltrac")).trim();
+            if (!code.equals(n(cur.get("gltrac")).trim()) && !GlCodeService.validCode(code)) { badCode++; continue; }
             // normalise amount on both sides so "200000.00" vs "200000" isn't seen as a change
             cur.put("gltram", normAmt(cur.get("gltram")));
             neu.put("gltram", normAmt(neu.get("gltram")));
@@ -193,7 +216,8 @@ public class GlChangeService {
             }
         }
         if (after.isEmpty()) return new Res(false, "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini)."
-                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : ""));
+                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
+                + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : ""));
         GlChangeRequest c = base("BULK_EDIT", T_GL_ROW, null, me, note);
         c.setBeforeJson(toJsonList(before));
         c.setAfterJson(toJsonList(after));
@@ -202,7 +226,8 @@ public class GlChangeService {
                 "BULK EDIT (Excel) " + after.size() + " baris diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Bulk edit " + after.size() + " baris GL diajukan via Excel (menunggu approval Checker)"
                 + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".")
-                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : ""));
+                + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
+                + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : ""));
     }
 
     /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
