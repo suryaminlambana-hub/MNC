@@ -19,17 +19,22 @@
         <td>
           <th:block th:with="key=${p[0] + '|' + p[1]},
                              diajukan=${pendingKeys != null and pendingKeys.contains(p[0] + '|' + p[1])},
+                             exportPend=${exportPending != null and exportPending.contains(p[0])},
                              dataPending=${pendingRows != null ? pendingRows.get(p[0] + '|' + p[1]) : null}">
             <span th:if="${diajukan}" class="badge bg-warning-subtle text-warning">
               <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi Hapus Batch <span th:text="${p[0]}"></span>
             </span>
+            <!--/* BUG_AUSY_00106: batch yang export-nya menunggu otorisasi tidak bisa dihapus */-->
+            <span th:if="${!diajukan and exportPend}" class="badge bg-warning-subtle text-warning">
+              <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi Export Batch <span th:text="${p[0]}"></span>
+            </span>
             <!-- BUG_AUSY_00096: batch dengan baris GL yang masih menunggu otorisasi tidak bisa dihapus -->
-            <span th:if="${!diajukan and dataPending != null and !dataPending.isEmpty()}"
+            <span th:if="${!diajukan and !exportPend and dataPending != null and !dataPending.isEmpty()}"
                   class="badge bg-warning-subtle text-warning">
               <i class="fa-solid fa-hourglass-half"></i> Ada Data Menunggu Otorisasi (ID
               <span th:text="${#strings.listJoin(dataPending, ', ')}"></span>)
             </span>
-            <button th:if="${!diajukan and (dataPending == null or dataPending.isEmpty())}"
+            <button th:if="${!diajukan and !exportPend and (dataPending == null or dataPending.isEmpty())}"
                     type="button" class="btn btn-sm btn-outline-danger btn-del-batch"
                     th:attr="data-paket=${p[0]},data-inputer=${p[1]}"><i class="fa-solid fa-trash"></i>
               <span th:text="${needApproval} ? 'Ajukan Hapus Batch' : 'Hapus Batch'">Hapus Batch</span></button>

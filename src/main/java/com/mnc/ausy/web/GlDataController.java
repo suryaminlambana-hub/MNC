@@ -97,6 +97,7 @@ public class GlDataController {
         model.addAttribute("needApproval", approval.requiresApproval(me == null ? null : me.getIdGroup()));
         model.addAttribute("pendingKeys", changes.pendingPaketKeys());
         model.addAttribute("pendingRows", changes.pendingRowsByPaket());
+        model.addAttribute("exportPending", changes.exportPendingPakets());   // BUG_AUSY_00106
         return "gl-delete/index";
     }
 
@@ -108,6 +109,11 @@ public class GlDataController {
         if (approval.requiresApproval(me.getIdGroup())) {
             GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
             ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+            return "redirect:/gl-delete";
+        }
+        if (changes.exportPendingPakets().contains(paket == null ? "" : paket.trim())) {
+            ra.addFlashAttribute("warn", "Batch " + paket + " sedang diajukan untuk export dan menunggu otorisasi"
+                    + " Checker — batch tidak dapat dihapus sampai otorisasi export diputuskan.");
             return "redirect:/gl-delete";
         }
         java.util.List<Long> pendingRows = changes.pendingRowIdsInPaket(paket, inputer);

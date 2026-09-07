@@ -3,8 +3,10 @@ package com.mnc.ausy.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mnc.ausy.domain.GlChangeRequest;
 import com.mnc.ausy.domain.GlCode;
+import com.mnc.ausy.domain.GlExportRequest;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlChangeRequestRepository;
+import com.mnc.ausy.repo.GlExportRequestRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import org.springframework.stereotype.Service;
@@ -80,11 +82,14 @@ public class GlChangeService {
     private final ApprovalService approval;
     private final AuditService audit;
     private final GlCodeService glCodeService;
+    private final GlExportRequestRepository exportRequests;
     private final ObjectMapper json = new ObjectMapper();
 
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
-                           AuditService audit, GlCodeService glCodeService) {
+                           AuditService audit, GlCodeService glCodeService,
+                           GlExportRequestRepository exportRequests) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
+        this.exportRequests = exportRequests;
     }
 
     // ---- maps & json helpers ----
@@ -123,6 +128,8 @@ public class GlChangeService {
     @Transactional
     public Res submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        String lock = batchLockReason(n(f.get("noPaket")));      // BUG_AUSY_00106
+        if (lock != null) return new Res(false, lock);
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
@@ -329,6 +336,10 @@ public class GlChangeService {
         if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
         if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))
             return new Res(false, "Batch tersebut sudah diajukan untuk dihapus dan menunggu otorisasi Checker.");
+        // BUG_AUSY_00106: ACCTXT-nya sudah masuk antrean checker — batch tidak boleh hilang di tengah jalan
+        if (exportPendingPakets().contains(n(paket).trim()))
+            return new Res(false, "Batch " + paket + " sedang diajukan untuk export dan menunggu otorisasi Checker"
+                    + " — batch tidak dapat dihapus sampai otorisasi export diputuskan.");
         List<Long> pendingRows = pendingRowIdsInPaket(paket, inputer);
         if (!pendingRows.isEmpty())
             return new Res(false, "Batch " + paket + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
@@ -393,14 +404,57 @@ public class GlChangeService {
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
             for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()))
                 out.put(g.getId(), "Menunggu Otorisasi Hapus Batch " + n(c.getNoPaket()));
+        // BUG_AUSY_00106 — baris yang export-nya sudah diajukan ikut terkunci sampai checker memutuskan
+        for (GlExportRequest r : exportRequests.findByStatusOrderByCreatedAtDesc("PENDING"))
+            for (GlTabel g : gl.findByExportReqIdOrderById(r.getId()))
+                out.put(g.getId(), "Menunggu Otorisasi Export Batch " + n(g.getNoPaket()));
         return out;
     }
 
-    /** Why a row is locked: its own request, or the pending deletion of the whole batch. */
+    /**
+     * Batches whose export request the Checker has not decided yet. The ACCTXT for those rows is
+     * already queued, so nothing inside them may move until the export is approved or rejected
+     * (BUG_AUSY_00106).
+     */
+    public Set<String> exportPendingPakets() {
+        Set<String> out = new LinkedHashSet<>();
+        for (GlExportRequest r : exportRequests.findByStatusOrderByCreatedAtDesc("PENDING"))
+            for (GlTabel g : gl.findByExportReqIdOrderById(r.getId()))
+                out.add(n(g.getNoPaket()).trim());
+        return out;
+    }
+
+    /**
+     * Why a whole batch is on hold, or null when it is free. Used where there is no GL row to look
+     * at yet — e.g. the maker types a batch number on "Tambah Data GL".
+     */
+    public String batchLockReason(String paket) {
+        String p = n(paket).trim();
+        if (p.isEmpty()) return null;
+        if (exportPendingPakets().contains(p)) return exportLockMsg(p);
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
+            if (p.equals(n(c.getNoPaket()).trim())) return deleteLockMsg(p);
+        return null;
+    }
+
+    private static String exportLockMsg(String paket) {
+        return "Batch " + paket + " sedang diajukan untuk export — data di dalamnya tidak dapat diubah"
+                + " sampai Checker memutuskan otorisasi export.";
+    }
+
+    private static String deleteLockMsg(String paket) {
+        return "Batch " + paket + " sedang diajukan untuk dihapus — data di dalamnya tidak dapat diubah"
+                + " sampai Checker memutuskan.";
+    }
+
+    /** Why a row is locked: its own request, a pending batch deletion, or a pending batch export. */
     private String lockReason(GlTabel g) {
-        if (g != null && cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, g.getNoPaket(), g.getGltrus()))
-            return "Batch " + g.getNoPaket() + " sedang diajukan untuk dihapus — data di dalamnya tidak dapat diubah"
-                    + " sampai Checker memutuskan.";
+        if (g != null) {
+            String p = n(g.getNoPaket()).trim();
+            if (exportPendingPakets().contains(p)) return exportLockMsg(p);
+            if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, g.getNoPaket(), g.getGltrus()))
+                return deleteLockMsg(p);
+        }
         return "Baris GL tersebut masih menunggu otorisasi Checker.";
     }
 
