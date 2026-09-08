@@ -29,22 +29,31 @@ echo ">> [2/5] Cek koneksi ke server"
 "${SSH[@]}" 'hostname' || { echo "Token tidak valid / grant sudah habis — request akses lagi di portal."; exit 1; }
 
 echo ">> [3/5] Kirim paket (tanpa progress bar, tunggu 1-3 menit)"
-"${SSH[@]}" 'cat > /tmp/app-dist.zip' < "$ZIP"
-REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip | cut -d" " -f1')
-[ "$SUM" = "$REMOTE_SUM" ] || { echo "GAGAL: checksum beda (transfer terpotong). Ulangi."; exit 1; }
-echo "   checksum cocok"
+REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip 2>/dev/null | cut -d" " -f1' || true)
+if [ "$SUM" = "$REMOTE_SUM" ]; then
+  echo "   paket identik sudah ada di server — transfer dilewati"
+else
+  "${SSH[@]}" 'cat > /tmp/app-dist.zip' < "$ZIP"
+  REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip | cut -d" " -f1')
+  [ "$SUM" = "$REMOTE_SUM" ] || { echo "GAGAL: checksum beda (transfer terpotong). Ulangi."; exit 1; }
+  echo "   checksum cocok"
+fi
 
 echo ">> [4/5] Pasang & restart service (minta password sudo ausyapp_dev)"
 PW="${AUSY_SUDO_PASS:-}"
 if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
 "${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
   S systemctl stop ausy
-  S unzip -o -x .env -d /opt/ausy /tmp/app-dist.zip | tail -2
+  S unzip -o /tmp/app-dist.zip -x .env -d /opt/ausy | tail -2
   S chown -R ausy:\$(id -gn ausy) /opt/ausy
   S chmod 600 /opt/ausy/.env
   S systemctl start ausy"
 
 echo ">> [5/5] Verifikasi"
 sleep 30
+JAR_LOCAL=$(shasum -a 256 target/ausy-*.jar | cut -d' ' -f1)
+JAR_REMOTE=$("${SSH[@]}" "PW='$PW'; echo \"\$PW\" | sudo -S -p '' sha256sum /opt/ausy/ausy-2.0.0.jar | cut -d' ' -f1")
+if [ "$JAR_LOCAL" = "$JAR_REMOTE" ]; then echo "   jar di server = build ini"; else
+  echo "GAGAL: jar di server BUKAN build ini (lokal=${JAR_LOCAL:0:12} server=${JAR_REMOTE:0:12})"; exit 1; fi
 "${SSH[@]}" 'systemctl is-active ausy; curl -s -o /dev/null -w "http_login=%{http_code}\n" http://127.0.0.1:8080/ausy/login'
 echo ">> Selesai — http://10.5.99.24:8080/ausy"
