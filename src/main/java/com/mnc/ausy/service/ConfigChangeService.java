@@ -484,6 +484,11 @@ public class ConfigChangeService {
                 if(id!=null){
                     long dipakai = users.countByIdGroup(id);      // bisa berubah sejak pengajuan
                     if (dipakai > 0) return "Tidak dapat diterapkan: group masih dipakai "+dipakai+" user.";
+                    // Hak akses menu (group_menu) punya foreign key ke group ini, dan aturan
+                    // approval_group menyebut id-nya. Keduanya harus dibersihkan dulu; kalau tidak,
+                    // DELETE ditolak database (error 500) atau menyisakan aturan approval yatim.
+                    groupMenus.deleteByIdGroup(id);
+                    approvalRules.deleteByApproverGroupOrTargetGroup(id, id);
                     if (groups.existsById(id)) groups.deleteById(id);
                 } }
             default -> { return "Operasi tidak dikenal."; }

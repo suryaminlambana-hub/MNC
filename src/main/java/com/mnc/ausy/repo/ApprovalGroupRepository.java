@@ -12,4 +12,6 @@ public interface ApprovalGroupRepository extends JpaRepository<ApprovalGroup, Lo
     boolean existsByTargetGroup(Integer target);
     /** Aturan approval untuk sebuah group — dipakai mengecek approvernya benar-benar ada & aktif. */
     List<ApprovalGroup> findByTargetGroup(Integer target);
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByApproverGroupOrTargetGroup(Integer approver, Integer target);
 }

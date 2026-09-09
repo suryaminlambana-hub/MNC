@@ -10,4 +10,5 @@ public interface GroupMenuRepository extends JpaRepository<GroupMenu, Long> {
     boolean existsByIdGroupAndIdMenu(Integer idGroup, Integer idMenu);
     @Transactional void deleteByIdGroupAndIdMenu(Integer idGroup, Integer idMenu);
     @Transactional void deleteByIdMenu(Integer idMenu);
+    @Transactional void deleteByIdGroup(Integer idGroup);
 }
