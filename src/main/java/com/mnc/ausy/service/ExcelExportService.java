@@ -37,7 +37,7 @@ public class ExcelExportService {
                     if (makeBold) c.setCellStyle(bold);
                 }
             }
-            for (int i = 0; i < headers.size(); i++) sh.autoSizeColumn(i);
+            sizeColumns(sh, headers, rows);
 
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             resp.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -68,13 +68,32 @@ public class ExcelExportService {
                         else c.setCellValue(v == null ? "" : v.toString());
                     }
                 }
-                for (int i = 0; i < spec.headers().size(); i++) sh.autoSizeColumn(i);
+                sizeColumns(sh, spec.headers(), spec.rows());
             }
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             resp.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             resp.setHeader("Content-Disposition", "attachment; filename=\"" + filePrefix + "_" + ts + ".xlsx\"");
             wb.write(resp.getOutputStream());
             resp.getOutputStream().flush();
+        }
+    }
+
+    /**
+     * Lebar kolom dihitung dari panjang isi sel, BUKAN {@code autoSizeColumn}.
+     * autoSizeColumn mengukur teks lewat font metrics AWT; di server Linux tanpa fontconfig
+     * (seperti RHEL minimal kita) panggilan itu melempar error dan seluruh export gagal 500.
+     * Cara ini deterministik dan hasilnya sama di mesin mana pun.
+     */
+    private static void sizeColumns(Sheet sh, List<String> headers, List<List<Object>> rows) {
+        for (int i = 0; i < headers.size(); i++) {
+            int len = headers.get(i) == null ? 0 : headers.get(i).length();
+            for (List<Object> row : rows) {
+                if (i >= row.size()) continue;
+                Object v = row.get(i);
+                if (v != null) len = Math.max(len, v.toString().length());
+            }
+            len = Math.max(8, Math.min(len + 2, 60));      // jaga tetap terbaca, tidak melebar liar
+            sh.setColumnWidth(i, len * 256);
         }
     }
 
