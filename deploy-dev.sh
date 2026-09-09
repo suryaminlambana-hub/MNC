@@ -20,8 +20,17 @@ GW=ssh.cyolo.io
 SSH=(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o BatchMode=yes "$GW" -l "$TOKEN")
 
 echo ">> [1/5] Build paket"
-./build-dist.sh >/dev/null
 ZIP=target/app-dist.zip
+STAMP=target/app-dist.commit
+HEAD_NOW=$(git rev-parse HEAD)$(git status --porcelain | shasum -a 256 | cut -d" " -f1)
+if [ -f "$ZIP" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$HEAD_NOW" ]; then
+  # Kode belum berubah sejak build terakhir: pakai paket yang ada supaya checksum-nya stabil,
+  # jadi retry setelah koneksi Safous putus tidak perlu kirim ulang 76 MB dari nol.
+  echo "   kode belum berubah — pakai paket yang sudah ada"
+else
+  ./build-dist.sh >/dev/null
+  echo "$HEAD_NOW" > "$STAMP"
+fi
 SUM=$(shasum -a 256 "$ZIP" | cut -d' ' -f1)
 echo "   $(ls -lh "$ZIP" | awk '{print $5}')  sha256=${SUM:0:16}…"
 
