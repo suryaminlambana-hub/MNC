@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUserId(String userId);
     boolean existsByUserId(String userId);
+    /** Berapa user yang terpasang ke sebuah group — group yang terpakai tidak boleh dihapus. */
+    long countByIdGroup(Integer idGroup);
 }

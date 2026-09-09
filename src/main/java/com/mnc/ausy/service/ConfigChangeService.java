@@ -207,9 +207,22 @@ public class ConfigChangeService {
         return saveReq(c,"GROUP","EDIT","'"+g.getNamaGroup()+"'");
     }
     @Transactional
+    /** Group yang masih punya user — dipakai halaman Group User untuk badge "Terpakai". */
+    public Set<Integer> groupsInUse() {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (GroupUser g : groups.findAllByOrderByNamaGroupAsc())
+            if (users.countByIdGroup(g.getIdGroup()) > 0) out.add(g.getIdGroup());
+        return out;
+    }
+
     public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        // BUG_AUSY_00111: menghapus group yang masih dipakai membuat user-nya kehilangan seluruh akses
+        long dipakai = users.countByIdGroup(idGroup);
+        if (dipakai > 0)
+            return "Group '"+g.getNamaGroup()+"' masih dipakai "+dipakai+" user — tidak dapat dihapus."
+                 + " Pindahkan user tersebut ke group lain lebih dulu.";
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         ConfigChangeRequest c=base("GROUP","DELETE",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g)));
         return saveReq(c,"GROUP","DELETE","'"+g.getNamaGroup()+"'");
@@ -458,7 +471,12 @@ public class ConfigChangeService {
             case "EDIT" -> { GroupUser g=groups.findById(toInt(c.getTargetId())).orElse(null);
                 if(g==null) return "Group sudah tidak ada."; if(a==null) return "Data rusak.";
                 g.setNamaGroup(a.get("namaGroup")); g.setInisial(a.get("inisial")); g.setLevel(a.get("level")); groups.save(g); }
-            case "DELETE" -> { Integer id=toInt(c.getTargetId()); if(id!=null && groups.existsById(id)) groups.deleteById(id); }
+            case "DELETE" -> { Integer id=toInt(c.getTargetId());
+                if(id!=null){
+                    long dipakai = users.countByIdGroup(id);      // bisa berubah sejak pengajuan
+                    if (dipakai > 0) return "Tidak dapat diterapkan: group masih dipakai "+dipakai+" user.";
+                    if (groups.existsById(id)) groups.deleteById(id);
+                } }
             default -> { return "Operasi tidak dikenal."; }
         }
         return null;

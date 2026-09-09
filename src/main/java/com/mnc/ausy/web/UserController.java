@@ -1,5 +1,6 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.domain.GroupUser;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
@@ -9,6 +10,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/users")
@@ -24,7 +29,13 @@ public class UserController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("users", users.findAll());
-        model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
+        List<GroupUser> allGroups = groups.findAllByOrderByNamaGroupAsc();
+        // BUG_AUSY_00110: kolom Group dulu menampilkan users.level (kolom lama yang tidak ikut
+        // terisi saat group baru dipasang) sehingga group baru tampil kosong. Ambil dari master.
+        Map<Integer,String> groupNames = new HashMap<>();
+        for (GroupUser g : allGroups) groupNames.put(g.getIdGroup(), g.getNamaGroup());
+        model.addAttribute("groups", allGroups);
+        model.addAttribute("groupNames", groupNames);
         model.addAttribute("pendingConfig", configChange.countPending());
         model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";

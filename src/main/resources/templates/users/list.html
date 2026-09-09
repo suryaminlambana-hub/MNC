@@ -22,7 +22,7 @@
                 <td th:text="${i.count}">1</td>
                 <td><b th:text="${u.userId}">user</b></td>
                 <td th:text="${u.nama}">Nama</td>
-                <td th:text="${u.level}">ROLE</td>
+                <td th:text="${groupNames != null and groupNames.containsKey(u.idGroup)} ? ${groupNames.get(u.idGroup)} : '—'">ROLE</td>
                 <td th:text="${u.email}">email</td>
                 <td th:with="pending=${pendingIds != null and pendingIds.contains(u.userId)}">
                     <span th:if="${pending}" class="badge bg-warning-subtle text-warning">

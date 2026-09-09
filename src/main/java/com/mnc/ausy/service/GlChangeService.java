@@ -784,9 +784,11 @@ public class GlChangeService {
         g.setGlName(glCodeService.descriptionOf(code, dc));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
         g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
-        // ADD lewat change request sudah di-approve checker -> GL aktif langsung, JANGAN masuk
-        // antrian Otorisasi Upload GL (yang difilter status_print='BELUM UPLOAD').
-        g.setStatusPrint("SUDAH UPLOAD"); g.setStatusDual("APPROVED");
+        // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
+        // Upload GL disaring status_dual='PENDING', jadi baris ini tetap tidak muncul di sana.
+        // status_print='BELUM UPLOAD' = belum di-export; kalau ditandai 'SUDAH UPLOAD' baris manual
+        // tidak akan pernah bisa diajukan export ke core (BUG_AUSY_00109).
+        g.setStatusPrint("BELUM UPLOAD"); g.setStatusDual("APPROVED");
         g.setGlsrc("m"); g.setActive((short)1);
         gl.save(g);
     }
