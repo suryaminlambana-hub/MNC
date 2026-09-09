@@ -190,6 +190,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitGroupAdd(String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         if (namaGroup==null||namaGroup.isBlank()) return "Nama Group wajib diisi.";
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",namaGroup.trim()); a.put("inisial",n(inisial)); a.put("level",n(level));
         ConfigChangeRequest c=base("GROUP","ADD",null,me,note); c.setAfterJson(toJson(a));
@@ -198,6 +199,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitGroupEdit(Integer idGroup, String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",n(namaGroup)); a.put("inisial",n(inisial)); a.put("level",n(level));
@@ -217,6 +219,7 @@ public class ConfigChangeService {
 
     public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
         // BUG_AUSY_00111: menghapus group yang masih dipakai membuat user-nya kehilangan seluruh akses
         long dipakai = users.countByIdGroup(idGroup);
@@ -239,6 +242,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuAdd(String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         if (namaMenu==null||namaMenu.isBlank()) return "Nama Menu wajib diisi.";
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",namaMenu.trim()); a.put("url",n(url));
         a.put("parent",String.valueOf(parent==null?0:parent)); a.put("urutan",String.valueOf(urutan==null?0:urutan));
@@ -248,6 +252,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuEdit(Integer idMenu, String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
         if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",n(namaMenu)); a.put("url",n(url));
@@ -260,6 +265,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuDelete(Integer idMenu, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
         if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         ConfigChangeRequest c=base("MENU","DELETE",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m)));
@@ -270,6 +276,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitAccess(Integer group, List<Integer> menuIds, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         if (group==null) return "Group belum dipilih.";
         if (isPending("ACCESS", group)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
@@ -297,6 +304,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitApprovalAdd(Integer approverGroup, Integer targetGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         if (approverGroup==null||targetGroup==null) return "Group belum lengkap.";
         if (approverGroup.equals(targetGroup)) return "Approver dan target tidak boleh group yang sama.";
         if (approvalRules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) return "Aturan tersebut sudah ada.";
@@ -311,6 +319,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitApprovalDelete(Long ruleId, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         ApprovalGroup r=approvalRules.findById(ruleId).orElse(null); if(r==null) return "Aturan tidak ditemukan.";
         if (isPending("APPROVAL", ruleId)) return pendingMsg("APPROVAL");
         Map<String,String> b=new LinkedHashMap<>();

@@ -4,7 +4,10 @@ import com.mnc.ausy.domain.TlogActivity;
 import com.mnc.ausy.domain.TlogTransaction;
 import com.mnc.ausy.repo.TlogActivityRepository;
 import com.mnc.ausy.repo.TlogTransactionRepository;
+import com.mnc.ausy.domain.GroupUser;
+import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.ExcelExportService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.PageRequest;
@@ -18,27 +21,34 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /** Immutable audit-trail viewer (read-only) — PDF §7.3 / §8 / §9.
- *  Scoped by role: Admin Approval (②) sees only Admin + Admin Approval (groups 1,2);
- *  Checker (④) sees only Maker + Checker (groups 3,4); other roles see all. */
+ *  Isinya terpisah per sisi kerja: yang memegang menu administratif hanya melihat jejak
+ *  Admin & Admin Approval, yang memegang menu operasional hanya melihat jejak Maker & Checker.
+ *  Sisi itu dibaca dari hak akses group (AccessService.sideOf), bukan dari id group yang
+ *  ditulis di kode, supaya group buatan admin ikut tersaring dengan benar (BUG_AUSY_00115). */
 @Controller
 public class AuditController {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-    private static final List<Integer> CONFIG_SIDE   = List.of(1, 2);   // admin + admin approval
-    private static final List<Integer> BUSINESS_SIDE = List.of(3, 4);   // maker + checker
     private final TlogTransactionRepository tx;
     private final TlogActivityRepository act;
     private final ExcelExportService excel;
+    private final GroupUserRepository groups;
+    private final AccessService access;
 
-    public AuditController(TlogTransactionRepository tx, TlogActivityRepository act, ExcelExportService excel) {
-        this.tx = tx; this.act = act; this.excel = excel;
+    public AuditController(TlogTransactionRepository tx, TlogActivityRepository act, ExcelExportService excel,
+                           GroupUserRepository groups, AccessService access) {
+        this.tx = tx; this.act = act; this.excel = excel; this.groups = groups; this.access = access;
     }
 
-    /** Which groups this viewer may see in the audit trail; null = all. */
+    /** Group mana saja yang boleh dilihat jejaknya oleh viewer ini; null = semua. */
     private List<Integer> scopeFor(AusyUserDetails me) {
         if (me == null) return null;
-        if (Integer.valueOf(2).equals(me.getIdGroup())) return CONFIG_SIDE;
-        if (Integer.valueOf(4).equals(me.getIdGroup())) return BUSINESS_SIDE;
-        return null;
+        String side = access.sideOf(me.getIdGroup());
+        if (side == null) return null;                       // memegang dua sisi: lihat semua
+        List<Integer> out = new ArrayList<>();
+        for (GroupUser g : groups.findAll())
+            if (side.equals(access.sideOf(g.getIdGroup()))) out.add(g.getIdGroup());
+        if (!out.contains(me.getIdGroup())) out.add(me.getIdGroup());
+        return out;
     }
     private boolean scoped(AusyUserDetails me) { return scopeFor(me) != null; }
 
@@ -77,8 +87,9 @@ public class AuditController {
         model.addAttribute("transactions", transactions(me, PageRequest.of(0, 100)));
         model.addAttribute("activities", activities(me, PageRequest.of(0, 100)));
         model.addAttribute("scoped", scoped(me));
+        String side = access.sideOf(me == null ? null : me.getIdGroup());
         model.addAttribute("scopeLabel",
-                Integer.valueOf(2).equals(me == null ? null : me.getIdGroup()) ? "Admin & Admin Approval" : "Maker & Checker");
+                "CONFIG".equals(side) ? "Admin & Admin Approval" : "BUSINESS".equals(side) ? "Maker & Checker" : "semua group");
         return "audit/index";
     }
 }

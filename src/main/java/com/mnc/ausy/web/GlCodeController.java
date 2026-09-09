@@ -40,9 +40,12 @@ public class GlCodeController {
         this.changes = changes; this.approval = approval;
     }
 
-    private boolean needsApproval(AusyUserDetails me) {
-        return approval.requiresApproval(me == null ? null : me.getIdGroup());
-    }
+    /**
+     * Dual control wajib untuk semua perubahan Kode GL. Kalau group pengaju belum punya
+     * Checker aktif, pengajuannya ditolak GlChangeService dengan pesan sendiri — tidak ada lagi
+     * jalur "langsung terapkan" yang dulu aktif ketika group tidak punya approver (BUG_AUSY_00116).
+     */
+    private boolean needsApproval(AusyUserDetails me) { return true; }
 
     /** Export the GL Code master (registered GL codes) to Excel. */
     @GetMapping("/export")
@@ -81,12 +84,7 @@ public class GlCodeController {
                       @RequestParam(required=false) String description, @RequestParam(defaultValue="1") Short status,
                       @RequestParam(required=false) String note,
                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        if (needsApproval(me)) {
-            flash(ra, changes.submitGlCodeAdd(code, position, description, status, me, note));
-        } else {
-            String err = service.add(code, position, description, status, me.getUsername());
-            flash(ra, err, "Kode GL ditambahkan.");
-        }
+        flash(ra, changes.submitGlCodeAdd(code, position, description, status, me, note));
         return "redirect:/gl-code";
     }
 
@@ -95,24 +93,14 @@ public class GlCodeController {
                        @RequestParam(required=false) String description, @RequestParam(defaultValue="1") Short status,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        if (needsApproval(me)) {
-            flash(ra, changes.submitGlCodeEdit(id, code, position, description, status, me, note));
-            return "redirect:/gl-code";
-        }
-        try {
-            String err = service.edit(id, code, position, description, status, me.getUsername());
-            flash(ra, err, "Kode GL diperbarui.");
-        } catch (GlCodeService.DuplicateGl e) {
-            ra.addFlashAttribute("warn", "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
-        }
+        flash(ra, changes.submitGlCodeEdit(id, code, position, description, status, me, note));
         return "redirect:/gl-code";
     }
 
     @PostMapping("/delete")
     public String delete(@RequestParam Long id, @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        if (needsApproval(me)) flash(ra, changes.submitGlCodeDelete(id, me, note));
-        else flash(ra, service.delete(id), "Kode GL dihapus.");
+        flash(ra, changes.submitGlCodeDelete(id, me, note));
         return "redirect:/gl-code";
     }
 
@@ -132,16 +120,11 @@ public class GlCodeController {
                 ra.addFlashAttribute("warn", issue);
                 return "redirect:/gl-code";
             }
-            if (needsApproval(me)) {
-                GlChangeService.Res r = changes.submitGlCodeImport(p.rows(), me, note);
-                // hitungan duplikat/invalid hanya relevan kalau pengajuannya diterima
-                flash(ra, r.ok() ? new GlChangeService.Res(true, r.message()
-                        + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)") : r);
-                return "redirect:/gl-code";
-            }
-            int added = service.applyImport(p.rows(), me.getUsername());
-            ra.addFlashAttribute("ok", "Import selesai — " + added + " ditambahkan, " + p.dup()
-                    + " duplikat, " + p.bad() + " tidak valid.");
+            GlChangeService.Res r = changes.submitGlCodeImport(p.rows(), me, note);
+            // hitungan duplikat/invalid hanya relevan kalau pengajuannya diterima
+            flash(ra, r.ok() ? new GlChangeService.Res(true, r.message()
+                    + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)") : r);
+            return "redirect:/gl-code";
         } catch (Exception e) {
             ra.addFlashAttribute("warn", "Gagal membaca CSV — pastikan file berformat CSV sesuai template"
                     + " (kolom: NoGL, Debit/Credit, Description).");

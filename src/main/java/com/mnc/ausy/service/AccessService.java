@@ -41,6 +41,46 @@ public class AccessService {
         return out;
     }
 
+    /**
+     * Halaman yang isinya pengajuan (maker/admin), bukan halaman baca atau halaman otorisasi.
+     * Dipakai untuk memutuskan perlu tidaknya peringatan "belum punya approver" (BUG_AUSY_00116),
+     * supaya group yang memang hanya menyetujui tidak ikut diperingati.
+     */
+    private static final Set<String> SUBMIT_PAGES = Set.of(
+            "/users", "/groups", "/menus", "/access", "/approval", "/admin/ftp",
+            "/upload", "/nala", "/gl-data", "/gl-delete", "/gl-code", "/gl-legacy/export-request");
+
+    /** Apakah group ini punya halaman yang bisa mengajukan perubahan? */
+    public boolean canSubmit(Integer idGroup) {
+        if (idGroup == null) return false;
+        for (Menu m : menus.findGrantedItems(idGroup))
+            if (m.getUrl() != null && SUBMIT_PAGES.contains(m.getUrl().trim())) return true;
+        return false;
+    }
+
+    /** Parent menu sisi administratif (Master Data, Otorisasi Administratif) — BUG_AUSY_00115. */
+    private static final Set<Integer> CONFIG_PARENTS = Set.of(200, 450);
+    /** Parent menu sisi operasional (Import, Data, Otorisasi GL, GL). */
+    private static final Set<Integer> BUSINESS_PARENTS = Set.of(100, 300, 400, 500);
+
+    /**
+     * Sisi kerja sebuah group dilihat dari menu yang dipegangnya: {@code "CONFIG"} (admin &
+     * admin approval), {@code "BUSINESS"} (maker & checker), atau null kalau memegang keduanya
+     * / tidak memegang apa pun. Dipakai memisahkan isi Audit Trail tanpa mengunci id group
+     * tertentu di kode (BUG_AUSY_00115).
+     */
+    public String sideOf(Integer idGroup) {
+        if (idGroup == null) return null;
+        boolean cfg = false, biz = false;
+        for (Menu m : menus.findGrantedItems(idGroup)) {
+            if (!"MENU".equals(m.getKind()) || m.getParent() == null) continue;
+            if (CONFIG_PARENTS.contains(m.getParent())) cfg = true;
+            if (BUSINESS_PARENTS.contains(m.getParent())) biz = true;
+        }
+        if (cfg == biz) return null;            // dua-duanya atau tidak sama sekali
+        return cfg ? "CONFIG" : "BUSINESS";
+    }
+
     /** Boleh atau tidak group ini membuka sebuah path aplikasi (context-path sudah dilepas). */
     public boolean allowed(Integer idGroup, String path) {
         Menu owner = ownerOf(path);

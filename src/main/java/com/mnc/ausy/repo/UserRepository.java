@@ -9,4 +9,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUserId(String userId);
     /** Berapa user yang terpasang ke sebuah group — group yang terpakai tidak boleh dihapus. */
     long countByIdGroup(Integer idGroup);
+    /** User aktif dalam sebuah group — approver dianggap ada kalau angkanya > 0. */
+    long countByIdGroupAndStatusAccount(Integer idGroup, Short statusAccount);
 }

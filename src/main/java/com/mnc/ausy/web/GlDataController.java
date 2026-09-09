@@ -94,7 +94,7 @@ public class GlDataController {
     public String deletePage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus
         model.addAttribute("pakets", gl.approvedPakets());
-        model.addAttribute("needApproval", approval.requiresApproval(me == null ? null : me.getIdGroup()));
+        model.addAttribute("needApproval", true);   // dual control wajib (BUG_AUSY_00116)
         model.addAttribute("pendingKeys", changes.pendingPaketKeys());
         model.addAttribute("pendingRows", changes.pendingRowsByPaket());
         model.addAttribute("exportPending", changes.exportPendingPakets());   // BUG_AUSY_00106
@@ -106,25 +106,10 @@ public class GlDataController {
     public String delete(@RequestParam String paket, @RequestParam String inputer,
                          @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        if (approval.requiresApproval(me.getIdGroup())) {
-            GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
-            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-            return "redirect:/gl-delete";
-        }
-        if (changes.exportPendingPakets().contains(paket == null ? "" : paket.trim())) {
-            ra.addFlashAttribute("warn", "Batch " + paket + " sedang diajukan untuk export dan menunggu otorisasi"
-                    + " Checker — batch tidak dapat dihapus sampai otorisasi export diputuskan.");
-            return "redirect:/gl-delete";
-        }
-        java.util.List<Long> pendingRows = changes.pendingRowIdsInPaket(paket, inputer);
-        if (!pendingRows.isEmpty()) {
-            ra.addFlashAttribute("warn", "Batch " + paket + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
-                    + pendingRows.toString().replaceAll("[\\[\\]]", "") + ").");
-            return "redirect:/gl-delete";
-        }
-        gl.deletePaket(paket, inputer);
-        audit.transaction(me.getUsername(), "BATCH_DELETE", "Batch " + paket + " (maker=" + inputer + ") dihapus");
-        ra.addFlashAttribute("ok", "Batch " + paket + " berhasil dihapus.");
+        // Selalu lewat maker->checker. Kalau group belum punya penyetuju aktif, pengajuan ditolak
+        // di service dengan pesannya sendiri — data TIDAK dihapus langsung (BUG_AUSY_00116).
+        GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/gl-delete";
     }
 }

@@ -1,5 +1,6 @@
 package com.mnc.ausy.service;
 
+import com.mnc.ausy.domain.ApprovalGroup;
 import com.mnc.ausy.repo.ApprovalGroupRepository;
 import com.mnc.ausy.repo.UserRepository;
 import org.springframework.stereotype.Service;
@@ -33,5 +34,31 @@ public class ApprovalService {
      */
     public boolean requiresApproval(Integer makerGroup) {
         return makerGroup != null && rules.existsByTargetGroup(makerGroup);
+    }
+
+    /** Pesan baku ketika group pengaju belum punya penyetuju yang aktif (BUG_AUSY_00116). */
+    public static final String NO_APPROVER =
+            "Pengajuan tidak dapat diproses karena Approval Group Anda belum memiliki Checker/Approver"
+          + " yang aktif. Silakan hubungi Administrator.";
+
+    /**
+     * Apakah group ini punya penyetuju yang benar-benar bisa memutuskan: ada aturan di Approval
+     * Group DAN group penyetujunya punya minimal satu user aktif. Tanpa itu pengajuan hanya akan
+     * menggantung tanpa ada yang bisa approve — atau, kalau tidak ada aturan sama sekali,
+     * perubahan malah langsung diterapkan tanpa dual control (BUG_AUSY_00116).
+     */
+    public boolean hasActiveApprover(Integer makerGroup) {
+        if (makerGroup == null) return false;
+        for (ApprovalGroup r : rules.findByTargetGroup(makerGroup)) {
+            Integer approver = r.getApproverGroup();
+            if (approver == null || approver.equals(makerGroup)) continue;
+            if (users.countByIdGroupAndStatusAccount(approver, (short) 1) > 0) return true;
+        }
+        return false;
+    }
+
+    /** null kalau boleh mengajukan; kalau tidak, alasannya untuk ditampilkan ke pengaju. */
+    public String submissionBlockedReason(Integer makerGroup) {
+        return hasActiveApprover(makerGroup) ? null : NO_APPROVER;
     }
 }

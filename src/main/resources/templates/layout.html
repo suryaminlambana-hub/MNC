@@ -54,6 +54,12 @@
                 </form>
             </div>
         </header>
+        <!--/* BUG_AUSY_00116: group belum punya penyetuju aktif — pengajuan apa pun akan ditolak */-->
+        <div th:if="${submitBlocked}" class="ausy-content pb-0">
+            <div class="alert alert-warning py-2 mb-0">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span th:text="${submitBlockedMsg}"></span>
+            </div>
+        </div>
         <main class="ausy-content" th:replace="${content}">content here</main>
     </div>
     <div class="ausy-overlay" id="navOverlay"></div>

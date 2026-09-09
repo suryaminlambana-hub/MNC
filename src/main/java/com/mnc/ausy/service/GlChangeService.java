@@ -134,6 +134,7 @@ public class GlChangeService {
     @Transactional
     public Res submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         String lock = batchLockReason(n(f.get("noPaket")));      // BUG_AUSY_00106
         if (lock != null) return new Res(false, lock);
         Res badCode = checkGlCodeInput(f.get("gltrac"));         // BUG_AUSY_00104
@@ -149,6 +150,7 @@ public class GlChangeService {
     @Transactional
     public Res submitEdit(Long glId, Map<String,String> f, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
         if (pendingGlRowIds().contains(glId))
@@ -194,6 +196,7 @@ public class GlChangeService {
     @Transactional
     public Res submitBulkEditExcel(List<Map<String,String>> uploaded, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         if (uploaded == null || uploaded.isEmpty()) return new Res(false, "File kosong / tidak ada baris data.");
         Set<Long> pending = pendingGlRowIds();
         List<Map<String,String>> before = new ArrayList<>(), after = new ArrayList<>();
@@ -246,6 +249,7 @@ public class GlChangeService {
     @Transactional
     public Res submitDelete(Long glId, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
         if (pendingGlRowIds().contains(glId))
@@ -262,6 +266,7 @@ public class GlChangeService {
     @Transactional
     public Res submitGlCodeAdd(String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         String p = GlCodeService.normPos(pos);
         Res bad = checkCode(code, p);
         if (bad != null) return bad;
@@ -279,6 +284,7 @@ public class GlChangeService {
     @Transactional
     public Res submitGlCodeEdit(Long id, String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
         if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
@@ -324,6 +330,7 @@ public class GlChangeService {
     @Transactional
     public Res submitGlCodeDelete(Long id, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
         if (glCodeService.used(g))
@@ -342,6 +349,7 @@ public class GlChangeService {
     @Transactional
     public Res submitGlCodeImport(List<Map<String,String>> rows, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         if (rows == null || rows.isEmpty()) return new Res(false, "Tidak ada baris baru yang bisa diajukan dari CSV.");
         List<Map<String,String>> fresh = new ArrayList<>();
         int held = 0;
@@ -363,6 +371,7 @@ public class GlChangeService {
     @Transactional
     public Res submitPaketDelete(String paket, String inputer, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
+        if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
         if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
         if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))

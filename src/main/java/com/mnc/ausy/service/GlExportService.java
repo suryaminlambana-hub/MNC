@@ -80,6 +80,7 @@ public class GlExportService {
     @Transactional
     public String submitExport(AusyUserDetails me, String note, List<String> pakets) {
         if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
+        if (!approval.hasActiveApprover(me.getIdGroup())) return ApprovalService.NO_APPROVER;
         if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu batch untuk diajukan export.";
         // BUG_AUSY_00102: data yang masih menunggu otorisasi belum final — batch-nya tidak boleh diexport
         // dulu, kalau tidak file ACCTXT terkirim ke core dengan nilai yang mungkin masih berubah.
