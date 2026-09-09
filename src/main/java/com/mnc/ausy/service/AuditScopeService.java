@@ -28,27 +28,24 @@ public class AuditScopeService {
         this.groups = groups; this.access = access;
     }
 
+    public static final String BUSINESS = "BUSINESS";   // jejak Maker & Checker
+    public static final String CONFIG    = "CONFIG";    // jejak Admin & Admin Approval
+
     /**
-     * Group yang jejaknya boleh dilihat group ini. Kalau sisinya tidak bisa ditentukan (memegang
-     * menu kedua sisi, atau belum diberi menu apa pun) yang tampil hanya jejak group itu sendiri —
-     * lebih baik terlalu sempit daripada membocorkan log sisi lain.
+     * Group yang termasuk sisi tertentu. Sisinya ditentukan oleh halaman yang dibuka
+     * (Audit Trail operasional vs administratif), jadi isinya pasti — tidak lagi ditebak dari
+     * menu lain yang kebetulan dipegang si pembaca.
      */
-    public List<Integer> visibleGroups(Integer idGroup) {
+    public List<Integer> groupsOnSide(String side) {
         List<Integer> out = new ArrayList<>();
-        if (idGroup == null) return out;
-        String side = access.sideOf(idGroup);
-        if (side == null) { out.add(idGroup); return out; }
         for (GroupUser g : groups.findAll())
-            if (side.equals(access.sideOf(g.getIdGroup()))) out.add(g.getIdGroup());
-        if (!out.contains(idGroup)) out.add(idGroup);
+            if (side != null && side.equals(access.sideOf(g.getIdGroup()))) out.add(g.getIdGroup());
+        if (out.isEmpty()) out.add(-1);          // jangan pernah jatuh ke "tanpa filter"
         return out;
     }
 
     /** Label sisi untuk ditampilkan di halaman audit. */
-    public String label(Integer idGroup) {
-        String side = access.sideOf(idGroup);
-        if ("CONFIG".equals(side)) return "Admin & Admin Approval";
-        if ("BUSINESS".equals(side)) return "Maker & Checker";
-        return "group Anda sendiri";
+    public String label(String side) {
+        return CONFIG.equals(side) ? "Admin & Admin Approval" : "Maker & Checker";
     }
 }

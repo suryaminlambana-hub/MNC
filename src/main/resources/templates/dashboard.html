@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    <div th:if="${cards.contains('audit-recent')}" class="ausy-card">
+    <div th:if="${cards.contains('audit-recent') or cards.contains('audit-recent-admin')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Transaksi Terbaru</h2>
         <table class="table table-sm table-hover align-middle mb-0">

@@ -67,7 +67,7 @@ public class DashboardController {
             model.addAttribute("pendingUsers", configChange.countPending());
             model.addAttribute("pendingUserList", configChange.pendingList());
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.visibleGroups(principal == null ? null : principal.getIdGroup()), PageRequest.of(0, 15)));
+                    auditScope.groupsOnSide(AuditScopeService.CONFIG), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
 
@@ -103,7 +103,7 @@ public class DashboardController {
             model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
             model.addAttribute("pendingChangeList", glChange.pendingVisible());
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.visibleGroups(principal.getIdGroup()), PageRequest.of(0, 10)));
+                    auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 10)));
             return "dashboard-checker";
         }
 
@@ -118,9 +118,13 @@ public class DashboardController {
         if (cards.contains("gl-active")) model.addAttribute("activeGl", gl.countByActive((short) 1));
         if (cards.contains("otorisasi-pending")) model.addAttribute("pendingPakets", gl.pendingPakets().size());
         if (cards.contains("gl-change-pending")) model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
-        if (cards.contains("audit-recent"))     // ikut tersaring per sisi, bukan semua log
+        // card aktivitas terbaru ada dua: operasional & administratif, masing-masing hak aksesnya sendiri
+        if (cards.contains("audit-recent"))
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.visibleGroups(principal == null ? null : principal.getIdGroup()), PageRequest.of(0, 8)));
+                    auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 8)));
+        else if (cards.contains("audit-recent-admin"))
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.groupsOnSide(AuditScopeService.CONFIG), PageRequest.of(0, 8)));
         model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
     }

@@ -56,7 +56,6 @@ public class AccessController {
         SECTION_LABELS.put("CHECKER",   "Checker — Otorisasi Operasional");
         SECTION_LABELS.put("ADMIN",     "Admin — Konfigurasi Sistem");
         SECTION_LABELS.put("ADMIN_APV", "Admin Approval — Otorisasi Konfigurasi");
-        SECTION_LABELS.put("UMUM",      "Umum — dipakai lebih dari satu role");
         SECTION_LABELS.put("",          "Lainnya");
     }
 

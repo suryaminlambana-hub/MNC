@@ -37,45 +37,51 @@ public class AuditController {
     }
 
     /** Group mana saja yang boleh dilihat jejaknya oleh viewer ini — selalu tersaring per sisi. */
-    private List<Integer> scopeFor(AusyUserDetails me) {
-        return me == null ? List.of() : scope.visibleGroups(me.getIdGroup());
-    }
-    private boolean scoped(AusyUserDetails me) { return true; }   // selalu tersaring per sisi
+    /* Dua halaman terpisah, masing-masing hak aksesnya sendiri di Access Menu:
+       /audit       -> jejak Maker & Checker      (bagian Checker)
+       /audit-admin -> jejak Admin & Admin Approval (bagian Admin Approval)
+       Isinya ditentukan halaman yang dibuka, bukan ditebak dari group pembacanya. */
 
-    private List<TlogTransaction> transactions(AusyUserDetails me, Pageable page) {
-        return tx.findByUserGroups(scopeFor(me), page);
-    }
+    @GetMapping("/audit")
+    public String auditBusiness(Model model) { return render(AuditScopeService.BUSINESS, model); }
 
-    private List<TlogActivity> activities(AusyUserDetails me, Pageable page) {
-        return act.findByUserGroups(scopeFor(me), page);
-    }
+    @GetMapping("/audit-admin")
+    public String auditConfig(Model model) { return render(AuditScopeService.CONFIG, model); }
 
     @GetMapping("/audit/export")
-    public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        // Sheet 1 — Transaksi
+    public void exportBusiness(HttpServletResponse resp) throws Exception {
+        export(AuditScopeService.BUSINESS, resp);
+    }
+
+    @GetMapping("/audit-admin/export")
+    public void exportConfig(HttpServletResponse resp) throws Exception {
+        export(AuditScopeService.CONFIG, resp);
+    }
+
+    private String render(String side, Model model) {
+        List<Integer> groups = scope.groupsOnSide(side);
+        model.addAttribute("transactions", tx.findByUserGroups(groups, PageRequest.of(0, 100)));
+        model.addAttribute("activities", act.findByUserGroups(groups, PageRequest.of(0, 100)));
+        model.addAttribute("scoped", true);
+        model.addAttribute("scopeLabel", scope.label(side));
+        model.addAttribute("exportUrl", AuditScopeService.CONFIG.equals(side) ? "/audit-admin/export" : "/audit/export");
+        return "audit/index";
+    }
+
+    private void export(String side, HttpServletResponse resp) throws Exception {
+        List<Integer> groups = scope.groupsOnSide(side);
         List<List<Object>> txRows = new ArrayList<>();
-        for (TlogTransaction t : transactions(me, PageRequest.of(0, 5000))) {
+        for (TlogTransaction t : tx.findByUserGroups(groups, PageRequest.of(0, 5000)))
             txRows.add(Arrays.asList(t.getTimeActivity() == null ? "" : t.getTimeActivity().format(TS),
                     t.getUserId(), t.getNameActivity(), t.getTinfo()));
-        }
-        // Sheet 2 — Login / Aktivitas
         List<List<Object>> actRows = new ArrayList<>();
-        for (TlogActivity a : activities(me, PageRequest.of(0, 5000))) {
+        for (TlogActivity a : act.findByUserGroups(groups, PageRequest.of(0, 5000)))
             actRows.add(Arrays.asList(a.getTimeActivity() == null ? "" : a.getTimeActivity().format(TS),
                     a.getUserId(), a.getIp(), a.getNameActivity(), a.getInfo()));
-        }
-        excel.downloadSheets(resp, "Audit_Trail", List.of(
+        String name = AuditScopeService.CONFIG.equals(side) ? "Audit_Trail_Admin" : "Audit_Trail_Maker_Checker";
+        excel.downloadSheets(resp, name, List.of(
                 new ExcelExportService.SheetData("Transaksi", List.of("Waktu", "User", "Aksi", "Detail"), txRows),
                 new ExcelExportService.SheetData("Login", List.of("Waktu", "User", "IP", "Aktivitas", "Info"), actRows)
         ));
-    }
-
-    @GetMapping("/audit")
-    public String audit(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        model.addAttribute("transactions", transactions(me, PageRequest.of(0, 100)));
-        model.addAttribute("activities", activities(me, PageRequest.of(0, 100)));
-        model.addAttribute("scoped", scoped(me));
-        model.addAttribute("scopeLabel", scope.label(me == null ? null : me.getIdGroup()));
-        return "audit/index";
     }
 }
