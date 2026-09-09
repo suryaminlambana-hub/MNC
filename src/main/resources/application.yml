@@ -2,6 +2,10 @@ server:
   port: 8080
   servlet:
     context-path: ${CONTEXT_PATH:/ausy}
+  # Aplikasi dipublish di belakang reverse proxy (dev-ausy.mncbank.co.id / Safous):
+  # hormati X-Forwarded-* supaya redirect setelah login memakai alamat publik,
+  # bukan alamat internal 10.5.99.24:8080 yang tidak bisa dijangkau browser user.
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
 
 spring:
   application:
