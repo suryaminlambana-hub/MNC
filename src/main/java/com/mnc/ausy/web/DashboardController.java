@@ -121,13 +121,6 @@ public class DashboardController {
         if (cards.contains("audit-recent"))     // ikut tersaring per sisi, bukan semua log
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.visibleGroups(principal == null ? null : principal.getIdGroup()), PageRequest.of(0, 8)));
-        if (cards.contains("volume-tx")) {
-            List<Object[]> daily = tx.dailyCounts();
-            long max = 1;
-            for (Object[] r : daily) max = Math.max(max, ((Number) r[1]).longValue());
-            model.addAttribute("chart", daily);
-            model.addAttribute("chartMax", max);
-        }
         model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
     }

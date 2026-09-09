@@ -22,6 +22,9 @@ public class Menu {
     /** MENU = link sidebar, ACTION = izin URL saja, CARD = card dashboard (url 'card:<key>'). */
     private String kind = "MENU";
 
+    /** Role yang biasa memakai item ini — hanya untuk mengelompokkan halaman Access Menu. */
+    private String section;
+
     @Transient
     private java.util.List<Menu> children = new java.util.ArrayList<>();
 
@@ -37,6 +40,8 @@ public class Menu {
     public void setUrutan(Integer urutan) { this.urutan = urutan; }
     public Integer getParent() { return parent; }
     public void setParent(Integer parent) { this.parent = parent; }
+    public String getSection() { return section; }
+    public void setSection(String section) { this.section = section; }
     public String getKind() { return kind; }
     public void setKind(String kind) { this.kind = kind; }
     /** Key card dashboard tanpa prefix 'card:' — kosong kalau baris ini bukan CARD. */

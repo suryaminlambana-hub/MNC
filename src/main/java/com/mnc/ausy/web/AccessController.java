@@ -35,19 +35,59 @@ public class AccessController {
         if (group != null) {
             Set<Integer> granted = new HashSet<>();
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
-            // parents with children, marking granted
             // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan
             List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc().stream()
                     .filter(m -> m.getActive() != null && m.getActive() == 1).toList();
-            List<Menu> parents = new ArrayList<>();
-            Map<Integer,Menu> byId = new HashMap<>();
-            for (Menu m : all) byId.put(m.getIdMenu(), m);
-            for (Menu m : all) if (m.getParent()==0) { m.setChildren(new ArrayList<>()); parents.add(m); }
-            for (Menu m : all) if (m.getParent()!=0 && byId.containsKey(m.getParent())) byId.get(m.getParent()).getChildren().add(m);
-            model.addAttribute("parents", parents);
+            model.addAttribute("sections", sections(all));
             model.addAttribute("granted", granted);
         }
         return "access/index";
+    }
+
+    /** Satu kelompok centangan di dalam sebuah section, mis. "Data" atau "Card Dashboard". */
+    public record AccessGroup(String title, String kind, List<Menu> items) {}
+    /** Satu bagian per role di halaman Access Menu (BUG_AUSY_00115). */
+    public record AccessSection(String label, List<AccessGroup> groups) {}
+
+    /** Urutan & judul section — item tanpa section masuk "Lainnya" di paling bawah. */
+    private static final LinkedHashMap<String,String> SECTION_LABELS = new LinkedHashMap<>();
+    static {
+        SECTION_LABELS.put("MAKER",     "Maker — Transaksi & Data GL");
+        SECTION_LABELS.put("CHECKER",   "Checker — Otorisasi Operasional");
+        SECTION_LABELS.put("ADMIN",     "Admin — Konfigurasi Sistem");
+        SECTION_LABELS.put("ADMIN_APV", "Admin Approval — Otorisasi Konfigurasi");
+        SECTION_LABELS.put("UMUM",      "Umum — dipakai lebih dari satu role");
+        SECTION_LABELS.put("",          "Lainnya");
+    }
+
+    /**
+     * Susun centangan per role (Maker / Checker / Admin / Admin Approval), lalu di dalamnya
+     * dikelompokkan lagi per parent menu supaya tetap terbaca "Data", "GL", "Card Dashboard".
+     * Section hanya penataan tampilan — admin tetap bebas memberi item apa pun ke group mana pun.
+     */
+    private List<AccessSection> sections(List<Menu> all) {
+        Map<Integer,String> parentName = new HashMap<>();
+        for (Menu m : all) if (m.getParent() != null && m.getParent() == 0) parentName.put(m.getIdMenu(), m.getNamaMenu());
+
+        // section -> judul kelompok -> item
+        Map<String, LinkedHashMap<String, List<Menu>>> bySection = new LinkedHashMap<>();
+        for (String key : SECTION_LABELS.keySet()) bySection.put(key, new LinkedHashMap<>());
+        for (Menu m : all) {
+            if (m.getParent() == null || m.getParent() == 0) continue;      // baris parent, bukan centangan
+            String sec = m.getSection() == null ? "" : m.getSection();
+            if (!bySection.containsKey(sec)) sec = "";
+            String title = parentName.getOrDefault(m.getParent(), "Lainnya");
+            bySection.get(sec).computeIfAbsent(title, k -> new ArrayList<>()).add(m);
+        }
+
+        List<AccessSection> out = new ArrayList<>();
+        for (var e : bySection.entrySet()) {
+            List<AccessGroup> groups = new ArrayList<>();
+            for (var g : e.getValue().entrySet())
+                groups.add(new AccessGroup(g.getKey(), g.getValue().get(0).getKind(), g.getValue()));
+            if (!groups.isEmpty()) out.add(new AccessSection(SECTION_LABELS.get(e.getKey()), groups));
+        }
+        return out;
     }
 
     // Simpan hak akses menu -> config dual control (butuh alasan + approval Admin Approval).
