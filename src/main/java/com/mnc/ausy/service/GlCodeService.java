@@ -53,6 +53,13 @@ public class GlCodeService {
 
     public GlCode find(Long id) { return glCodes.findById(id).orElse(null); }
 
+    /** Master description for a NoGL + D/C, or "" when the code is not registered. */
+    public String descriptionOf(String code, String position) {
+        String p = normPos(position);
+        if (code == null || code.isBlank() || p.isEmpty()) return "";
+        return glCodes.findByCodeAndPosition(code.trim(), p).map(GlCode::getDescription).orElse("");
+    }
+
     public boolean exists(String code, String pos) { return glCodes.existsByCodeAndPosition(code, pos); }
 
     public List<GlCode> listWithUsage() {

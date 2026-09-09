@@ -13,7 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -83,13 +85,17 @@ public class GlChangeService {
     private final AuditService audit;
     private final GlCodeService glCodeService;
     private final GlExportRequestRepository exportRequests;
+    private final SequenceService seq;
     private final ObjectMapper json = new ObjectMapper();
+
+    /** Posting date format the core expects (same as the Excel upload path). */
+    private static final DateTimeFormatter DDMMYY = DateTimeFormatter.ofPattern("ddMMyy");
 
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
                            AuditService audit, GlCodeService glCodeService,
-                           GlExportRequestRepository exportRequests) {
+                           GlExportRequestRepository exportRequests, SequenceService seq) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
-        this.exportRequests = exportRequests;
+        this.exportRequests = exportRequests; this.seq = seq;
     }
 
     // ---- maps & json helpers ----
@@ -762,10 +768,22 @@ public class GlChangeService {
     private void applyAdd(Map<String,String> a, String maker) {
         if (a == null) return;
         GlTabel g = new GlTabel();
-        g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-        g.setGltram(amt(a.get("gltram"))); g.setGltrds(a.get("gltrds"));
+        String code = n(a.get("gltrac")).trim(), dc = n(a.get("gltrcd")).trim();
+        BigDecimal amount = amt(a.get("gltram"));
+        g.setGltrac(code); g.setGltrcd(dc);
+        g.setGltram(amount); g.setGltrds(a.get("gltrds"));
         g.setNoPaket(a.get("noPaket"));
         g.setGltrus(maker.length()>10?maker.substring(0,10):maker);
+        // Baris manual dulu hanya mengisi 5 kolom, sehingga tanggal posting kosong di List GL Aktif
+        // dan baris itu masuk ACCTXT tanpa tanggal / nominal ekuivalen / referensi. Lengkapi di sini,
+        // memakai bentuk yang sama dengan jalur Upload Excel. Tanggal = saat GL benar-benar aktif
+        // (checker approve), karena applyAdd dijalankan pada saat otorisasi.
+        String ddmmyy = LocalDate.now().format(DDMMYY);
+        g.setGltrpd(ddmmyy); g.setGltrpd1(ddmmyy);
+        g.setGleqam(amount); g.setGlotam(amount);
+        g.setGlName(glCodeService.descriptionOf(code, dc));
+        g.setGltrcy("IDR"); g.setGlotcc("IDR");
+        g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung, JANGAN masuk
         // antrian Otorisasi Upload GL (yang difilter status_print='BELUM UPLOAD').
         g.setStatusPrint("SUDAH UPLOAD"); g.setStatusDual("APPROVED");
