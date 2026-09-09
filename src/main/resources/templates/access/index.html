@@ -3,7 +3,9 @@
 <head><title>Access Menu — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Access Menu</h1>
-  <p class="text-muted">Atur menu apa saja yang dapat diakses tiap group. Perubahan <b>butuh alasan</b> &amp; menunggu approval Admin Approval (dual control).</p>
+  <p class="text-muted">Atur hak akses tiap group: <b>menu</b> yang muncul di sidebar, <b>aksi</b> tertentu
+    (mis. Ajukan Export, otorisasi), dan <b>card dashboard</b> yang boleh dilihat. Perubahan <b>butuh alasan</b>
+    &amp; menunggu approval Admin Approval (dual control).</p>
   <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
   <div th:if="${pendingConfig > 0}" class="alert alert-warning py-2"><i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> perubahan config menunggu otorisasi Admin Approval.</div>
 
@@ -30,7 +32,11 @@
     <form method="post" th:action="@{/access/save}">
       <input type="hidden" name="group" th:value="${selectedGroup}">
       <div th:each="p : ${parents}" class="mb-3">
-        <div class="fw-bold text-uppercase text-muted small mb-2" th:text="${p.namaMenu}"></div>
+        <div class="fw-bold text-uppercase text-muted small mb-2">
+          <span th:text="${p.namaMenu}"></span>
+          <span th:if="${p.kind == 'CARD'}" class="badge bg-info-subtle text-info ms-1">dashboard</span>
+          <span th:if="${p.kind == 'ACTION'}" class="badge bg-secondary-subtle text-secondary ms-1">tanpa menu</span>
+        </div>
         <div class="row">
           <div class="col-md-4 mb-1" th:each="c : ${p.children}">
             <div class="form-check">

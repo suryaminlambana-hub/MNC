@@ -2,6 +2,7 @@ package com.mnc.ausy.web;
 
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
@@ -29,12 +30,15 @@ public class DashboardController {
     private final ConfigChangeService configChange;
     private final GlExportService glExport;
     private final FtpAdminService ftpAdmin;
+    private final AccessService access;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
-                               ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin) {
+                               ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin,
+                               AccessService access) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
         this.glChange = glChange; this.configChange = configChange; this.glExport = glExport; this.ftpAdmin = ftpAdmin;
+        this.access = access;
     }
 
     @GetMapping("/")
@@ -99,18 +103,27 @@ public class DashboardController {
             return "dashboard-checker";
         }
 
-        // --- Fallback (any other authenticated role) ---
-        model.addAttribute("totalUsers", users.count());
-        model.addAttribute("totalGroups", groups.count());
-        model.addAttribute("activeGl", gl.countByActive((short) 1));
-        model.addAttribute("pendingPakets", gl.pendingPakets().size());
-        model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
-        model.addAttribute("recent", tx.findAllByOrderByTimeActivityDesc(PageRequest.of(0, 8)));
-        List<Object[]> daily = tx.dailyCounts();
-        long max = 1;
-        for (Object[] r : daily) max = Math.max(max, ((Number) r[1]).longValue());
-        model.addAttribute("chart", daily);
-        model.addAttribute("chartMax", max);
+        // --- Group lain (mis. group baru buatan admin): isinya murni dari Access Menu ---
+        // Tidak ada card yang dicentang = dashboard kosong, bukan menampilkan semuanya
+        // seperti sebelumnya (BUG_AUSY_00112). Query pun hanya dijalankan untuk card yang diberikan.
+        java.util.Set<String> cards = access.cardsFor(principal == null ? null : principal.getIdGroup());
+        if (cards.contains("cfg-stats")) {
+            model.addAttribute("totalUsers", users.count());
+            model.addAttribute("totalGroups", groups.count());
+        }
+        if (cards.contains("gl-active")) model.addAttribute("activeGl", gl.countByActive((short) 1));
+        if (cards.contains("otorisasi-pending")) model.addAttribute("pendingPakets", gl.pendingPakets().size());
+        if (cards.contains("gl-change-pending")) model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
+        if (cards.contains("audit-recent"))
+            model.addAttribute("recent", tx.findAllByOrderByTimeActivityDesc(PageRequest.of(0, 8)));
+        if (cards.contains("volume-tx")) {
+            List<Object[]> daily = tx.dailyCounts();
+            long max = 1;
+            for (Object[] r : daily) max = Math.max(max, ((Number) r[1]).longValue());
+            model.addAttribute("chart", daily);
+            model.addAttribute("chartMax", max);
+        }
+        model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
     }
 

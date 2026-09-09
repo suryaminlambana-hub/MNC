@@ -7,12 +7,12 @@
     <p class="text-muted">Semua permintaan Maker yang menunggu persetujuan Anda.</p>
 
     <div class="dash-grid">
-        <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
+        <div th:if="${cards.contains('otorisasi-pending')}" class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingPakets > 0}">PERLU OTORISASI</span>
             <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
             <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Batch Menunggu Otorisasi</div></div>
         </div>
-        <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
+        <div th:if="${cards.contains('gl-change-pending')}" class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU APPROVE</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
             <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
@@ -20,7 +20,7 @@
     </div>
 
     <!-- Batch menunggu otorisasi -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('otorisasi-pending')}" class="ausy-card">
         <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
             <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-file-circle-check text-muted"></i> Batch Menunggu Otorisasi</h2>
             <a class="btn btn-sm btn-primary" th:href="@{/otorisasi-gl}"><i class="fa-solid fa-check-double"></i> Buka Otorisasi</a>
@@ -51,7 +51,7 @@
     </div>
 
     <!-- Perubahan GL pending dari maker -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('gl-change-pending')}" class="ausy-card">
         <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
             <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-clipboard-check text-muted"></i> Perubahan GL Pending</h2>
             <a class="btn btn-sm btn-primary" th:href="@{/otorisasi-gl}"><i class="fa-solid fa-list-check"></i> Review Perubahan</a>
@@ -84,7 +84,7 @@
     </div>
 
     <!-- Aktivitas transaksi terbaru = Audit Trail (Maker + Checker) -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('audit-recent')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Terakhir (Audit Trail)</h2>
         <table class="table table-sm table-hover align-middle mb-0">

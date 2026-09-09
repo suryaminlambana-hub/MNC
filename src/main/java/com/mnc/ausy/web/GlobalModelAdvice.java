@@ -1,6 +1,7 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.MenuService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -12,8 +13,17 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class GlobalModelAdvice {
 
     private final MenuService menuService;
+    private final AccessService access;
 
-    public GlobalModelAdvice(MenuService menuService) { this.menuService = menuService; }
+    public GlobalModelAdvice(MenuService menuService, AccessService access) {
+        this.menuService = menuService; this.access = access;
+    }
+
+    /** Card dashboard yang boleh dilihat group ini — tiap card di-guard dengan ini (BUG_AUSY_00112). */
+    @ModelAttribute("cards")
+    public java.util.Set<String> cards(@AuthenticationPrincipal AusyUserDetails user) {
+        return user == null ? java.util.Set.of() : access.cardsFor(user.getIdGroup());
+    }
 
     @ModelAttribute("currentUser")
     public AusyUserDetails currentUser(@AuthenticationPrincipal AusyUserDetails user) {

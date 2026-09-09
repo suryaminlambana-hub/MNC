@@ -36,7 +36,9 @@ public class AccessController {
             Set<Integer> granted = new HashSet<>();
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
             // parents with children, marking granted
-            List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc();
+            // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan
+            List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc().stream()
+                    .filter(m -> m.getActive() != null && m.getActive() == 1).toList();
             List<Menu> parents = new ArrayList<>();
             Map<Integer,Menu> byId = new HashMap<>();
             for (Menu m : all) byId.put(m.getIdMenu(), m);

@@ -6,32 +6,39 @@
     <h1 class="ausy-page-title">Dashboard</h1>
     <p class="text-muted">Ringkasan operasional AUSY.</p>
 
+    <div th:if="${noCards}" class="ausy-card" style="padding:28px" >
+        <p class="mb-1"><i class="fa-solid fa-circle-info text-muted"></i>
+            <b>Belum ada ringkasan yang ditampilkan untuk group Anda.</b></p>
+        <p class="text-muted mb-0">Card dashboard diatur Administrator lewat <b>Access Menu</b>.
+            Silakan hubungi Administrator bila Anda membutuhkan ringkasan tertentu di halaman ini.</p>
+    </div>
+
     <div class="dash-grid">
-        <div class="dash-card">
+        <div th:if="${cards.contains('cfg-stats')}" class="dash-card">
             <div class="dash-ico c-accent"><i class="fa-solid fa-users"></i></div>
             <div><div class="dash-num" th:text="${totalUsers}">0</div><div class="dash-label">Total User</div></div>
         </div>
-        <div class="dash-card">
+        <div th:if="${cards.contains('cfg-stats')}" class="dash-card">
             <div class="dash-ico c-info"><i class="fa-solid fa-user-shield"></i></div>
             <div><div class="dash-num" th:text="${totalGroups}">0</div><div class="dash-label">Group</div></div>
         </div>
-        <div class="dash-card">
+        <div th:if="${cards.contains('gl-active')}" class="dash-card">
             <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>
             <div><div class="dash-num" th:text="${activeGl}">0</div><div class="dash-label">Baris GL Aktif</div></div>
         </div>
-        <div class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
+        <div th:if="${cards.contains('otorisasi-pending')}" class="dash-card" th:classappend="${pendingPakets > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingPakets > 0}">PERLU AKSI</span>
             <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
             <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Batch Menunggu Otorisasi</div></div>
         </div>
-        <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
+        <div th:if="${cards.contains('gl-change-pending')}" class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU AKSI</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
             <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
         </div>
     </div>
 
-    <div class="ausy-card" style="padding:18px 20px">
+    <div th:if="${cards.contains('volume-tx')}" class="ausy-card" style="padding:18px 20px">
         <h2 class="h6 mb-3 d-flex align-items-center gap-2"><i class="fa-solid fa-chart-column text-muted"></i> Volume Transaksi (7 hari terakhir)</h2>
         <div class="dash-chart" th:if="${!chart.isEmpty()}">
             <div class="dash-col" th:each="c : ${chart}">
@@ -45,7 +52,7 @@
         <p th:if="${chart.isEmpty()}" class="text-muted mb-0 py-3 text-center">Belum ada transaksi untuk digrafikkan.</p>
     </div>
 
-    <div class="ausy-card">
+    <div th:if="${cards.contains('audit-recent')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Transaksi Terbaru</h2>
         <table class="table table-sm table-hover align-middle mb-0">

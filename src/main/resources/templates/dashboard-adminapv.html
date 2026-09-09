@@ -7,7 +7,7 @@
     <p class="text-muted">Otorisasi perubahan user dari Admin.</p>
 
     <div class="dash-grid">
-        <div class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
+        <div th:if="${cards.contains('cfg-pending')}" class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingUsers > 0}">PERLU OTORISASI</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-user-check"></i></div>
             <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">User Menunggu Otorisasi</div></div>
@@ -15,7 +15,7 @@
     </div>
 
     <!-- User menunggu otorisasi (collapsible + tombol ke halaman otorisasi) — mirror Checker -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('cfg-pending')}" class="ausy-card">
         <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-1">
             <button class="ausy-collapse-hd flex-grow-1 p-0" type="button" data-bs-toggle="collapse" data-bs-target="#pendingUserBox"
                     aria-expanded="true" aria-controls="pendingUserBox" style="border:0;background:none">
@@ -49,7 +49,7 @@
     </div>
 
     <!-- Aktivitas terbaru = Audit Trail, hanya Admin + Admin Approval -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('audit-recent')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Aktivitas Terbaru (Audit Trail)
             <span class="text-muted fw-normal small">— Admin &amp; Admin Approval</span></h2>

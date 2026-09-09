@@ -19,6 +19,9 @@ public class Menu {
     private Integer parent = 0;
     private Short active = 1;
 
+    /** MENU = link sidebar, ACTION = izin URL saja, CARD = card dashboard (url 'card:<key>'). */
+    private String kind = "MENU";
+
     @Transient
     private java.util.List<Menu> children = new java.util.ArrayList<>();
 
@@ -34,6 +37,13 @@ public class Menu {
     public void setUrutan(Integer urutan) { this.urutan = urutan; }
     public Integer getParent() { return parent; }
     public void setParent(Integer parent) { this.parent = parent; }
+    public String getKind() { return kind; }
+    public void setKind(String kind) { this.kind = kind; }
+    /** Key card dashboard tanpa prefix 'card:' — kosong kalau baris ini bukan CARD. */
+    @Transient
+    public String getCardKey() {
+        return url != null && url.startsWith("card:") ? url.substring(5) : "";
+    }
     public Short getActive() { return active; }
     public void setActive(Short active) { this.active = active; }
     public java.util.List<Menu> getChildren() { return children; }

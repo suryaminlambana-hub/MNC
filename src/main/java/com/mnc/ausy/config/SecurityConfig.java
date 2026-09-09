@@ -1,18 +1,49 @@
 package com.mnc.ausy.config;
 
+import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
 @Configuration
 public class SecurityConfig {
 
+    private final AccessService access;
+
+    public SecurityConfig(AccessService access) { this.access = access; }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();   // accepts legacy $2y$ hashes from the PHP app
+    }
+
+    /**
+     * Izin per-request dibaca dari data (Access Menu), bukan dari daftar group id di kode.
+     * Path yang tidak dimiliki item akses mana pun (dashboard, ganti password) tetap terbuka
+     * untuk semua yang sudah login — sama seperti aturan anyRequest().authenticated() dulu.
+     */
+    private AuthorizationManager<RequestAuthorizationContext> menuAccess() {
+        return (auth, ctx) -> {
+            Authentication a = auth.get();
+            if (a == null || !a.isAuthenticated() || a instanceof AnonymousAuthenticationToken)
+                return new AuthorizationDecision(false);
+            HttpServletRequest req = ctx.getRequest();
+            String path = req.getRequestURI();
+            String cp = req.getContextPath();
+            if (cp != null && !cp.isEmpty() && path.startsWith(cp)) path = path.substring(cp.length());
+            Integer group = (a.getPrincipal() instanceof AusyUserDetails u) ? u.getIdGroup() : null;
+            return new AuthorizationDecision(access.allowed(group, path));
+        };
     }
 
     @Bean
@@ -20,21 +51,11 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/webjars/**", "/css/**", "/js/**", "/img/**", "/favicon.ico").permitAll()
-                // --- Segregation of Duties (group authorities: GROUP_1..GROUP_4) ---
-                // (1) CONFIG/SETTING: user, group, menu, access, approval, GL Code (parameter)
-                .requestMatchers("/users/**", "/groups/**", "/menus/**", "/access/**", "/approval/**", "/admin/**").hasAuthority("GROUP_1")
-                // (3) BUSINESS MAKER: upload, GL data operations, & GL Code parameter (dipindah dari admin — BUG_00056)
-                .requestMatchers("/upload/**", "/nala/**", "/gl-data/**", "/gl-delete/**", "/gl-code/**",
-                                 "/gl-legacy/export-request").hasAuthority("GROUP_3")
-                // (2) CONFIG APPROVER (Admin Approval): authorize user/config change requests
-                .requestMatchers("/config-change/**").hasAuthority("GROUP_2")
-                // (4) BUSINESS APPROVER: otorisasi / approve (approve-only)
-                .requestMatchers("/otorisasi/**", "/otorisasi-gl/**", "/gl-change/**", "/gl-export/**").hasAuthority("GROUP_4")
-                // Audit Trail: only the approver roles — Config Approver (2) & Checker (4).
-                // Admin (1) and Maker (3) cannot view it (per role revisions).
-                .requestMatchers("/audit/**").hasAnyAuthority("GROUP_2", "GROUP_4")
-                // shared read (dashboard, list, rekap, report) — any authenticated role
-                .anyRequest().authenticated()
+                // Segregation of Duties tidak lagi di-hardcode per group id: hak akses dibaca dari
+                // group_menu (Access Menu) lewat AccessService, supaya group buatan admin bisa
+                // membuka menu yang diberikan padanya (BUG_AUSY_00113) dan admin yang mengaturnya.
+                // Hak bawaan 4 group lama diseed di V18 sehingga perilakunya tidak berubah.
+                .anyRequest().access(menuAccess())
             )
             .formLogin(form -> form
                 .loginPage("/login")

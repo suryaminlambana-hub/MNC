@@ -6,7 +6,7 @@
     <h1 class="ausy-page-title">Beranda Maker</h1>
     <p class="text-muted">Ringkasan tugas upload &amp; perubahan GL.</p>
 
-    <div th:if="${ftpFailedCount > 0}" class="alert alert-danger py-2">
+    <div th:if="${cards.contains('ftp-failed') and ftpFailedCount > 0}" class="alert alert-danger py-2">
         <b><i class="fa-solid fa-triangle-exclamation"></i> <span th:text="${ftpFailedCount}"></span> export yang sudah di-approve checker gagal terkirim ke FTP.</b>
         Hubungi Admin untuk kirim ulang dari Konfigurasi FTP.
         <ul class="mb-0 mt-1 small">
@@ -17,11 +17,11 @@
     </div>
 
     <div class="dash-grid">
-        <div class="dash-card">
+        <div th:if="${cards.contains('gl-active')}" class="dash-card">
             <div class="dash-ico c-ok"><i class="fa-solid fa-table-list"></i></div>
             <div><div class="dash-num" th:text="${activeGl}">0</div><div class="dash-label">Baris GL Aktif</div></div>
         </div>
-        <div class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
+        <div th:if="${cards.contains('gl-pending')}" class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">MENUNGGU CHECKER</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
             <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Perubahan GL Pending (collapsible list) -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('gl-pending')}" class="ausy-card">
         <button class="ausy-collapse-hd" type="button" data-bs-toggle="collapse" data-bs-target="#pendingChangeBox"
                 aria-expanded="true" aria-controls="pendingChangeBox">
             <span><i class="fa-solid fa-clipboard-check text-muted"></i> Perubahan GL Pending
@@ -60,7 +60,7 @@
     </div>
 
     <!-- List GL Aktif -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('gl-active')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-table-list text-muted"></i> List GL Aktif</h2>
         <div class="px-3 pb-3">
@@ -86,7 +86,7 @@
     </div>
 
     <!-- Riwayat GL: request maker + keputusan checker -->
-    <div class="ausy-card">
+    <div th:if="${cards.contains('gl-history')}" class="ausy-card">
         <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
             <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat GL
             <span class="text-muted fw-normal small">— aktivitas GL Anda &amp; keputusan Checker</span></h2>
