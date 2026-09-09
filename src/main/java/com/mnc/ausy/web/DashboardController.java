@@ -3,6 +3,7 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AccessService;
+import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
@@ -31,14 +32,15 @@ public class DashboardController {
     private final GlExportService glExport;
     private final FtpAdminService ftpAdmin;
     private final AccessService access;
+    private final AuditScopeService auditScope;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
                                ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin,
-                               AccessService access) {
+                               AccessService access, AuditScopeService auditScope) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
         this.glChange = glChange; this.configChange = configChange; this.glExport = glExport; this.ftpAdmin = ftpAdmin;
-        this.access = access;
+        this.access = access; this.auditScope = auditScope;
     }
 
     @GetMapping("/")
@@ -64,7 +66,8 @@ public class DashboardController {
         if (hasGroup(auth, "GROUP_2")) {
             model.addAttribute("pendingUsers", configChange.countPending());
             model.addAttribute("pendingUserList", configChange.pendingList());
-            model.addAttribute("recent", tx.findByUserGroups(List.of(1, 2), PageRequest.of(0, 15)));
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.visibleGroups(principal == null ? null : principal.getIdGroup()), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
 
@@ -99,7 +102,8 @@ public class DashboardController {
             model.addAttribute("pendingPakets", pendingPaketList.size() + pendingExportList.size());
             model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
             model.addAttribute("pendingChangeList", glChange.pendingVisible());
-            model.addAttribute("recent", tx.findByUserGroups(List.of(3, 4), PageRequest.of(0, 10)));
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.visibleGroups(principal.getIdGroup()), PageRequest.of(0, 10)));
             return "dashboard-checker";
         }
 
@@ -114,8 +118,9 @@ public class DashboardController {
         if (cards.contains("gl-active")) model.addAttribute("activeGl", gl.countByActive((short) 1));
         if (cards.contains("otorisasi-pending")) model.addAttribute("pendingPakets", gl.pendingPakets().size());
         if (cards.contains("gl-change-pending")) model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
-        if (cards.contains("audit-recent"))
-            model.addAttribute("recent", tx.findAllByOrderByTimeActivityDesc(PageRequest.of(0, 8)));
+        if (cards.contains("audit-recent"))     // ikut tersaring per sisi, bukan semua log
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.visibleGroups(principal == null ? null : principal.getIdGroup()), PageRequest.of(0, 8)));
         if (cards.contains("volume-tx")) {
             List<Object[]> daily = tx.dailyCounts();
             long max = 1;

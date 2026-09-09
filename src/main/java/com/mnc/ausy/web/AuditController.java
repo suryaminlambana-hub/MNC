@@ -4,10 +4,8 @@ import com.mnc.ausy.domain.TlogActivity;
 import com.mnc.ausy.domain.TlogTransaction;
 import com.mnc.ausy.repo.TlogActivityRepository;
 import com.mnc.ausy.repo.TlogTransactionRepository;
-import com.mnc.ausy.domain.GroupUser;
-import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
-import com.mnc.ausy.service.AccessService;
+import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.PageRequest;
@@ -31,35 +29,25 @@ public class AuditController {
     private final TlogTransactionRepository tx;
     private final TlogActivityRepository act;
     private final ExcelExportService excel;
-    private final GroupUserRepository groups;
-    private final AccessService access;
+    private final AuditScopeService scope;
 
     public AuditController(TlogTransactionRepository tx, TlogActivityRepository act, ExcelExportService excel,
-                           GroupUserRepository groups, AccessService access) {
-        this.tx = tx; this.act = act; this.excel = excel; this.groups = groups; this.access = access;
+                           AuditScopeService scope) {
+        this.tx = tx; this.act = act; this.excel = excel; this.scope = scope;
     }
 
-    /** Group mana saja yang boleh dilihat jejaknya oleh viewer ini; null = semua. */
+    /** Group mana saja yang boleh dilihat jejaknya oleh viewer ini — selalu tersaring per sisi. */
     private List<Integer> scopeFor(AusyUserDetails me) {
-        if (me == null) return null;
-        String side = access.sideOf(me.getIdGroup());
-        if (side == null) return null;                       // memegang dua sisi: lihat semua
-        List<Integer> out = new ArrayList<>();
-        for (GroupUser g : groups.findAll())
-            if (side.equals(access.sideOf(g.getIdGroup()))) out.add(g.getIdGroup());
-        if (!out.contains(me.getIdGroup())) out.add(me.getIdGroup());
-        return out;
+        return me == null ? List.of() : scope.visibleGroups(me.getIdGroup());
     }
-    private boolean scoped(AusyUserDetails me) { return scopeFor(me) != null; }
+    private boolean scoped(AusyUserDetails me) { return true; }   // selalu tersaring per sisi
 
     private List<TlogTransaction> transactions(AusyUserDetails me, Pageable page) {
-        List<Integer> s = scopeFor(me);
-        return s != null ? tx.findByUserGroups(s, page) : tx.findAllByOrderByTimeActivityDesc(page);
+        return tx.findByUserGroups(scopeFor(me), page);
     }
 
     private List<TlogActivity> activities(AusyUserDetails me, Pageable page) {
-        List<Integer> s = scopeFor(me);
-        return s != null ? act.findByUserGroups(s, page) : act.findAllByOrderByTimeActivityDesc(page);
+        return act.findByUserGroups(scopeFor(me), page);
     }
 
     @GetMapping("/audit/export")
@@ -87,9 +75,7 @@ public class AuditController {
         model.addAttribute("transactions", transactions(me, PageRequest.of(0, 100)));
         model.addAttribute("activities", activities(me, PageRequest.of(0, 100)));
         model.addAttribute("scoped", scoped(me));
-        String side = access.sideOf(me == null ? null : me.getIdGroup());
-        model.addAttribute("scopeLabel",
-                "CONFIG".equals(side) ? "Admin & Admin Approval" : "BUSINESS".equals(side) ? "Maker & Checker" : "semua group");
+        model.addAttribute("scopeLabel", scope.label(me == null ? null : me.getIdGroup()));
         return "audit/index";
     }
 }
