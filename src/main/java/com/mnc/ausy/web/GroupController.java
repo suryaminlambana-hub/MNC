@@ -27,28 +27,14 @@ public class GroupController {
         return "groups/list";
     }
 
-    // Add/Edit/Delete Group -> config dual control (butuh alasan + approval Admin Approval).
-    @PostMapping("/add")
-    public String add(@RequestParam String namaGroup, @RequestParam(required=false) String inisial,
-                      @RequestParam(required=false) String level, @RequestParam(required=false) String note,
-                      @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitGroupAdd(namaGroup, inisial, level, me, note));
-        return "redirect:/groups";
-    }
-
+    // Tambah & Hapus role tidak ada dalam requirement — tombol dan endpoint-nya dihapus
+    // (BUG_AUSY_00118). Yang tersisa hanya Ubah, tetap lewat approval Admin Approval.
     @PostMapping("/edit")
     public String edit(@RequestParam Integer idGroup, @RequestParam String namaGroup,
                        @RequestParam(required=false) String inisial, @RequestParam(required=false) String level,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("ok", configChange.submitGroupEdit(idGroup, namaGroup, inisial, level, me, note));
-        return "redirect:/groups";
-    }
-
-    @PostMapping("/delete")
-    public String delete(@RequestParam Integer idGroup, @RequestParam(required=false) String note,
-                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitGroupDelete(idGroup, me, note));
         return "redirect:/groups";
     }
 }

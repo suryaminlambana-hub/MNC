@@ -35,29 +35,14 @@ public class MenuAdminController {
         return "menus/list";
     }
 
-    // Add/Edit/Delete Menu -> config dual control (butuh alasan + approval Admin Approval).
-    @PostMapping("/add")
-    public String add(@RequestParam String namaMenu, @RequestParam(required=false) String url,
-                      @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan,
-                      @RequestParam(required=false) String note,
-                      @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitMenuAdd(namaMenu, url, parent, urutan, me, note));
-        return "redirect:/menus";
-    }
-
+    // Tambah & Hapus menu tidak ada dalam requirement — tombol dan endpoint-nya dihapus
+    // (BUG_AUSY_00119). Yang tersisa hanya Ubah, tetap lewat approval Admin Approval.
     @PostMapping("/edit")
     public String edit(@RequestParam Integer idMenu, @RequestParam String namaMenu, @RequestParam(required=false) String url,
                        @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("ok", configChange.submitMenuEdit(idMenu, namaMenu, url, parent, urutan, me, note));
-        return "redirect:/menus";
-    }
-
-    @PostMapping("/delete")
-    public String delete(@RequestParam Integer idMenu, @RequestParam(required=false) String note,
-                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitMenuDelete(idMenu, me, note));
         return "redirect:/menus";
     }
 }

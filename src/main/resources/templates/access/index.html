@@ -3,7 +3,7 @@
 <head><title>Access Menu — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Access Menu</h1>
-  <p class="text-muted">Atur hak akses tiap group: <b>menu</b> yang muncul di sidebar, <b>aksi</b> tertentu
+  <p class="text-muted">Atur hak akses tiap role: <b>menu</b> yang muncul di sidebar, <b>aksi</b> tertentu
     (mis. Ajukan Export, otorisasi), dan <b>card dashboard</b> yang boleh dilihat. Perubahan <b>butuh alasan</b>
     &amp; menunggu approval Admin Approval (dual control).</p>
   <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
@@ -11,9 +11,9 @@
 
   <div class="ausy-card mb-3" style="padding:18px">
     <form method="get" th:action="@{/access}" class="row g-2 align-items-end">
-      <div class="col-auto"><label class="form-label">Group</label>
+      <div class="col-auto"><label class="form-label">Role</label>
         <select class="form-select" name="group" onchange="this.form.submit()">
-          <option value="">Pilih group…</option>
+          <option value="">Pilih role…</option>
           <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}" th:selected="${selectedGroup != null and selectedGroup == g.idGroup}"></option>
         </select></div>
     </form>

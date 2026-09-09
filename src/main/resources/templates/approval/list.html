@@ -10,7 +10,7 @@
 
   <div class="ausy-card mb-3" style="padding:18px">
     <form method="post" th:action="@{/approval/add}" class="row g-2 align-items-end">
-      <div class="col-auto"><label class="form-label">Group Penyetuju</label>
+      <div class="col-auto"><label class="form-label">Role Penyetuju</label>
         <select class="form-select" name="approverGroup" required>
           <option value="">Pilih…</option><option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
         </select></div>
@@ -27,7 +27,7 @@
 
   <div class="ausy-card">
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>No</th><th>Group Penyetuju</th><th>Berwenang Menyetujui</th><th>Aksi</th></tr></thead>
+      <thead><tr><th>No</th><th>Role Penyetuju</th><th>Berwenang Menyetujui</th><th>Aksi</th></tr></thead>
       <tbody>
       <tr th:each="r,i : ${rules}">
         <td th:text="${i.count}"></td>

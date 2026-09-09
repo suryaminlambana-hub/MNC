@@ -22,11 +22,11 @@ public class ConfigChangeService {
     /** Displayed fields per entity (json key -> label) for the review diff. */
     static final Map<String, LinkedHashMap<String,String>> ENTITY_FIELDS = new LinkedHashMap<>();
     static {
-        ENTITY_FIELDS.put("USER", fields("userId","Username","nama","Nama","email","Email","group","Group","status","Status"));
-        ENTITY_FIELDS.put("GROUP", fields("namaGroup","Nama Group","inisial","Inisial","level","Level"));
+        ENTITY_FIELDS.put("USER", fields("userId","Username","nama","Nama","email","Email","group","Role","status","Status"));
+        ENTITY_FIELDS.put("GROUP", fields("namaGroup","Nama Role","inisial","Inisial","level","Level"));
         ENTITY_FIELDS.put("MENU", fields("namaMenu","Nama Menu","url","URL","parent","Parent","urutan","Urutan"));
-        ENTITY_FIELDS.put("ACCESS", fields("group","Group","aksesMenu","Menu yang Diberi Akses"));
-        ENTITY_FIELDS.put("APPROVAL", fields("approver","Group Penyetuju","target","Berwenang Menyetujui"));
+        ENTITY_FIELDS.put("ACCESS", fields("group","Role","aksesMenu","Menu yang Diberi Akses"));
+        ENTITY_FIELDS.put("APPROVAL", fields("approver","Role Penyetuju","target","Berwenang Menyetujui"));
     }
     private static LinkedHashMap<String,String> fields(String... kv){
         LinkedHashMap<String,String> m=new LinkedHashMap<>();
@@ -34,7 +34,7 @@ public class ConfigChangeService {
         return m;
     }
     private static String entityLabel(String e){
-        return switch (e==null?"":e){ case "GROUP"->"Group User"; case "MENU"->"Menu"; case "ACCESS"->"Access Menu";
+        return switch (e==null?"":e){ case "GROUP"->"Role"; case "MENU"->"Menu"; case "ACCESS"->"Access Menu";
             case "APPROVAL"->"Approval Group"; default->"User"; };
     }
     /** Kept for backward compat (GL/user forms may reference it). */
@@ -200,7 +200,7 @@ public class ConfigChangeService {
     public String submitGroupEdit(Integer idGroup, String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
-        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Role tidak ditemukan.";
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",n(namaGroup)); a.put("inisial",n(inisial)); a.put("level",n(level));
         Map<String,String> b=groupMap(g);
@@ -220,11 +220,11 @@ public class ConfigChangeService {
     public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
-        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Group tidak ditemukan.";
+        GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Role tidak ditemukan.";
         // BUG_AUSY_00111: menghapus group yang masih dipakai membuat user-nya kehilangan seluruh akses
         long dipakai = users.countByIdGroup(idGroup);
         if (dipakai > 0)
-            return "Group '"+g.getNamaGroup()+"' masih dipakai "+dipakai+" user — tidak dapat dihapus."
+            return "Role '"+g.getNamaGroup()+"' masih dipakai "+dipakai+" user — tidak dapat dihapus."
                  + " Pindahkan user tersebut ke group lain lebih dulu.";
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         ConfigChangeRequest c=base("GROUP","DELETE",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g)));
@@ -478,12 +478,12 @@ public class ConfigChangeService {
             case "ADD" -> { if(a==null) return "Data rusak."; GroupUser g=new GroupUser();
                 g.setNamaGroup(a.get("namaGroup")); g.setInisial(a.get("inisial")); g.setLevel(a.get("level")); groups.save(g); }
             case "EDIT" -> { GroupUser g=groups.findById(toInt(c.getTargetId())).orElse(null);
-                if(g==null) return "Group sudah tidak ada."; if(a==null) return "Data rusak.";
+                if(g==null) return "Role sudah tidak ada."; if(a==null) return "Data rusak.";
                 g.setNamaGroup(a.get("namaGroup")); g.setInisial(a.get("inisial")); g.setLevel(a.get("level")); groups.save(g); }
             case "DELETE" -> { Integer id=toInt(c.getTargetId());
                 if(id!=null){
                     long dipakai = users.countByIdGroup(id);      // bisa berubah sejak pengajuan
-                    if (dipakai > 0) return "Tidak dapat diterapkan: group masih dipakai "+dipakai+" user.";
+                    if (dipakai > 0) return "Tidak dapat diterapkan: role masih dipakai "+dipakai+" user.";
                     // Hak akses menu (group_menu) punya foreign key ke group ini, dan aturan
                     // approval_group menyebut id-nya. Keduanya harus dibersihkan dulu; kalau tidak,
                     // DELETE ditolak database (error 500) atau menyisakan aturan approval yatim.

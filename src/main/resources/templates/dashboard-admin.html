@@ -13,7 +13,7 @@
         </div>
         <div th:if="${cards.contains('cfg-stats')}" class="dash-card">
             <div class="dash-ico c-info"><i class="fa-solid fa-user-shield"></i></div>
-            <div><div class="dash-num" th:text="${totalGroups}">0</div><div class="dash-label">Group</div></div>
+            <div><div class="dash-num" th:text="${totalGroups}">0</div><div class="dash-label">Role</div></div>
         </div>
         <div th:if="${cards.contains('cfg-pending')}" class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingUsers > 0}">MENUNGGU APPROVAL</span>

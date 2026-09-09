@@ -16,7 +16,7 @@
 
     <div class="ausy-card">
         <table class="table table-hover align-middle mb-0 dt">
-            <thead><tr><th>No</th><th>Username</th><th>Nama</th><th>Group</th><th>Email</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>No</th><th>Username</th><th>Nama</th><th>Role</th><th>Email</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody>
             <tr th:each="u, i : ${users}">
                 <td th:text="${i.count}">1</td>
@@ -54,7 +54,7 @@
                 <div class="mb-2"><label class="form-label">Password <span class="text-danger">*</span></label><input class="form-control" type="password" name="password" required></div>
                 <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama"></div>
                 <div class="mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email"></div>
-                <div class="mb-2"><label class="form-label">Group</label>
+                <div class="mb-2"><label class="form-label">Role</label>
                     <select class="form-select" name="idGroup" required>
                         <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
                     </select></div>
@@ -73,7 +73,7 @@
                 <input type="hidden" name="userId" id="e_uid">
                 <div class="mb-2"><label class="form-label">Nama</label><input class="form-control" name="nama" id="e_nama"></div>
                 <div class="mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email" id="e_email"></div>
-                <div class="mb-2"><label class="form-label">Group</label>
+                <div class="mb-2"><label class="form-label">Role</label>
                     <select class="form-select" name="idGroup" id="e_group">
                         <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}"></option>
                     </select></div>
