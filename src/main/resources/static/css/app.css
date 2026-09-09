@@ -2,54 +2,54 @@
    AUSY — product UI: light/dark, glass chrome, slate-blue accent.
    ============================================================ */
 :root{
-  --accent:oklch(0.72 0.13 85); --accent-hover:oklch(0.66 0.135 82);   /* MNC gold */
-  --accent-soft:oklch(0.95 0.045 88); --accent-line:oklch(0.85 0.07 86);
-  --on-accent:oklch(0.24 0.03 80);                                     /* near-black text on gold */
+  --accent:#ca9d33; --accent-hover:#bb8805;   /* MNC gold */
+  --accent-soft:#fbedcd; --accent-line:#e2cb99;
+  --on-accent:#271e0e;                                     /* near-black text on gold */
   /* chrome (sidebar/topbar) — LIGHT here, dark values under [data-theme=dark] */
-  --chrome:oklch(0.985 0.003 256); --chrome-line:oklch(0.90 0.008 256); --chrome-hover:oklch(0.955 0.008 256);
-  --chrome-ink:oklch(0.30 0.02 262); --chrome-soft:oklch(0.50 0.016 262); --chrome-faint:oklch(0.62 0.012 262);
-  --gold:oklch(0.60 0.14 82);
+  --chrome:#f9fafc; --chrome-line:#dbdee3; --chrome-hover:#edf0f6;
+  --chrome-ink:#282e38; --chrome-soft:#5e636d; --chrome-faint:#82868e;
+  --gold:#a97500;
 
-  --page-1:oklch(0.97 0.012 256); --page-2:oklch(0.95 0.02 250);
-  --glass:oklch(0.99 0.004 256/0.72);          /* frosted chrome */
-  --surface:oklch(0.995 0.0015 255);           /* solid cards */
-  --ink:oklch(0.30 0.02 262); --ink-soft:oklch(0.50 0.016 262); --ink-faint:oklch(0.62 0.012 262);
-  --border:oklch(0.90 0.008 256); --line:oklch(0.93 0.006 256);
-  --hover:oklch(0.955 0.008 256); --thead:oklch(0.965 0.006 256); --row-hover:oklch(0.975 0.006 256);
-  --btn2:oklch(0.92 0.006 256); --btn2-h:oklch(0.88 0.008 256);
+  --page-1:#f0f6fd; --page-2:#e5f0fc;
+  --glass:rgba(250,252,254,0.72);          /* frosted chrome */
+  --surface:#fdfdfe;           /* solid cards */
+  --ink:#282e38; --ink-soft:#5e636d; --ink-faint:#82868e;
+  --border:#dbdee3; --line:#e5e8ec;
+  --hover:#edf0f6; --thead:#f1f4f8; --row-hover:#f4f7fb;
+  --btn2:#e2e5e9; --btn2-h:#d4d8dd;
 
-  --ok-bg:oklch(0.95 0.045 150); --ok-fg:oklch(0.46 0.11 150);
-  --wn-bg:oklch(0.96 0.06 82);   --wn-fg:oklch(0.48 0.10 70);
-  --dn-bg:oklch(0.955 0.045 25); --dn-fg:oklch(0.52 0.15 25);
-  --in-bg:oklch(0.95 0.04 248);  --in-fg:oklch(0.50 0.11 252);
+  --ok-bg:#daf8df; --ok-fg:#1d6835;
+  --wn-bg:#ffefc5;   --wn-fg:#81520a;
+  --dn-bg:#ffe5e1; --dn-fg:#af3c3a;
+  --in-bg:#daf2ff;  --in-fg:#2e65a0;
 
   --radius:14px; --radius-md:11px; --radius-sm:9px; --pill:999px;
-  --shadow-sm:0 1px 2px oklch(0.4 0.02 262/.06);
-  --shadow:0 1px 3px oklch(0.4 0.02 262/.07), 0 12px 30px oklch(0.4 0.02 262/.08);
+  --shadow-sm:0 1px 2px rgba(66,72,83,0.06);
+  --shadow:0 1px 3px rgba(66,72,83,0.07), 0 12px 30px rgba(66,72,83,0.08);
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
 }
 [data-theme=dark]{
-  --accent:oklch(0.80 0.13 86); --accent-hover:oklch(0.85 0.12 88);    /* MNC gold (dark) */
-  --accent-soft:oklch(0.42 0.07 84/0.5); --accent-line:oklch(0.52 0.08 84);
-  --on-accent:oklch(0.20 0.03 80);
+  --accent:#e3b750; --accent-hover:#eec96c;    /* MNC gold (dark) */
+  --accent-soft:rgba(95,73,26,0.5); --accent-line:#7f652e;
+  --on-accent:#1d1406;
   /* dark chrome */
-  --chrome:oklch(0.20 0.012 90); --chrome-line:oklch(0.31 0.012 90); --chrome-hover:oklch(0.27 0.015 88);
-  --chrome-ink:oklch(0.96 0.02 90); --chrome-soft:oklch(0.82 0.025 90); --chrome-faint:oklch(0.66 0.03 88);
-  --gold:oklch(0.80 0.13 86);
+  --chrome:#181610; --chrome-line:#33302a; --chrome-hover:#29261e;
+  --chrome-ink:#f7f2e3; --chrome-soft:#cac4b2; --chrome-faint:#9a927e;
+  --gold:#e3b750;
 
-  --page-1:oklch(0.20 0.022 264); --page-2:oklch(0.17 0.025 268);
-  --glass:oklch(0.25 0.022 264/0.62);
-  --surface:oklch(0.255 0.02 264);
-  --ink:oklch(0.94 0.01 264); --ink-soft:oklch(0.76 0.012 264); --ink-faint:oklch(0.62 0.012 264);
-  --border:oklch(0.36 0.018 264); --line:oklch(0.32 0.016 264);
-  --hover:oklch(0.31 0.02 264); --thead:oklch(0.29 0.018 264); --row-hover:oklch(0.30 0.02 264);
-  --btn2:oklch(0.34 0.018 264); --btn2-h:oklch(0.40 0.02 264);
+  --page-1:#111620; --page-2:#0b0f1a;
+  --glass:rgba(28,34,44,0.62);
+  --surface:#1e232d;
+  --ink:#e8ebf2; --ink-soft:#adb1b9; --ink-faint:#82868e;
+  --border:#383d47; --line:#2f333b;
+  --hover:#2b303b; --thead:#272b35; --row-hover:#292e38;
+  --btn2:#333842; --btn2-h:#424853;
 
-  --ok-bg:oklch(0.34 0.06 150); --ok-fg:oklch(0.85 0.11 150);
-  --wn-bg:oklch(0.36 0.06 80);  --wn-fg:oklch(0.87 0.11 85);
-  --dn-bg:oklch(0.36 0.07 25);  --dn-fg:oklch(0.86 0.10 25);
-  --in-bg:oklch(0.34 0.05 250); --in-fg:oklch(0.85 0.10 252);
-  --shadow:0 1px 3px oklch(0 0 0/.3), 0 14px 34px oklch(0 0 0/.34);
+  --ok-bg:#1f4127; --ok-fg:#98e2a8;
+  --wn-bg:#4e3914;  --wn-fg:#f5cf7d;
+  --dn-bg:#5d2d2a;  --dn-fg:#ffb8b0;
+  --in-bg:#233a51; --in-fg:#9ed2ff;
+  --shadow:0 1px 3px rgba(0,0,0,0.3), 0 14px 34px rgba(0,0,0,0.34);
 }
 
 *{box-sizing:border-box}
@@ -136,7 +136,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
 .btn-secondary:hover{background:var(--btn2-h);color:var(--ink)}
 .btn-outline-secondary{border-color:var(--border);color:var(--ink-soft);background:transparent}
 .btn-outline-secondary:hover{background:var(--hover);color:var(--ink);border-color:var(--border)}
-.btn-outline-danger{border-color:oklch(0.78 0.08 25);color:var(--dn-fg);background:transparent}
+.btn-outline-danger{border-color:#e6a49e;color:var(--dn-fg);background:transparent}
 .btn-outline-danger:hover{background:var(--dn-bg);color:var(--dn-fg)}
 
 /* ---------- Forms ---------- */
@@ -245,7 +245,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
   .ausy-sidebar{position:fixed;left:0;top:0;margin-left:-259px;z-index:60}
   .ausy-shell.nav-collapsed .ausy-sidebar{margin-left:-259px}
   .ausy-shell.nav-open .ausy-sidebar{margin-left:0}
-  .ausy-shell.nav-open .ausy-overlay{display:block;position:fixed;inset:0;z-index:55;background:oklch(0.2 0.02 262/.5)}
+  .ausy-shell.nav-open .ausy-overlay{display:block;position:fixed;inset:0;z-index:55;background:rgba(17,22,31,0.5)}
   .ausy-content,.ausy-main > main{padding:18px 16px}
   .ausy-topbar{padding:0 14px}
   .ausy-user-name{display:none}
@@ -259,15 +259,15 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
   transition:transform .18s cubic-bezier(.22,1,.36,1),box-shadow .18s}
 .dash-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
 .dash-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-size:17px;color:var(--on-accent);box-shadow:inset 0 1px 0 oklch(1 0 0/.25)}
+  font-size:17px;color:var(--on-accent);box-shadow:inset 0 1px 0 rgba(255,255,255,0.25)}
 .dash-num{font-size:30px;font-weight:700;line-height:1;letter-spacing:-.025em;color:var(--ink)}
 .dash-label{font-size:12px;font-weight:600;color:var(--ink-soft);margin-top:6px}
 /* per-metric icon shades */
 .dash-ico.c-accent{background:linear-gradient(145deg,var(--accent),var(--accent-hover))}
-.dash-ico.c-info{background:linear-gradient(145deg,oklch(0.62 0.12 252),oklch(0.54 0.13 252))}
-.dash-ico.c-ok{background:linear-gradient(145deg,oklch(0.66 0.13 152),oklch(0.56 0.13 150))}
-.dash-ico.c-warn{background:linear-gradient(145deg,oklch(0.74 0.13 78),oklch(0.66 0.13 66))}
-.dash-ico.c-purple{background:linear-gradient(145deg,oklch(0.62 0.14 300),oklch(0.54 0.15 300))}
+.dash-ico.c-info{background:linear-gradient(145deg,#4c89cc,#2c71b7)}
+.dash-ico.c-ok{background:linear-gradient(145deg,#4aa969,#2d8949)}
+.dash-ico.c-warn{background:linear-gradient(145deg,#d7a03d,#c7802b)}
+.dash-ico.c-purple{background:linear-gradient(145deg,#9470cd,#7d56b8)}
 /* actionable cards light up when there is something to act on */
 .dash-card.attn{background:linear-gradient(160deg,var(--wn-bg),var(--surface) 70%);border-color:var(--accent-line)}
 .dash-card .dash-pill{position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:700;letter-spacing:.03em;
