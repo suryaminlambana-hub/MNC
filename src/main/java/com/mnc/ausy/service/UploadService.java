@@ -99,7 +99,7 @@ public class UploadService {
                 g.setGltrds(desc);
                 g.setGltrbr(cell(row, 7));
                 g.setBrName(cell(row, 8));
-                g.setGltrcc(cell(row, 9));
+                g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));   // sama seperti source asli
                 g.setGltrcy(cell(row, 11));
                 g.setGltram(amt);
                 g.setGlflag(cell(row, 14));
