@@ -31,13 +31,25 @@ public final class GltrrfFormatter {
     private static String fit(String v, int n) { String x = s(v); if (x.length() > n) x = x.substring(0, n); return padR(x, n); }
 
     static String gltrbr(String v){ return padL0(s(v),5); }
-    static String gltrac(String v){ return padL0(s(v),11); }
+    /** 16 karakter — sesuai file ACCTXT acuan dari core (dulu 11, bikin seluruh baris meleset). */
+    static String gltrac(String v){ return padL0(s(v),16); }
     static String gltrcc(String v){ return padL0(s(v),5); }
     static String glresp(String v){ return padL0(s(v),5); }
     static String gltrfy(String v){ String k=s(v).replace(" ","").replace("NULL",""); return (k.equals("IDR")||k.isEmpty())?"     ":fit(" "+k+" ",5); }
-    static String gltram(BigDecimal v){ String n = v==null?"0":v.toBigInteger().toString(); return padL0(n,17); }
-    static String gltrds(String v){ String x=s(v); if(x.length()>40)x=x.substring(0,40); return padR(x,40); }
-    static String gltrrf(String v){ return padR(s(v),20); }
+    /**
+     * Nominal ditulis tanpa titik desimal — 28.045.688,00 menjadi 2804568800 (2 desimal implisit),
+     * sama seperti PHP yang membuang karakter titik dari nilai kolom NUMERIC(17,2). Versi Java
+     * sebelumnya memakai toBigInteger() sehingga desimalnya hilang dan nominal yang dikirim ke core
+     * 100 kali lebih kecil (BUG_AUSY_00121).
+     */
+    static String gltram(BigDecimal v){
+        java.math.BigDecimal x = v == null ? java.math.BigDecimal.ZERO : v;
+        return padL0(x.setScale(2, java.math.RoundingMode.HALF_UP).unscaledValue().toString(), 17);
+    }
+    /** 49 karakter di file acuan (dulu 40). */
+    static String gltrds(String v){ String x=s(v); if(x.length()>49)x=x.substring(0,49); return padR(x,49); }
+    /** Kolom referensi 10 karakter, letaknya SEBELUM deskripsi (dulu 20 karakter sesudahnya). */
+    static String gltrrf(String v){ return fit(v,10); }
     static String gltrus(String v){ String x=s(v); if(x.length()>10)x=x.substring(0,10); return padR(x,10); }
     static String glflag(String v){ String x=s(v); return x.isEmpty()?" ":fit(x,1); }
     static String glrate(){ return "0000000000000"; }
@@ -51,12 +63,38 @@ public final class GltrrfFormatter {
     static String glsrc (String v){ return fit(v,1); }   // source p / m
     static String glotcc(String v){ return fit(v,3); }   // offset currency
 
-    /** One fixed-width line for a GL row, matching the PHP otorisasi assembly. */
+    /** Pengisi 3 karakter antara cost centre dan mata uang; di file acuan selalu "000". */
+    static String filler3(){ return "000"; }
+
+    /**
+     * Satu baris ACCTXT 253 karakter, mengikuti file acuan dari core (BUG_AUSY_00121):
+     *
+     * <pre>
+     *   1-5   gltrbr   cabang                71      spasi pemisah
+     *   6-21  gltrac   nomor GL (16)         73-121  gltrds  deskripsi (49)
+     *  22-26  gltrcc   cost centre          122-131  gltrus  operator
+     *  27-29  "000"    pengisi              132      glflag
+     *  30-32  gltrcy   mata uang            133-137  glresp
+     *  33-37  gltrfy   kurs asing           138-154  gleqam
+     *  38     gltrcd   D / C                155-167  glrate  (konstan)
+     *  39-44  gltrpd   tgl posting ddMMyy   168      glsrc
+     *  45-61  gltram   nominal              169-171  glotcc
+     *  62-71  gltrrf   referensi (10)       172      spasi
+     *                                       173-189  glotam
+     *                                       190-194  glprdc
+     *                                       195-253  sisaTxt (19 nol + 40 spasi)
+     * </pre>
+     *
+     * Bedanya dengan versi lama (245 karakter, warisan PHP): nomor GL 16 bukan 11, ada pengisi
+     * "000" sebelum mata uang, dan kolom referensi 10 karakter pindah ke depan deskripsi
+     * (deskripsi ikut melebar jadi 49) — dulu referensi ditulis 20 karakter setelah deskripsi.
+     */
     public static String line(GlTabel r) {
         StringBuilder b = new StringBuilder();
-        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc())).append(gltrcy(r.getGltrcy()));
-        b.append(gltrfy(r.getGltrfy())).append(gltrcd(r.getGltrcd())).append(gltrpd(r.getGltrpd())).append(gltram(r.getGltram())).append(gltrds(r.getGltrds()));
-        b.append(gltrrf(r.getGltrrf())).append(gltrus(r.getGltrus())).append(glflag(r.getGlflag())).append(glresp(r.getGlresp())).append(gltram(r.getGleqam()));
+        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc())).append(filler3());
+        b.append(gltrcy(r.getGltrcy())).append(gltrfy(r.getGltrfy())).append(gltrcd(r.getGltrcd())).append(gltrpd(r.getGltrpd()));
+        b.append(gltram(r.getGltram())).append(gltrrf(r.getGltrrf())).append(' ').append(gltrds(r.getGltrds()));
+        b.append(gltrus(r.getGltrus())).append(glflag(r.getGlflag())).append(glresp(r.getGlresp())).append(gltram(r.getGleqam()));
         b.append(glrate()).append(glsrc(r.getGlsrc())).append(glotcc(r.getGlotcc())).append(' ').append(gltram(r.getGlotam())).append(glprdc(r.getGlprdc()));
         b.append(sisaTxt());
         return b.toString();
