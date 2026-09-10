@@ -31,8 +31,13 @@ public final class GltrrfFormatter {
     private static String fit(String v, int n) { String x = s(v); if (x.length() > n) x = x.substring(0, n); return padR(x, n); }
 
     static String gltrbr(String v){ return padL0(s(v),5); }
-    /** 16 karakter — sesuai file ACCTXT acuan dari core (dulu 11, bikin seluruh baris meleset). */
-    static String gltrac(String v){ return padL0(s(v),16); }
+    /**
+     * 19 karakter. Source asli menulis {@code "00000000000" + nilai} — 11 nol DI DEPAN nilai,
+     * bukan dipadding sampai 11 seperti port lama; dengan nomor akun 8 digit hasilnya 19 karakter
+     * dan itulah yang ada di file ACCTXT acuan. Di sini dipadding tetap 19 supaya panjang record
+     * tidak berubah kalau nomor akunnya lebih pendek (BUG_AUSY_00121).
+     */
+    static String gltrac(String v){ return padL0(s(v),19); }
     static String gltrcc(String v){ return padL0(s(v),5); }
     static String glresp(String v){ return padL0(s(v),5); }
     static String gltrfy(String v){ String k=s(v).replace(" ","").replace("NULL",""); return (k.equals("IDR")||k.isEmpty())?"     ":fit(" "+k+" ",5); }
@@ -46,10 +51,9 @@ public final class GltrrfFormatter {
         java.math.BigDecimal x = v == null ? java.math.BigDecimal.ZERO : v;
         return padL0(x.setScale(2, java.math.RoundingMode.HALF_UP).unscaledValue().toString(), 17);
     }
-    /** 49 karakter di file acuan (dulu 40). */
-    static String gltrds(String v){ String x=s(v); if(x.length()>49)x=x.substring(0,49); return padR(x,49); }
-    /** Kolom referensi 10 karakter, letaknya SEBELUM deskripsi (dulu 20 karakter sesudahnya). */
-    static String gltrrf(String v){ return fit(v,10); }
+    static String gltrds(String v){ String x=s(v); if(x.length()>40)x=x.substring(0,40); return padR(x,40); }
+    /** 20 karakter, tepat setelah deskripsi — sama seperti source asli. */
+    static String gltrrf(String v){ return padR(fit(v,20),20); }
     static String gltrus(String v){ String x=s(v); if(x.length()>10)x=x.substring(0,10); return padR(x,10); }
     static String glflag(String v){ String x=s(v); return x.isEmpty()?" ":fit(x,1); }
     static String glrate(){ return "0000000000000"; }
@@ -63,37 +67,33 @@ public final class GltrrfFormatter {
     static String glsrc (String v){ return fit(v,1); }   // source p / m
     static String glotcc(String v){ return fit(v,3); }   // offset currency
 
-    /** Pengisi 3 karakter antara cost centre dan mata uang; di file acuan selalu "000". */
-    static String filler3(){ return "000"; }
-
     /**
-     * Satu baris ACCTXT 253 karakter, mengikuti file acuan dari core (BUG_AUSY_00121):
+     * Satu baris ACCTXT 253 karakter, dicocokkan dengan source asli MNC + file acuan dari core
+     * (BUG_AUSY_00121):
      *
      * <pre>
-     *   1-5   gltrbr   cabang                71      spasi pemisah
-     *   6-21  gltrac   nomor GL (16)         73-121  gltrds  deskripsi (49)
-     *  22-26  gltrcc   cost centre          122-131  gltrus  operator
-     *  27-29  "000"    pengisi              132      glflag
-     *  30-32  gltrcy   mata uang            133-137  glresp
-     *  33-37  gltrfy   kurs asing           138-154  gleqam
-     *  38     gltrcd   D / C                155-167  glrate  (konstan)
-     *  39-44  gltrpd   tgl posting ddMMyy   168      glsrc
-     *  45-61  gltram   nominal              169-171  glotcc
-     *  62-71  gltrrf   referensi (10)       172      spasi
-     *                                       173-189  glotam
-     *                                       190-194  glprdc
-     *                                       195-253  sisaTxt (19 nol + 40 spasi)
+     *   1-5    gltrbr  cabang               122-131  gltrus  operator
+     *   6-24   gltrac  nomor akun (19)      132      glflag
+     *  25-29   gltrcc  cost centre          133-137  glresp
+     *  30-32   gltrcy  mata uang            138-154  gleqam
+     *  33-37   gltrfy  kurs asing           155-167  glrate (konstan)
+     *  38      gltrcd  D / C                168      glsrc
+     *  39-44   gltrpd  tgl posting ddMMyy   169-171  glotcc
+     *  45-61   gltram  nominal (2 desimal   172      spasi
+     *                  implisit)            173-189  glotam
+     *  62-101  gltrds  deskripsi (40)       190-194  glprdc
+     * 102-121  gltrrf  referensi (20)       195-253  sisaTxt (19 nol + 40 spasi)
      * </pre>
      *
-     * Bedanya dengan versi lama (245 karakter, warisan PHP): nomor GL 16 bukan 11, ada pengisi
-     * "000" sebelum mata uang, dan kolom referensi 10 karakter pindah ke depan deskripsi
-     * (deskripsi ikut melebar jadi 49) — dulu referensi ditulis 20 karakter setelah deskripsi.
+     * Yang salah di port lama: nomor akun dipadding 11 (harusnya 11 nol + nilai = 19) sehingga
+     * seluruh baris kurang 8 karakter, dan nominal dipotong desimalnya sehingga nilainya 100 kali
+     * lebih kecil. Susunan kolomnya sendiri sudah benar sejak awal.
      */
     public static String line(GlTabel r) {
         StringBuilder b = new StringBuilder();
-        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc())).append(filler3());
+        b.append(gltrbr(r.getGltrbr())).append(gltrac(r.getGltrac())).append(gltrcc(r.getGltrcc()));
         b.append(gltrcy(r.getGltrcy())).append(gltrfy(r.getGltrfy())).append(gltrcd(r.getGltrcd())).append(gltrpd(r.getGltrpd()));
-        b.append(gltram(r.getGltram())).append(gltrrf(r.getGltrrf())).append(' ').append(gltrds(r.getGltrds()));
+        b.append(gltram(r.getGltram())).append(gltrds(r.getGltrds())).append(gltrrf(r.getGltrrf()));
         b.append(gltrus(r.getGltrus())).append(glflag(r.getGlflag())).append(glresp(r.getGlresp())).append(gltram(r.getGleqam()));
         b.append(glrate()).append(glsrc(r.getGlsrc())).append(glotcc(r.getGlotcc())).append(' ').append(gltram(r.getGlotam())).append(glprdc(r.getGlprdc()));
         b.append(sisaTxt());

@@ -95,7 +95,7 @@ public class UploadService {
                 g.setGltrac(cell(row, 4));
                 g.setGltrpd(ddmmyy);
                 g.setGlName(cell(row, 5));
-                String desc = cell(row, 6); if (desc.length() > 49) desc = desc.substring(0, 49);   // lebar kolom ACCTXT
+                String desc = cell(row, 6); if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
                 g.setGltrds(desc);
                 g.setGltrbr(cell(row, 7));
                 g.setBrName(cell(row, 8));
