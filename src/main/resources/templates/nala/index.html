@@ -6,6 +6,11 @@
   <p class="text-muted">Upload chunked + checksum + <b>resume</b>. Bisa dijeda / diputus, lalu dilanjut kapan saja (bahkan login berikutnya) tanpa mengulang dari awal.</p>
 
   <div class="ausy-card" style="padding:22px;max-width:680px">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <b><i class="fa-solid fa-file-excel"></i> File Excel</b>
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/nala/template}">
+        <i class="fa-solid fa-download"></i> Download Template</a>
+    </div>
     <div class="mb-3"><input class="form-control" type="file" id="file" accept=".xlsx,.xls"></div>
     <div class="d-flex gap-2">
       <button class="btn btn-primary" id="go"><i class="fa-solid fa-cloud-arrow-up"></i> <span id="goLabel">Mulai Upload</span></button>

@@ -11,8 +11,16 @@ import java.util.Map;
 
 @Controller
 public class NalaController {
+    private final com.mnc.ausy.service.UploadTemplateService templates;
     private final NalaUploadService nala;
-    public NalaController(NalaUploadService nala) { this.nala = nala; }
+    public NalaController(NalaUploadService nala, com.mnc.ausy.service.UploadTemplateService templates) {
+        this.templates = templates; this.nala = nala; }
+
+    /** Template Excel yang sama dengan halaman Upload Excel (BUG_AUSY_00122). */
+    @GetMapping("/nala/template")
+    public void template(jakarta.servlet.http.HttpServletResponse resp) throws Exception {
+        templates.download(resp);
+    }
 
     @GetMapping("/nala")
     public String page() { return "nala/index"; }
