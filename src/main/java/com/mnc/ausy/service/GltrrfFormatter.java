@@ -51,6 +51,12 @@ public final class GltrrfFormatter {
         java.math.BigDecimal x = v == null ? java.math.BigDecimal.ZERO : v;
         return padL0(x.setScale(2, java.math.RoundingMode.HALF_UP).unscaledValue().toString(), 17);
     }
+    /**
+     * 40 karakter. Kolom gl_tabel.gltrds sempat dilebarkan jadi 49 oleh migrasi V23 sewaktu lebar
+     * kolom ini belum pasti; setelah source asli MNC diterima ternyata tetap 40. Kolomnya dibiarkan
+     * 49 (tidak ada migrasi penyempitan yang berisiko), tapi form & upload membatasi 40 supaya
+     * tidak ada teks yang diam-diam terpotong saat export.
+     */
     static String gltrds(String v){ String x=s(v); if(x.length()>40)x=x.substring(0,40); return padR(x,40); }
     /** 20 karakter, tepat setelah deskripsi — sama seperti source asli. */
     static String gltrrf(String v){ return padR(fit(v,20),20); }
