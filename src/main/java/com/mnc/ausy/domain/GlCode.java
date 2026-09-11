@@ -18,6 +18,13 @@ public class GlCode {
     @Column(name = "modified_date") private LocalDateTime modifiedDate;
 
     @Transient private boolean used;
+    @Transient private long usageCount;        // berapa baris GL memakai kode ini
+    @Transient private long usagePending;      // di antaranya, yang masih menunggu otorisasi
+
+    public long getUsageCount() { return usageCount; }
+    public void setUsageCount(long v) { this.usageCount = v; }
+    public long getUsagePending() { return usagePending; }
+    public void setUsagePending(long v) { this.usagePending = v; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

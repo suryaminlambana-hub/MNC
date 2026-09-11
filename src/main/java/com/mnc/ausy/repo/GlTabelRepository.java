@@ -8,11 +8,19 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
-    boolean existsByGltrac(String gltrac);
+    /**
+     * Berapa baris GL yang memakai kode ini pada sisi D/C tersebut — baris yang sudah dihapus
+     * (active=0) TIDAK dihitung, karena datanya sudah tidak ada di sistem dan dulu membuat kode
+     * baru ikut tertulis "Terpakai" padahal tidak ada datanya (BUG_AUSY_00123).
+     * 100-D terpakai tidak berarti 100-C ikut terpakai (BUG_AUSY_00100).
+     */
+    @Query("select count(g) from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos and g.active = 1")
+    long countUsage(@Param("code") String code, @Param("pos") String pos);
 
-    /** Is this GL code used on that side (D/C)? 100-D being used says nothing about 100-C. */
-    @Query("select count(g) > 0 from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos")
-    boolean existsByGltracAndPosition(@Param("code") String code, @Param("pos") String pos);
+    /** Dari pemakaian itu, berapa yang batch-nya masih menunggu otorisasi upload. */
+    @Query("select count(g) from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos"
+         + " and g.active = 1 and g.statusDual = 'PENDING'")
+    long countUsagePending(@Param("code") String code, @Param("pos") String pos);
 
     // Hanya cast baris yang no_paket-nya angka murni; hindari error "invalid input syntax
     // for type integer" saat ada no_paket kosong/non-numerik (BUG_00069).

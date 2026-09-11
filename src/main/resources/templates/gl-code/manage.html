@@ -47,7 +47,11 @@
       <tbody>
       <tr th:each="g,i : ${rows}">
         <td th:text="${i.count}"></td>
-        <td><code th:text="${g.code}"></code> <span th:if="${g.used}" class="badge bg-warning-subtle text-warning"><i class="fa-solid fa-lock"></i> Terpakai</span></td>
+        <td><code th:text="${g.code}"></code> <span th:if="${g.used}" class="badge bg-warning-subtle text-warning"
+              th:title="'Dipakai ' + ${g.usageCount} + ' baris GL'
+                        + (${g.usagePending} > 0 ? ' (' + ${g.usagePending} + ' masih menunggu otorisasi upload)' : '')">
+          <i class="fa-solid fa-lock"></i> Terpakai
+          <span th:text="${g.usageCount}">0</span></span></td>
         <td><span th:class="${g.position=='C'}?'badge bg-warning-subtle text-warning':'badge bg-info-subtle text-info'" th:text="${g.position=='C'?'Credit':'Debit'}"></span></td>
         <td th:text="${g.description}"></td>
         <td><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>

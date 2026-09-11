@@ -45,9 +45,21 @@ public class GlCodeService {
      * if 100-D appears in a transaction, 100-C is still free to edit or delete.
      */
     public boolean used(String code, String position) {
+        return usageCount(code, position) > 0;
+    }
+
+    /** Berapa baris GL yang memakai kode ini (baris terhapus tidak dihitung — BUG_AUSY_00123). */
+    public long usageCount(String code, String position) {
         String p = normPos(position);
-        if (code == null || p.isEmpty()) return false;
-        return glTabel.existsByGltracAndPosition(code, p);
+        if (code == null || code.isBlank() || p.isEmpty()) return 0;
+        return glTabel.countUsage(code.trim(), p);
+    }
+
+    /** Dari pemakaian itu, berapa yang batch-nya masih menunggu otorisasi upload. */
+    public long usagePending(String code, String position) {
+        String p = normPos(position);
+        if (code == null || code.isBlank() || p.isEmpty()) return 0;
+        return glTabel.countUsagePending(code.trim(), p);
     }
     public boolean used(GlCode g) { return g != null && used(g.getCode(), g.getPosition()); }
 
@@ -64,7 +76,12 @@ public class GlCodeService {
 
     public List<GlCode> listWithUsage() {
         List<GlCode> rows = glCodes.findAllByOrderByCodeAscPositionAsc();
-        for (GlCode g : rows) g.setUsed(used(g));
+        for (GlCode g : rows) {
+            long n = usageCount(g.getCode(), g.getPosition());
+            g.setUsageCount(n);
+            g.setUsagePending(n > 0 ? usagePending(g.getCode(), g.getPosition()) : 0);
+            g.setUsed(n > 0);
+        }
         return rows;
     }
 
