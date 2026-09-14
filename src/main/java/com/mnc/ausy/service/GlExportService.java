@@ -76,19 +76,44 @@ public class GlExportService {
     /** Exportable rows grouped by paket, so the maker can pick which one(s) to submit. */
     public List<Object[]> exportablePakets() { return gl.exportablePakets(); }
 
+    /**
+     * Baris GL tambahan manual yang siap diexport, dipilih satu per satu — batch-nya bisa kosong
+     * sehingga tidak pernah muncul di daftar batch (BUG_AUSY_00124), dan memang diminta tampil
+     * terpisah supaya tidak tercampur dengan batch hasil upload (BUG_AUSY_00125).
+     * Baris yang masih menunggu otorisasi perubahan tidak ikut (BUG_AUSY_00102).
+     */
+    public List<GlTabel> exportableManualRows() {
+        Set<Long> pending = changes.pendingGlRowIds();
+        List<GlTabel> out = new ArrayList<>();
+        for (GlTabel g : gl.findExportableManual()) if (!pending.contains(g.getId())) out.add(g);
+        return out;
+    }
+
     // ---------- Maker: Ajukan Export ----------
     @Transactional
-    public String submitExport(AusyUserDetails me, String note, List<String> pakets) {
+    public String submitExport(AusyUserDetails me, String note, List<String> pakets, List<Long> glIds) {
         if (note == null || note.isBlank()) return "Alasan pengajuan export wajib diisi.";
         if (!approval.hasActiveApprover(me.getIdGroup())) return ApprovalService.NO_APPROVER;
-        if (pakets == null || pakets.isEmpty()) return "Pilih minimal satu batch untuk diajukan export.";
+        List<String> paket = clean(pakets);
+        List<Long> ids = glIds == null ? List.of() : glIds.stream().filter(Objects::nonNull).toList();
+        if (paket.isEmpty() && ids.isEmpty())
+            return "Pilih minimal satu batch atau satu data GL untuk diajukan export.";
         // BUG_AUSY_00102: data yang masih menunggu otorisasi belum final — batch-nya tidak boleh diexport
         // dulu, kalau tidak file ACCTXT terkirim ke core dengan nilai yang mungkin masih berubah.
-        List<String> held = pendingPakets(pakets);
+        List<String> held = pendingPakets(paket);
         if (!held.isEmpty())
             return "Batch " + String.join(", ", held) + " tidak dapat diajukan export: masih ada data yang"
                     + " menunggu otorisasi Checker. Selesaikan otorisasi tersebut lebih dulu.";
-        List<GlTabel> rows = gl.findExportableByNoPaketIn(pakets);
+        Set<Long> pendingRows = changes.pendingGlRowIds();
+        for (Long id : ids)
+            if (pendingRows.contains(id))
+                return "Data GL #" + id + " masih menunggu otorisasi Checker — selesaikan dulu sebelum diexport.";
+
+        List<GlTabel> rows = new ArrayList<>();
+        if (!paket.isEmpty()) rows.addAll(gl.findExportableByNoPaketIn(paket));
+        if (!ids.isEmpty())
+            for (GlTabel g : gl.findExportableByIdIn(ids))
+                if (rows.stream().noneMatch(x -> x.getId().equals(g.getId()))) rows.add(g);
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
             return "Tidak ada GL aktif yang belum di-export.";
@@ -102,10 +127,22 @@ public class GlExportService {
         req.setStatus("PENDING"); req.setRowsCount(rows.size()); req.setDebit(d); req.setCredit(c);
         req.setCreatedAt(LocalDateTime.now()); req.setNoteMaker(note);
         requests.save(req);
-        gl.markExportable(req.getId(), pakets);
+        if (!paket.isEmpty()) gl.markExportable(req.getId(), paket);
+        if (!ids.isEmpty()) gl.markExportableByIds(req.getId(), ids);
+        String what = (paket.isEmpty() ? "" : "batch " + String.join(",", paket))
+                + (paket.isEmpty() || ids.isEmpty() ? "" : " + ")
+                + (ids.isEmpty() ? "" : ids.size() + " data GL manual");
         audit.transaction(me.getUsername(), "EXPORT_REQ",
-                "Ajukan export batch " + String.join(",", pakets) + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
+                "Ajukan export " + what + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
         return "Permintaan export diajukan (" + rows.size() + " baris) — menunggu otorisasi checker.";
+    }
+
+    /** Buang nilai kosong dari pilihan batch — batch kosong tidak pernah bisa dicocokkan. */
+    private static List<String> clean(List<String> v) {
+        if (v == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String s : v) if (s != null && !s.isBlank() && !out.contains(s.trim())) out.add(s.trim());
+        return out;
     }
 
     /** Which of the batches the maker picked still hold rows awaiting a checker (BUG_AUSY_00102). */

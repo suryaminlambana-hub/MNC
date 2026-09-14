@@ -68,13 +68,30 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
            "and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.noPaket in :pakets order by g.id")
     List<GlTabel> findExportableByNoPaketIn(@Param("pakets") List<String> pakets);
 
-    /** Exportable rows grouped by paket, for the maker's "pilih paket" checklist. */
+    /**
+     * Batch hasil upload yang siap diexport, untuk checklist "pilih batch" milik maker.
+     * Baris yang ditambahkan manual (glsrc='m') TIDAK ikut di sini — baris begitu dipilih
+     * satu per satu di daftarnya sendiri, karena batch-nya bisa saja kosong sehingga tidak
+     * pernah bisa tercentang lewat daftar batch (BUG_AUSY_00124/00125).
+     */
     @Query(value = "select no_paket, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
                    "from gl_tabel where active=1 and status_dual='APPROVED' and status_print='BELUM UPLOAD' " +
-                   "and export_req_id is null group by no_paket order by no_paket", nativeQuery = true)
+                   "and export_req_id is null and coalesce(glsrc,'p') <> 'm' and coalesce(no_paket,'') <> '' " +
+                   "group by no_paket order by no_paket", nativeQuery = true)
     List<Object[]> exportablePakets();
+
+    /** Baris GL tambahan manual yang siap diexport — dipilih satu per satu oleh maker. */
+    @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
+         + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null"
+         + " and (g.glsrc = 'm' or g.noPaket is null or g.noPaket = '') order by g.id")
+    List<GlTabel> findExportableManual();
+
+    /** GL aktif siap export berdasarkan id baris (untuk data tambahan manual). */
+    @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
+         + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.id in :ids order by g.id")
+    List<GlTabel> findExportableByIdIn(@Param("ids") List<Long> ids);
 
     long countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull(Short active, String statusDual, String statusPrint);
 
@@ -86,6 +103,13 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
            "where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null " +
            "and g.noPaket in :pakets")
     int markExportable(@Param("rid") Long reqId, @Param("pakets") List<String> pakets);
+
+    /** Idem untuk baris yang dipilih satu per satu. */
+    @Modifying @Transactional
+    @Query("update GlTabel g set g.exportReqId=:rid, g.statusPrint='PROSES EXPORT' " +
+           "where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null " +
+           "and g.id in :ids")
+    int markExportableByIds(@Param("rid") Long reqId, @Param("ids") List<Long> ids);
 
     /** Approve export: baris request jadi SUDAH UPLOAD (terkirim ke core). */
     @Modifying @Transactional

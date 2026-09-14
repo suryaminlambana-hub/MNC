@@ -26,7 +26,7 @@
         <div class="modal-body">
           <p class="text-muted small">Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
 
-          <label class="form-label">Pilih batch yang diajukan <span class="text-danger">*</span></label>
+          <label class="form-label">Pilih batch hasil upload <span class="text-danger">*</span></label>
           <div class="ausy-card mb-3" style="padding:0">
             <table class="table table-sm align-middle mb-0">
               <thead><tr>
@@ -46,6 +46,34 @@
                 <td class="text-end" th:text="${p[1]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[2],1,'POINT',2,'COMMA')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!--/* BUG_AUSY_00125: data tambahan manual dipisah dari batch supaya tidak tercampur;
+                 batch-nya bisa kosong sehingga dulu tidak pernah bisa dipilih (BUG_AUSY_00124). */-->
+          <label class="form-label">Pilih data GL yang ditambahkan manual</label>
+          <div class="ausy-card mb-3" style="padding:0">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr>
+                <th class="ps-3"><input type="checkbox" id="glAll"></th>
+                <th>ID</th><th>NoGL</th><th>D/C</th><th>Deskripsi</th>
+                <th class="text-end pe-3">Nominal</th>
+              </tr></thead>
+              <tbody>
+              <tr th:each="g : ${exportableManual}">
+                <td class="ps-3"><input type="checkbox" name="glIds" class="gl-cb" th:value="${g.id}"></td>
+                <td th:text="${g.id}"></td>
+                <td th:text="${g.gltrac}"></td>
+                <td><span class="badge" th:classappend="${g.gltrcd == 'D'} ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'"
+                          th:text="${g.gltrcd}"></span></td>
+                <td class="small" th:text="${g.gltrds}"></td>
+                <td class="text-end text-nowrap pe-3"
+                    th:text="${g.gltram != null ? #numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA') : ''}"></td>
+              </tr>
+              <tr th:if="${exportableManual == null or exportableManual.isEmpty()}">
+                <td colspan="6" class="text-center text-muted py-3">Tidak ada data GL tambahan manual yang menunggu export.</td>
               </tr>
               </tbody>
             </table>
@@ -99,14 +127,20 @@
 
       var paketAll = document.getElementById('paketAll');
       var paketCbs = document.querySelectorAll('.paket-cb');
+      var glAll = document.getElementById('glAll');
+      var glCbs = document.querySelectorAll('.gl-cb');
+      if (glAll) glAll.addEventListener('change', function(){
+        glCbs.forEach(function(cb){ if (!cb.disabled) cb.checked = glAll.checked; });
+      });
       paketAll.addEventListener('change', function(){
         paketCbs.forEach(function(cb){ if (!cb.disabled) cb.checked = paketAll.checked; });
       });
       document.getElementById('exportForm').addEventListener('submit', function(e){
-        var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; });
+        var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; })
+                      || Array.prototype.some.call(glCbs, function(cb){ return cb.checked; });
         if (!anyChecked) {
           e.preventDefault();
-          alert('Pilih minimal satu batch yang ingin diajukan export.');
+          alert('Pilih minimal satu batch atau satu data GL yang ingin diajukan export.');
         }
       });
     })();

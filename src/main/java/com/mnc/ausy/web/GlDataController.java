@@ -72,6 +72,7 @@ public class GlDataController {
         model.addAttribute("canExport", canExport);
         model.addAttribute("exportableCount", glExport.exportableCount());
         model.addAttribute("exportablePakets", glExport.exportablePakets());
+        model.addAttribute("exportableManual", glExport.exportableManualRows());   // BUG_AUSY_00124/00125
         model.addAttribute("pendingPakets", glExport.pendingPaketKeys());   // BUG_AUSY_00102
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
@@ -84,8 +85,9 @@ public class GlDataController {
      */
     @PostMapping("/gl-legacy/export-request")
     public String exportRequest(@RequestParam String note, @RequestParam(required = false) List<String> pakets,
+                                @RequestParam(required = false) List<Long> glIds,
                                 @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.submitExport(me, note, pakets);
+        String msg = glExport.submitExport(me, note, pakets, glIds);
         ra.addFlashAttribute(msg.startsWith("Permintaan export diajukan") ? "ok" : "warn", msg);
         return "redirect:/gl-legacy";
     }
