@@ -372,7 +372,7 @@ public class GlChangeService {
     public Res submitPaketDelete(String paket, String inputer, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
-        List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
+        List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new Res(false, "Batch tidak ditemukan.");
         if (cr.existsByStatusAndTargetAndNoPaketAndInputer("PENDING", T_PAKET, paket, inputer))
             return new Res(false, "Batch tersebut sudah diajukan untuk dihapus dan menunggu otorisasi Checker.");
@@ -442,7 +442,7 @@ public class GlChangeService {
                     try { out.put(Long.valueOf(m.get("id")), label); } catch (Exception ignored) {}
         }
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
-            for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()))
+            for (GlTabel g : gl.findBatchRows(c.getNoPaket(), c.getInputer()))
                 out.put(g.getId(), "Menunggu Otorisasi Hapus Batch " + n(c.getNoPaket()));
         // BUG_AUSY_00106 — baris yang export-nya sudah diajukan ikut terkunci sampai checker memutuskan
         for (GlExportRequest r : exportRequests.findByStatusOrderByCreatedAtDesc("PENDING"))
@@ -516,7 +516,7 @@ public class GlChangeService {
         Set<Long> pending = pendingGlRowIds();
         List<Long> out = new ArrayList<>();
         if (pending.isEmpty()) return out;
-        for (GlTabel g : gl.findByNoPaketAndGltrusOrderById(paket, inputer))
+        for (GlTabel g : gl.findBatchRows(paket, inputer))
             if (pending.contains(g.getId())) out.add(g.getId());
         return out;
     }
@@ -744,7 +744,7 @@ public class GlChangeService {
 
     private String applyPaketDelete(GlChangeRequest c) {
         if (!"DELETE".equals(c.getOp())) return "Operasi tidak dikenal.";
-        if (gl.findByNoPaketAndGltrusOrderById(c.getNoPaket(), c.getInputer()).isEmpty())
+        if (gl.findBatchRows(c.getNoPaket(), c.getInputer()).isEmpty())
             return "Batch sudah tidak ada / sudah diproses.";
         gl.deletePaket(c.getNoPaket(), c.getInputer());
         return null;

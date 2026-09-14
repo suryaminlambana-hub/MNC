@@ -38,15 +38,37 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> pendingPakets();
 
-    /** Recap of GL that has passed otorisasi (active & not PENDING) — konsisten dengan List GL. */
+    /**
+     * Recap of GL that has passed otorisasi (active & not PENDING) — konsisten dengan List GL.
+     * Data yang ditambahkan manual dikelompokkan terpisah dengan penanda {@code (manual)} supaya
+     * tidak terbaca sebagai batch hasil upload (BUG_AUSY_00126).
+     */
+    @Query(value = "select case when coalesce(glsrc,'p')='m' or coalesce(no_paket,'')='' then '(manual)' " +
+                   "            else no_paket end as batch, gltrus, count(*), " +
+                   "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
+                   "from gl_tabel where active=1 and (status_dual is null or status_dual <> 'PENDING') " +
+                   "group by 1, gltrus order by 1", nativeQuery = true)
+    List<Object[]> approvedPakets();
+
+    /**
+     * Batch yang boleh dihapus di halaman Hapus Batch: hanya hasil upload. Data yang ditambahkan
+     * manual bukan bagian dari batch mana pun, jadi tidak boleh ikut terhapus sekaligus
+     * (BUG_AUSY_00126) — penghapusannya lewat Kelola Data GL, satu per satu.
+     */
     @Query(value = "select no_paket, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
                    "from gl_tabel where active=1 and (status_dual is null or status_dual <> 'PENDING') " +
+                   "and coalesce(glsrc,'p') <> 'm' and coalesce(no_paket,'') <> '' " +
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
-    List<Object[]> approvedPakets();
+    List<Object[]> deletablePakets();
 
     List<GlTabel> findByNoPaketAndGltrusOrderById(String paket, String inputer);
+
+    /** Baris yang benar-benar milik sebuah batch — data tambahan manual tidak ikut (BUG_AUSY_00126). */
+    @Query("select g from GlTabel g where g.noPaket=:p and g.gltrus=:u and coalesce(g.glsrc,'p') <> 'm' order by g.id")
+    List<GlTabel> findBatchRows(@Param("p") String paket, @Param("u") String inputer);
     List<GlTabel> findByNoPaketOrderById(String paket);
     List<GlTabel> findTop200ByActiveOrderByIdDesc(Short active);
     long countByActive(Short active);
@@ -59,7 +81,7 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     long countByNoPaket(String noPaket);
 
     @Modifying @Transactional
-    @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u")
+    @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u and coalesce(g.glsrc,'p') <> 'm'")
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
 
     // ===== Export flow (maker Ajukan Export -> checker Otorisasi Export -> FTP) =====

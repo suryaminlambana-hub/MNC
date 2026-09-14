@@ -14,7 +14,12 @@
       <thead><tr><th>Batch</th><th>Uploader</th><th>Volume</th><th class="text-end">Jml</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Balance</th></tr></thead>
       <tbody>
       <tr th:each="r : ${rows}">
-        <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${r.paket}"></span></span></td>
+        <!--/* BUG_AUSY_00126: data tambahan manual boleh satu grup, tapi ditulis apa adanya */-->
+        <td th:switch="${r.paket}">
+          <span th:case="'(manual)'" class="badge bg-info-subtle text-info">
+            <i class="fa-solid fa-pen"></i> Data Tambahan Manual</span>
+          <span th:case="*" class="badge bg-primary-subtle text-primary">BATCH <span th:text="${r.paket}"></span></span>
+        </td>
         <td th:text="${r.uploader}"></td>
         <td style="min-width:160px">
           <div class="progress" style="height:8px"><div class="progress-bar" th:style="'width:' + ${#numbers.formatDecimal(r.jml * 100.0 / maxJml,1,2)} + '%'"></div></div>

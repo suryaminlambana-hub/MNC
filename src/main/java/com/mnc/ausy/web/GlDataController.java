@@ -95,7 +95,7 @@ public class GlDataController {
     @GetMapping("/gl-delete")
     public String deletePage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus
-        model.addAttribute("pakets", gl.approvedPakets());
+        model.addAttribute("pakets", gl.deletablePakets());   // tanpa data tambahan manual (BUG_AUSY_00126)
         model.addAttribute("needApproval", true);   // dual control wajib (BUG_AUSY_00116)
         model.addAttribute("pendingKeys", changes.pendingPaketKeys());
         model.addAttribute("pendingRows", changes.pendingRowsByPaket());

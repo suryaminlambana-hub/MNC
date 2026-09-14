@@ -57,7 +57,7 @@ public class OtorisasiService {
         if (!approval.canApprove(approverGroup, inputer))
             return new ExportResult(false, "Group Anda tidak berwenang meng-approve batch dari group tersebut.", 0, null);
 
-        List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
+        List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
 
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
@@ -88,7 +88,7 @@ public class OtorisasiService {
         if (note == null || note.isBlank())
             return new ExportResult(false, "Catatan penolakan wajib diisi.", 0, null);
 
-        List<GlTabel> rows = gl.findByNoPaketAndGltrusOrderById(paket, inputer);
+        List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
 
         gl.deletePaket(paket, inputer);   // reject -> removed from temp table (gl_tabel)

@@ -25,6 +25,11 @@ public class RekapController {
 
     public record Row(String paket, String uploader, long jml, BigDecimal debit, BigDecimal credit, boolean balanced) {}
 
+    /** Grup data tambahan manual ditulis apa adanya, bukan sebagai nomor batch (BUG_AUSY_00126). */
+    private static String batchLabel(String paket) {
+        return "(manual)".equals(paket) ? "Data Tambahan Manual" : paket;
+    }
+
     @GetMapping("/rekap/export")
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         List<String> head = List.of("Batch","Uploader","Jumlah Baris","Debit","Credit","Balance");
@@ -33,7 +38,8 @@ public class RekapController {
         for (Object[] r : gl.approvedPakets()) {
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
-            data.add(Arrays.asList(r[0], r[1], jml, d, c, d.compareTo(c) == 0 ? "Balance" : "Tidak Balance"));
+            data.add(Arrays.asList(batchLabel((String) r[0]), r[1], jml, d, c,
+                    d.compareTo(c) == 0 ? "Balance" : "Tidak Balance"));
             totJml += jml; totD = totD.add(d); totC = totC.add(c);
         }
         data.add(Arrays.asList("TOTAL", "", totJml, totD, totC, totD.compareTo(totC) == 0 ? "Balance" : "Tidak Balance"));
