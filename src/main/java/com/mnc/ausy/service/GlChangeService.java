@@ -76,6 +76,11 @@ public class GlChangeService {
         return "Data GL";
     }
 
+    /** Group pengaju: dari permintaannya sendiri, baru dari record user kalau belum tersimpan. */
+    private Integer makerGroupOf(GlChangeRequest c) {
+        return c.getMakerGroup() != null ? c.getMakerGroup() : approval.groupOf(c.getMaker());
+    }
+
     /** Outcome of a maker/checker action: accepted or not, plus the message to flash. */
     public record Res(boolean ok, String message) {}
 
@@ -599,7 +604,7 @@ public class GlChangeService {
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApprove(approverGroup, c.getMaker())) continue;
+            if (!approval.canApproveGroup(approverGroup, makerGroupOf(c))) continue;
             if (isStale(c)) continue;
             String label = targetLabel(c.getTarget());
             if ("BULK_EDIT".equals(c.getOp()))
@@ -674,7 +679,7 @@ public class GlChangeService {
             return new Res(false, "Permintaan tidak ditemukan / sudah diproses.");
         if (me.getUsername().equals(c.getMaker()))
             return new Res(false, "Maker tidak boleh mengotorisasi permintaannya sendiri.");
-        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveGroup(me.getIdGroup(), makerGroupOf(c)))
             return new Res(false, "Group Anda tidak berwenang meng-approve permintaan dari maker tersebut.");
 
         String err = apply(c);
@@ -760,7 +765,7 @@ public class GlChangeService {
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
         if (me.getUsername().equals(c.getMaker()))
             return "Maker tidak boleh memutuskan permintaannya sendiri.";
-        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveGroup(me.getIdGroup(), makerGroupOf(c)))
             return "Group Anda tidak berwenang menolak permintaan dari maker tersebut.";
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         // rejected: live GL data is left unchanged (8.3.d)

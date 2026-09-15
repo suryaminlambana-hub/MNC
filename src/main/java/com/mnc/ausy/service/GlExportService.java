@@ -43,6 +43,11 @@ public class GlExportService {
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 
+    /** Group pengaju export: dari permintaannya, baru dari record user kalau belum tersimpan. */
+    private Integer groupOf(GlExportRequest r) {
+        return r.getRequesterGroup() != null ? r.getRequesterGroup() : approval.groupOf(r.getRequestedBy());
+    }
+
     public long pendingCount() { return requests.countByStatus("PENDING"); }
 
     /** All pending export requests, unscoped — for the maker dashboard's "Perubahan GL Pending" overview. */
@@ -165,7 +170,7 @@ public class GlExportService {
     public List<GlExportRequest> pendingExportFor(Integer approverGroup) {
         List<GlExportRequest> out = new ArrayList<>();
         for (GlExportRequest r : requests.findByStatusOrderByCreatedAtDesc("PENDING"))
-            if (approval.canApprove(approverGroup, r.getRequestedBy())) out.add(r);
+            if (approval.canApproveGroup(approverGroup, groupOf(r))) out.add(r);
         return out;
     }
 
@@ -173,7 +178,7 @@ public class GlExportService {
     public String approveExport(Long reqId, Integer approverGroup, String checker) {
         GlExportRequest req = requests.findById(reqId).orElse(null);
         if (req == null || !"PENDING".equals(req.getStatus())) return "Permintaan export tidak ditemukan / sudah diproses.";
-        if (!approval.canApprove(approverGroup, req.getRequestedBy()))
+        if (!approval.canApproveGroup(approverGroup, groupOf(req)))
             return "Group Anda tidak berwenang meng-approve export dari group tersebut.";
         List<GlTabel> rows = gl.findByExportReqIdOrderById(reqId);
         if (rows.isEmpty()) return "Tidak ada baris GL untuk permintaan ini.";
@@ -234,7 +239,7 @@ public class GlExportService {
     public String rejectExport(Long reqId, Integer approverGroup, String checker, String note) {
         GlExportRequest req = requests.findById(reqId).orElse(null);
         if (req == null || !"PENDING".equals(req.getStatus())) return "Permintaan export tidak ditemukan / sudah diproses.";
-        if (!approval.canApprove(approverGroup, req.getRequestedBy()))
+        if (!approval.canApproveGroup(approverGroup, groupOf(req)))
             return "Group Anda tidak berwenang menolak export dari group tersebut.";
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         gl.revertExport(reqId);

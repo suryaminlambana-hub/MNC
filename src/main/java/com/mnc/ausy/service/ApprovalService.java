@@ -42,7 +42,11 @@ public class ApprovalService {
      * kecuali pengajuan group-nya sendiri.
      */
     public boolean canApproveConfig(Integer approverGroup, String submitterUserId) {
-        Integer targetGroup = users.findByUserId(submitterUserId).map(u -> u.getIdGroup()).orElse(null);
+        return canApproveConfigGroup(approverGroup, groupOf(submitterUserId));
+    }
+
+    /** Idem berbasis id group, dipakai dengan maker_group yang tersimpan di permintaannya. */
+    public boolean canApproveConfigGroup(Integer approverGroup, Integer targetGroup) {
         if (approverGroup == null || targetGroup == null) return false;
         if (approverGroup.equals(targetGroup)) return false;
         return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)
@@ -68,10 +72,24 @@ public class ApprovalService {
      * pengajuan group-nya sendiri.
      */
     public boolean canApprove(Integer approverGroup, String submitterUserId) {
-        Integer targetGroup = users.findByUserId(submitterUserId).map(u -> u.getIdGroup()).orElse(null);
+        return canApproveGroup(approverGroup, groupOf(submitterUserId));
+    }
+
+    /**
+     * Versi berbasis id group. Permintaan menyimpan sendiri group pengajunya, jadi pakai itu:
+     * kalau user pengajunya sudah dihapus, permintaannya tetap bisa diproses. Sebelumnya group
+     * selalu dicari dari record user, sehingga permintaan dari user yang sudah dihapus tidak
+     * terlihat oleh penyetuju mana pun dan menggantung selamanya.
+     */
+    public boolean canApproveGroup(Integer approverGroup, Integer targetGroup) {
         if (approverGroup == null || targetGroup == null) return false;
         if (approverGroup.equals(targetGroup)) return false;   // cannot approve own group
         return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup);
+    }
+
+    /** Group pengaju dari username; null kalau usernya sudah tidak ada. */
+    public Integer groupOf(String userId) {
+        return userId == null ? null : users.findByUserId(userId).map(u -> u.getIdGroup()).orElse(null);
     }
 
     /**

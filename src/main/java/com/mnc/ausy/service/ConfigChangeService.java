@@ -402,7 +402,7 @@ public class ConfigChangeService {
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApproveConfig(approverGroup, c.getMaker())) continue;
+            if (!approval.canApproveConfigGroup(approverGroup, makerGroupOf(c))) continue;
             out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
@@ -437,6 +437,11 @@ public class ConfigChangeService {
         return list;
     }
 
+    /** Group pengaju: dari permintaannya sendiri, baru dari record user kalau belum tersimpan. */
+    private Integer makerGroupOf(ConfigChangeRequest c) {
+        return c.getMakerGroup() != null ? c.getMakerGroup() : approval.groupOf(c.getMaker());
+    }
+
     public long countPending(){ return cr.countByStatus("PENDING"); }
 
     /**
@@ -449,7 +454,7 @@ public class ConfigChangeService {
     public List<PendingUser> pendingListFor(Integer approverGroup) {
         List<PendingUser> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApproveConfig(approverGroup, c.getMaker())) continue;
+            if (!approval.canApproveConfigGroup(approverGroup, makerGroupOf(c))) continue;
             out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
@@ -496,7 +501,7 @@ public class ConfigChangeService {
     public String approve(Long crId, AusyUserDetails me, String note) {
         ConfigChangeRequest c = cr.findById(crId).orElse(null);
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
-        if (!approval.canApproveConfig(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveConfigGroup(me.getIdGroup(), makerGroupOf(c)))
             return "Group Anda tidak berwenang meng-approve permintaan config ini.";
         String applyMsg = switch (n(c.getEntity())) {
             case "GROUP"    -> applyGroup(c);
@@ -518,7 +523,7 @@ public class ConfigChangeService {
     public String reject(Long crId, AusyUserDetails me, String note) {
         ConfigChangeRequest c = cr.findById(crId).orElse(null);
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
-        if (!approval.canApproveConfig(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveConfigGroup(me.getIdGroup(), makerGroupOf(c)))
             return "Group Anda tidak berwenang menolak permintaan config ini.";
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         c.setStatus("REJECTED"); c.setChecker(me.getUsername());
