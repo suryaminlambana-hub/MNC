@@ -40,8 +40,13 @@ public class UserController {
         model.addAttribute("groups", allGroups);
         model.addAttribute("groupNames", groupNames);
         Set<String> resettable = new HashSet<>();     // hanya user sisi operasional (BUG_AUSY_00129)
-        for (User u : users.findAll()) if (configChange.resettableByAdmin(u)) resettable.add(u.getUserId());
+        Set<String> protectedIds = new HashSet<>();   // akun utama sistem (BUG_AUSY_00131)
+        for (User u : users.findAll()) {
+            if (configChange.resettableByAdmin(u)) resettable.add(u.getUserId());
+            if (u.isProtectedAccount()) protectedIds.add(u.getUserId());
+        }
         model.addAttribute("resettable", resettable);
+        model.addAttribute("protectedUsers", protectedIds);
         model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";

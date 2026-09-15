@@ -175,6 +175,11 @@ public class ConfigChangeService {
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
+        // Akun bawaan sistem: tanpa keduanya tidak ada lagi yang bisa mengonfigurasi maupun
+        // mengotorisasi konfigurasi (BUG_AUSY_00131). Akun buatan admin tetap bisa dihapus.
+        if (u.isProtectedAccount())
+            return "Akun '" + userId + "' adalah akun utama sistem dan tidak dapat dihapus."
+                 + " Akun lain yang dibuat Admin tetap bisa dihapus.";
         if (isPending("USER", userId)) return pendingMsg("USER");
         ConfigChangeRequest c = base("USER","DELETE", userId, me, note); c.setBeforeJson(toJson(userMap(u)));
         return saveReq(c, "USER", "DELETE", "'" + userId + "'");
@@ -581,6 +586,9 @@ public class ConfigChangeService {
         users.save(u); return null;
     }
     private String applyUserDelete(String targetId) {
+        User guard = users.findByUserId(targetId).orElse(null);
+        if (guard != null && guard.isProtectedAccount())
+            return "Tidak dapat diterapkan: '" + targetId + "' adalah akun utama sistem.";
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
         users.delete(u); return null;

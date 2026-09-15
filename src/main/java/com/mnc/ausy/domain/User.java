@@ -36,6 +36,9 @@ public class User {
 
     private String addby;
 
+    /** Akun bawaan sistem (admin & admin approver utama) — tidak boleh dihapus (BUG_AUSY_00131). */
+    @Column(name = "protected_account") private Short protectedAccount = 0;
+
     // getters / setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -45,6 +48,9 @@ public class User {
     public void setPass(String pass) { this.pass = pass; }
     public String getNama() { return nama; }
     public void setNama(String nama) { this.nama = nama; }
+    public boolean isProtectedAccount() { return protectedAccount != null && protectedAccount == 1; }
+    public Short getProtectedAccount() { return protectedAccount; }
+    public void setProtectedAccount(Short v) { this.protectedAccount = v; }
     public Short getStatusAccount() { return statusAccount; }
     public void setStatusAccount(Short statusAccount) { this.statusAccount = statusAccount; }
     public String getEmail() { return email; }

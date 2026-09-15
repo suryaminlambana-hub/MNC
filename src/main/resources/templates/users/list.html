@@ -39,8 +39,14 @@
                                 class="btn btn-sm btn-outline-secondary btn-reset"
                                 th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#resetPass"
                                 title="Reset password user ini (butuh approval Admin Approval)">Reset Password</button>
-                        <button class="btn btn-sm btn-outline-danger btn-del"
+                        <!--/* BUG_AUSY_00131: akun admin & admin approver utama tidak bisa dihapus */-->
+                        <button th:unless="${protectedUsers != null and protectedUsers.contains(u.userId)}"
+                                class="btn btn-sm btn-outline-danger btn-del"
                                 th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
+                        <span th:if="${protectedUsers != null and protectedUsers.contains(u.userId)}"
+                              class="badge bg-secondary-subtle text-secondary"
+                              title="Akun utama sistem — tidak dapat dihapus">
+                            <i class="fa-solid fa-shield-halved"></i> Akun Utama</span>
                     </th:block>
                     <span th:if="${pending}" class="text-muted small">—</span>
                 </td>
