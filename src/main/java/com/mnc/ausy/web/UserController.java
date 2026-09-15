@@ -1,6 +1,7 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.domain.GroupUser;
+import com.mnc.ausy.domain.User;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +39,9 @@ public class UserController {
         for (GroupUser g : allGroups) groupNames.put(g.getIdGroup(), g.getNamaGroup());
         model.addAttribute("groups", allGroups);
         model.addAttribute("groupNames", groupNames);
+        Set<String> resettable = new HashSet<>();     // hanya user sisi operasional (BUG_AUSY_00129)
+        for (User u : users.findAll()) if (configChange.resettableByAdmin(u)) resettable.add(u.getUserId());
+        model.addAttribute("resettable", resettable);
         model.addAttribute("pendingConfig", configChange.countPending());
         model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";
@@ -59,6 +65,15 @@ public class UserController {
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         ra.addFlashAttribute("ok", configChange.submitEdit(userId, nama, email, idGroup, status, password, me, note));
+        return "redirect:/users";
+    }
+
+    /** BUG_AUSY_00129 — reset password user Maker/Checker, tetap lewat Admin Approval. */
+    @PostMapping("/reset-password")
+    public String resetPassword(@RequestParam String userId, @RequestParam String password,
+                                @RequestParam(required=false) String note,
+                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        ra.addFlashAttribute("ok", configChange.submitPasswordReset(userId, password, me, note));
         return "redirect:/users";
     }
 

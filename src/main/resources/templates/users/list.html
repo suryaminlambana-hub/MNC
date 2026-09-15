@@ -35,6 +35,10 @@
                         <button class="btn btn-sm btn-outline-secondary btn-edit"
                                 th:attr="data-uid=${u.userId},data-nama=${u.nama},data-email=${u.email},data-group=${u.idGroup},data-status=${u.statusAccount}"
                                 data-bs-toggle="modal" data-bs-target="#editUser">Ubah</button>
+                        <button th:if="${resettable != null and resettable.contains(u.userId)}"
+                                class="btn btn-sm btn-outline-secondary btn-reset"
+                                th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#resetPass"
+                                title="Reset password user ini (butuh approval Admin Approval)">Reset Password</button>
                         <button class="btn btn-sm btn-outline-danger btn-del"
                                 th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
                     </th:block>
@@ -88,6 +92,27 @@
         </form>
     </div></div></div>
 
+    <!--/* BUG_AUSY_00129: reset password user Maker/Checker, berdiri sendiri & tetap dual control */-->
+    <div class="modal fade" id="resetPass" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form th:action="@{/users/reset-password}" method="post">
+            <div class="modal-header"><h5 class="modal-title">Ajukan Reset Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" name="userId" id="r_uid">
+                <p class="mb-2">Reset password user <b id="r_uid_label"></b>. Password baru berlaku setelah
+                    disetujui Admin Approval.</p>
+                <div class="mb-2"><label class="form-label">Password baru <span class="text-danger">*</span></label>
+                    <input class="form-control" type="password" name="password" minlength="6" required
+                           placeholder="minimal 6 karakter"></div>
+                <div class="mb-2"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="note" rows="2" required
+                              placeholder="Alasan reset (dikirim ke Admin Approval)"></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button class="btn btn-primary">Ajukan ke Admin Approval</button></div>
+        </form>
+    </div></div></div>
+
     <!-- Delete modal (reason required) -->
     <div class="modal fade" id="delUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
         <form th:action="@{/users/delete}" method="post">
@@ -116,6 +141,12 @@
         b.addEventListener('click', function(){
             document.getElementById('d_uid').value = b.dataset.uid;
             document.getElementById('d_uid_label').textContent = b.dataset.uid;
+        });
+    });
+    document.querySelectorAll('.btn-reset').forEach(function(b){
+        b.addEventListener('click', function(){
+            document.getElementById('r_uid').value = b.dataset.uid;
+            document.getElementById('r_uid_label').textContent = b.dataset.uid;
         });
     });
     </script>

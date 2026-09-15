@@ -49,20 +49,23 @@ public class ConfigChangeService {
     private final ApprovalService approval;
     private final AuditService audit;
     private final PasswordEncoder encoder;
+    private final AccessService access;
     private final ObjectMapper json = new ObjectMapper();
 
     public ConfigChangeService(UserRepository users, GroupUserRepository groups, MenuRepository menuRepo,
                                GroupMenuRepository groupMenus, ApprovalGroupRepository approvalRules,
                                ConfigChangeRequestRepository cr, ApprovalService approval, AuditService audit,
-                               PasswordEncoder encoder) {
+                               PasswordEncoder encoder, AccessService access) {
         this.users = users; this.groups = groups; this.menuRepo = menuRepo; this.groupMenus = groupMenus;
         this.approvalRules = approvalRules; this.cr = cr; this.approval = approval; this.audit = audit; this.encoder = encoder;
+        this.access = access;
     }
 
     private static String n(String s){ return s==null?"":s; }
     /** Tampilkan operasi dalam Bahasa Indonesia (kode internal tetap ADD/EDIT/DELETE). */
     public static String opLabel(String op){
-        switch (n(op)) { case "ADD": return "TAMBAH"; case "EDIT": return "UBAH"; case "DELETE": return "HAPUS"; default: return n(op); }
+        switch (n(op)) { case "ADD": return "TAMBAH"; case "EDIT": return "UBAH"; case "DELETE": return "HAPUS";
+            case "RESET_PASS": return "RESET PASSWORD"; default: return n(op); }
     }
     private static final java.util.regex.Pattern EMAIL =
             java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -128,6 +131,7 @@ public class ConfigChangeService {
     public String submitAdd(String userId, String rawPass, String nama, String email, Integer idGroup,
                             AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         userId = userId==null?"":userId.toLowerCase().trim();
         if (userId.isEmpty()) return "Username tidak valid.";
         if (users.existsByUserId(userId)) return "Username sudah dipakai.";
@@ -144,6 +148,7 @@ public class ConfigChangeService {
     public String submitEdit(String userId, String nama, String email, Integer idGroup, Short status,
                              String rawPass, AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         if (invalidEmail(email)) return "Format email tidak valid.";
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
@@ -166,6 +171,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitDelete(String userId, AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
@@ -229,6 +235,15 @@ public class ConfigChangeService {
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         ConfigChangeRequest c=base("GROUP","DELETE",String.valueOf(idGroup),me,note); c.setBeforeJson(toJson(groupMap(g)));
         return saveReq(c,"GROUP","DELETE","'"+g.getNamaGroup()+"'");
+    }
+
+    /** Apakah aturan ini satu-satunya penyetuju aktif untuk target tersebut? */
+    private boolean lastApproverFor(Integer targetGroup, Integer approverGroup) {
+        for (ApprovalGroup other : approvalRules.findByTargetGroup(targetGroup)) {
+            if (other.getApproverGroup() == null || other.getApproverGroup().equals(approverGroup)) continue;
+            if (users.countByIdGroupAndStatusAccount(other.getApproverGroup(), (short) 1) > 0) return false;
+        }
+        return true;
     }
 
     // ================= MENU =================
@@ -300,11 +315,49 @@ public class ConfigChangeService {
         return m;
     }
 
+    /**
+     * BUG_AUSY_00129 — Admin mereset password user sisi operasional (Maker/Checker) lewat tombol
+     * sendiri, bukan diselipkan di form Ubah. Tetap dual control: password baru hanya dipasang
+     * setelah Admin Approval menyetujui, dan yang tersimpan di permintaan sudah ter-hash.
+     */
+    @Transactional
+    public String submitPasswordReset(String userId, String newPass, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        if (newPass==null||newPass.isBlank()) return "Password baru wajib diisi.";
+        if (newPass.trim().length() < 6) return "Password baru minimal 6 karakter.";
+        User u = users.findByUserId(userId).orElse(null);
+        if (u == null) return "User tidak ditemukan.";
+        if (isPending("USER", userId)) return pendingMsg("USER");
+        if (!resettableByAdmin(u))
+            return "Password user " + userId + " tidak dapat direset dari sini — tombol ini hanya untuk"
+                 + " user sisi operasional (Maker & Checker).";
+        Map<String,String> a=new LinkedHashMap<>();
+        a.put("userId", n(u.getUserId())); a.put("nama", n(u.getNama()));
+        a.put("pass", encoder.encode(newPass.trim()));
+        ConfigChangeRequest c=base("USER","RESET_PASS",userId,me,note); c.setAfterJson(toJson(a));
+        return saveReq(c,"USER","RESET_PASS","'"+userId+"'");
+    }
+
+    /** User sisi operasional (Maker/Checker) — hanya mereka yang passwordnya boleh direset Admin. */
+    public boolean resettableByAdmin(User u) {
+        return u != null && "BUSINESS".equals(access.sideOf(u.getIdGroup()));
+    }
+
     // ================= APPROVAL (approval_group) =================
+    /**
+     * BUG_AUSY_00128 — jalan keluar kalau rantai otorisasi putus.
+     *
+     * Semua perubahan config wajib lewat penyetuju. Kalau group penyetujunya hilang (mis. role
+     * Admin Approval lama dihapus dan diganti yang baru), admin tidak bisa mengajukan apa pun —
+     * termasuk memasang penyetuju baru, jadi sistemnya mati kunci. Karena itu, SELAMA group
+     * pengaju belum punya penyetuju aktif, penambahan aturan Approval Group diterapkan langsung
+     * dan dicatat khusus di audit trail. Begitu penyetuju ada, semuanya kembali lewat dual control.
+     */
     @Transactional
     public String submitApprovalAdd(Integer approverGroup, Integer targetGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        boolean breakGlass = !approval.hasActiveApprover(me.getIdGroup());
         if (approverGroup==null||targetGroup==null) return "Group belum lengkap.";
         if (approverGroup.equals(targetGroup)) return "Approver dan target tidak boleh group yang sama.";
         if (approvalRules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) return "Aturan tersebut sudah ada.";
@@ -313,6 +366,16 @@ public class ConfigChangeService {
         Map<String,String> a=new LinkedHashMap<>();
         a.put("approver", groupName(approverGroup)); a.put("target", groupName(targetGroup));
         a.put("approverGroup", String.valueOf(approverGroup)); a.put("targetGroup", String.valueOf(targetGroup));
+        if (breakGlass) {
+            ApprovalGroup r = new ApprovalGroup();
+            r.setApproverGroup(approverGroup); r.setTargetGroup(targetGroup);
+            approvalRules.save(r);
+            audit.transaction(me.getUsername(), "APPROVAL_BREAKGLASS",
+                    "Aturan " + groupName(approverGroup) + " → " + groupName(targetGroup) + " dipasang LANGSUNG"
+                  + " karena group " + groupName(me.getIdGroup()) + " belum punya penyetuju aktif. Alasan: " + note);
+            return "Aturan approval dipasang langsung karena group Anda belum punya penyetuju aktif"
+                 + " (tercatat di audit trail). Perubahan config berikutnya kembali butuh otorisasi.";
+        }
         ConfigChangeRequest c=base("APPROVAL","ADD",null,me,note); c.setAfterJson(toJson(a));
         return saveReq(c,"APPROVAL","ADD","("+groupName(approverGroup)+" → "+groupName(targetGroup)+")");
     }
@@ -322,6 +385,10 @@ public class ConfigChangeService {
         { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
         ApprovalGroup r=approvalRules.findById(ruleId).orElse(null); if(r==null) return "Aturan tidak ditemukan.";
         if (isPending("APPROVAL", ruleId)) return pendingMsg("APPROVAL");
+        // Melepas aturan terakhir membuat group target tidak bisa mengajukan apa pun (BUG_AUSY_00128).
+        if (lastApproverFor(r.getTargetGroup(), r.getApproverGroup()))
+            return "Aturan ini satu-satunya penyetuju untuk " + groupName(r.getTargetGroup())
+                 + ". Pasang penyetuju pengganti lebih dulu, baru aturan ini bisa dilepas.";
         Map<String,String> b=new LinkedHashMap<>();
         b.put("approver", groupName(r.getApproverGroup())); b.put("target", groupName(r.getTargetGroup()));
         ConfigChangeRequest c=base("APPROVAL","DELETE",String.valueOf(ruleId),me,note); c.setBeforeJson(toJson(b));
@@ -441,6 +508,7 @@ public class ConfigChangeService {
             case "ADD" -> applyUserAdd(parse(c.getAfterJson()), c.getMaker());
             case "EDIT" -> applyUserEdit(c.getTargetId(), parse(c.getAfterJson()));
             case "DELETE" -> applyUserDelete(c.getTargetId());
+            case "RESET_PASS" -> applyPasswordReset(c.getTargetId(), parse(c.getAfterJson()));
             default -> "Operasi tidak dikenal.";
         };
     }
@@ -454,6 +522,14 @@ public class ConfigChangeService {
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount((short)1); u.setCreDate(LocalDateTime.now()); u.setAddby(maker);
         users.save(u); return null;
+    }
+    private String applyPasswordReset(String targetId, Map<String,String> a) {
+        if (a == null || a.get("pass") == null) return "Data permintaan rusak.";
+        User u = users.findByUserId(targetId).orElse(null);
+        if (u == null) return "User '" + targetId + "' sudah tidak ada.";
+        u.setPass(a.get("pass"));
+        users.save(u);
+        return null;
     }
     private String applyUserEdit(String targetId, Map<String,String> a) {
         if (a == null) return "Data permintaan rusak.";
