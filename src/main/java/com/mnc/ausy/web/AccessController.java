@@ -38,11 +38,25 @@ public class AccessController {
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
             // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan
             List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc().stream()
-                    .filter(m -> m.getActive() != null && m.getActive() == 1).toList();
+                    .filter(m -> m.getActive() != null && m.getActive() == 1)
+                    .filter(m -> m.getBundledWith() == null)   // aksi yang menempel ikut menunya
+                    .toList();
             model.addAttribute("sections", sections(all));
             model.addAttribute("granted", granted);
         }
         return "access/index";
+    }
+
+    /**
+     * Tambahkan aksi yang menempel pada menu yang dicentang. Tanpa ini, role penyetuju baru bisa
+     * membuka halaman otorisasi tapi tidak berwenang menyetujui apa pun, karena endpoint
+     * approve/reject-nya ada di baris hak akses yang terpisah.
+     */
+    private List<Integer> withBundledActions(List<Integer> menuIds) {
+        List<Integer> out = new ArrayList<>(menuIds == null ? List.of() : menuIds);
+        for (Menu m : menus.findByBundledWithIsNotNull())
+            if (out.contains(m.getBundledWith()) && !out.contains(m.getIdMenu())) out.add(m.getIdMenu());
+        return out;
     }
 
     /** Satu kelompok centangan di dalam sebuah section, mis. "Data" atau "Card Dashboard". */
@@ -96,7 +110,7 @@ public class AccessController {
                        @RequestParam(name="menu", required=false) List<Integer> menuIds,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitAccess(group, menuIds, me, note));
+        ra.addFlashAttribute("ok", configChange.submitAccess(group, withBundledActions(menuIds), me, note));
         return "redirect:/access?group=" + group;
     }
 }

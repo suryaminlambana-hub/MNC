@@ -25,6 +25,9 @@ public class Menu {
     /** Role yang biasa memakai item ini — hanya untuk mengelompokkan halaman Access Menu. */
     private String section;
 
+    /** Aksi yang menempel pada sebuah menu: ikut diberikan otomatis saat menunya dicentang. */
+    @Column(name = "bundled_with") private Integer bundledWith;
+
     @Transient
     private java.util.List<Menu> children = new java.util.ArrayList<>();
 
@@ -40,6 +43,8 @@ public class Menu {
     public void setUrutan(Integer urutan) { this.urutan = urutan; }
     public Integer getParent() { return parent; }
     public void setParent(Integer parent) { this.parent = parent; }
+    public Integer getBundledWith() { return bundledWith; }
+    public void setBundledWith(Integer v) { this.bundledWith = v; }
     public String getSection() { return section; }
     public void setSection(String section) { this.section = section; }
     public String getKind() { return kind; }

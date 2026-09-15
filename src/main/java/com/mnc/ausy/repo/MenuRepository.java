@@ -30,6 +30,9 @@ public interface MenuRepository extends JpaRepository<Menu, Integer> {
 
     List<Menu> findByKindOrderByParentAscUrutanAsc(String kind);
 
+    /** Aksi yang menempel pada sebuah menu (ikut otomatis saat menunya diberikan). */
+    List<Menu> findByBundledWithIsNotNull();
+
     List<Menu> findByParentOrderByUrutanAsc(Integer parent);
     List<Menu> findAllByOrderByParentAscUrutanAsc();
 }

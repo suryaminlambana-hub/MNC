@@ -17,7 +17,7 @@ public class ConfigChangeController {
 
     public ConfigChangeController(ConfigChangeService service) { this.service = service; }
 
-    @GetMapping("/config-change/review")
+    @GetMapping({"/config-change", "/config-change/review"})
     public String review(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         var sections = service.pendingReviewSectionsFor(me.getIdGroup());
         long total = sections.stream().mapToLong(s -> s.items().size()).sum();

@@ -28,7 +28,13 @@ public class GlobalModelAdvice {
     @ModelAttribute("submitBlocked")
     public boolean submitBlocked(@AuthenticationPrincipal AusyUserDetails user) {
         if (user == null) return false;
-        return access.canSubmit(user.getIdGroup()) && !approval.hasActiveApprover(user.getIdGroup());
+        Integer g = user.getIdGroup();
+        if (!access.canSubmit(g)) return false;
+        // sisi config memakai aturan config (role Otorisasi Config sudah cukup), sisanya matriks
+        boolean ok = "CONFIG".equals(access.sideOf(g))
+                ? approval.hasActiveApproverForConfig(g)
+                : approval.hasActiveApprover(g);
+        return !ok;
     }
 
     @ModelAttribute("submitBlockedMsg")

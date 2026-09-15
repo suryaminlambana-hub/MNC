@@ -24,8 +24,7 @@ public class ApprovalService {
      * "Otorisasi Perubahan Config", bukan dari id group yang ditulis di kode.
      */
     public boolean configAuthorizer(Integer group) {
-        return group != null && access.allowed(group, "/config-change")
-                && "CONFIG".equals(access.sideOf(group));
+        return group != null && access.allowed(group, "/config-change");
     }
 
     /**
@@ -34,7 +33,32 @@ public class ApprovalService {
      * mengganti role Config Approver tidak memutus rantai otorisasi (BUG_AUSY_00128).
      */
     private boolean configPairing(Integer approverGroup, Integer targetGroup) {
-        return configAuthorizer(approverGroup) && "CONFIG".equals(access.sideOf(targetGroup));
+        return configAuthorizer(approverGroup) && !configAuthorizer(targetGroup);
+    }
+
+    /**
+     * Wewenang untuk permintaan perubahan config (User/Role/Menu/Access/Approval). Selain matriks
+     * Approval Group, role yang memegang menu Otorisasi Config selalu boleh menyetujuinya —
+     * kecuali pengajuan group-nya sendiri.
+     */
+    public boolean canApproveConfig(Integer approverGroup, String submitterUserId) {
+        Integer targetGroup = users.findByUserId(submitterUserId).map(u -> u.getIdGroup()).orElse(null);
+        if (approverGroup == null || targetGroup == null) return false;
+        if (approverGroup.equals(targetGroup)) return false;
+        return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)
+                || configAuthorizer(approverGroup);
+    }
+
+    /** Penyetuju untuk pengajuan config: matriks, atau adanya role Otorisasi Config ber-user aktif. */
+    public boolean hasActiveApproverForConfig(Integer makerGroup) {
+        if (makerGroup == null) return false;
+        if (hasActiveApprover(makerGroup)) return true;
+        for (GroupUser g : groups.findAll()) {
+            Integer id = g.getIdGroup();
+            if (id == null || id.equals(makerGroup) || !configAuthorizer(id)) continue;
+            if (users.countByIdGroupAndStatusAccount(id, (short) 1) > 0) return true;
+        }
+        return false;
     }
 
     /**
@@ -47,8 +71,7 @@ public class ApprovalService {
         Integer targetGroup = users.findByUserId(submitterUserId).map(u -> u.getIdGroup()).orElse(null);
         if (approverGroup == null || targetGroup == null) return false;
         if (approverGroup.equals(targetGroup)) return false;   // cannot approve own group
-        return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)
-                || configPairing(approverGroup, targetGroup);
+        return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup);
     }
 
     /**
@@ -78,13 +101,6 @@ public class ApprovalService {
             if (approver == null || approver.equals(makerGroup)) continue;
             if (users.countByIdGroupAndStatusAccount(approver, (short) 1) > 0) return true;
         }
-        // pasangan bawaan sisi config: cukup ada Config Approver ber-user aktif
-        if ("CONFIG".equals(access.sideOf(makerGroup)))
-            for (GroupUser g : groups.findAll()) {
-                Integer id = g.getIdGroup();
-                if (id == null || id.equals(makerGroup) || !configAuthorizer(id)) continue;
-                if (users.countByIdGroupAndStatusAccount(id, (short) 1) > 0) return true;
-            }
         return false;
     }
 

@@ -131,7 +131,7 @@ public class ConfigChangeService {
     public String submitAdd(String userId, String rawPass, String nama, String email, Integer idGroup,
                             AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         userId = userId==null?"":userId.toLowerCase().trim();
         if (userId.isEmpty()) return "Username tidak valid.";
         if (users.existsByUserId(userId)) return "Username sudah dipakai.";
@@ -148,7 +148,7 @@ public class ConfigChangeService {
     public String submitEdit(String userId, String nama, String email, Integer idGroup, Short status,
                              String rawPass, AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (invalidEmail(email)) return "Format email tidak valid.";
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
@@ -171,7 +171,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitDelete(String userId, AusyUserDetails me, String note) {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
@@ -196,7 +196,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitGroupAdd(String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (namaGroup==null||namaGroup.isBlank()) return "Nama Group wajib diisi.";
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",namaGroup.trim()); a.put("inisial",n(inisial)); a.put("level",n(level));
         ConfigChangeRequest c=base("GROUP","ADD",null,me,note); c.setAfterJson(toJson(a));
@@ -205,7 +205,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitGroupEdit(Integer idGroup, String namaGroup, String inisial, String level, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Role tidak ditemukan.";
         if (isPending("GROUP", idGroup)) return pendingMsg("GROUP");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaGroup",n(namaGroup)); a.put("inisial",n(inisial)); a.put("level",n(level));
@@ -225,7 +225,7 @@ public class ConfigChangeService {
 
     public String submitGroupDelete(Integer idGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         GroupUser g=groups.findById(idGroup).orElse(null); if(g==null) return "Role tidak ditemukan.";
         // BUG_AUSY_00111: menghapus group yang masih dipakai membuat user-nya kehilangan seluruh akses
         long dipakai = users.countByIdGroup(idGroup);
@@ -257,7 +257,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuAdd(String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (namaMenu==null||namaMenu.isBlank()) return "Nama Menu wajib diisi.";
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",namaMenu.trim()); a.put("url",n(url));
         a.put("parent",String.valueOf(parent==null?0:parent)); a.put("urutan",String.valueOf(urutan==null?0:urutan));
@@ -267,7 +267,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuEdit(Integer idMenu, String namaMenu, String url, Integer parent, Integer urutan, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
         if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         Map<String,String> a=new LinkedHashMap<>(); a.put("namaMenu",n(namaMenu)); a.put("url",n(url));
@@ -280,7 +280,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitMenuDelete(Integer idMenu, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         Menu m=menuRepo.findById(idMenu).orElse(null); if(m==null) return "Menu tidak ditemukan.";
         if (isPending("MENU", idMenu)) return pendingMsg("MENU");
         ConfigChangeRequest c=base("MENU","DELETE",String.valueOf(idMenu),me,note); c.setBeforeJson(toJson(menuMap(m)));
@@ -291,7 +291,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitAccess(Integer group, List<Integer> menuIds, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (group==null) return "Group belum dipilih.";
         if (isPending("ACCESS", group)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
@@ -323,7 +323,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitPasswordReset(String userId, String newPass, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (newPass==null||newPass.isBlank()) return "Password baru wajib diisi.";
         if (newPass.trim().length() < 6) return "Password baru minimal 6 karakter.";
         User u = users.findByUserId(userId).orElse(null);
@@ -357,7 +357,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitApprovalAdd(Integer approverGroup, Integer targetGroup, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        boolean breakGlass = !approval.hasActiveApprover(me.getIdGroup());
+        boolean breakGlass = !approval.hasActiveApproverForConfig(me.getIdGroup());
         if (approverGroup==null||targetGroup==null) return "Group belum lengkap.";
         if (approverGroup.equals(targetGroup)) return "Approver dan target tidak boleh group yang sama.";
         if (approvalRules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)) return "Aturan tersebut sudah ada.";
@@ -382,7 +382,7 @@ public class ConfigChangeService {
     @Transactional
     public String submitApprovalDelete(Long ruleId, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
-        { String blk = approval.submissionBlockedReason(me.getIdGroup()); if (blk != null) return blk; }
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         ApprovalGroup r=approvalRules.findById(ruleId).orElse(null); if(r==null) return "Aturan tidak ditemukan.";
         if (isPending("APPROVAL", ruleId)) return pendingMsg("APPROVAL");
         // Melepas aturan terakhir membuat group target tidak bisa mengajukan apa pun (BUG_AUSY_00128).
@@ -402,7 +402,7 @@ public class ConfigChangeService {
     public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
         List<ReviewItem> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApprove(approverGroup, c.getMaker())) continue;
+            if (!approval.canApproveConfig(approverGroup, c.getMaker())) continue;
             out.add(new ReviewItem(c, diffs(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
@@ -449,7 +449,7 @@ public class ConfigChangeService {
     public List<PendingUser> pendingListFor(Integer approverGroup) {
         List<PendingUser> out = new ArrayList<>();
         for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApprove(approverGroup, c.getMaker())) continue;
+            if (!approval.canApproveConfig(approverGroup, c.getMaker())) continue;
             out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
         }
         return out;
@@ -496,7 +496,7 @@ public class ConfigChangeService {
     public String approve(Long crId, AusyUserDetails me, String note) {
         ConfigChangeRequest c = cr.findById(crId).orElse(null);
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
-        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveConfig(me.getIdGroup(), c.getMaker()))
             return "Group Anda tidak berwenang meng-approve permintaan config ini.";
         String applyMsg = switch (n(c.getEntity())) {
             case "GROUP"    -> applyGroup(c);
@@ -518,7 +518,7 @@ public class ConfigChangeService {
     public String reject(Long crId, AusyUserDetails me, String note) {
         ConfigChangeRequest c = cr.findById(crId).orElse(null);
         if (c == null || !"PENDING".equals(c.getStatus())) return "Permintaan tidak ditemukan / sudah diproses.";
-        if (!approval.canApprove(me.getIdGroup(), c.getMaker()))
+        if (!approval.canApproveConfig(me.getIdGroup(), c.getMaker()))
             return "Group Anda tidak berwenang menolak permintaan config ini.";
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         c.setStatus("REJECTED"); c.setChecker(me.getUsername());
