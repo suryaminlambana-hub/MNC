@@ -31,11 +31,42 @@
             <div class="dash-ico c-warn"><i class="fa-solid fa-file-circle-check"></i></div>
             <div><div class="dash-num" th:text="${pendingPakets}">0</div><div class="dash-label">Batch Menunggu Otorisasi</div></div>
         </div>
+        <div th:if="${cards.contains('cfg-pending')}" class="dash-card" th:classappend="${pendingUsers > 0} ? 'attn'">
+            <span class="dash-pill" th:if="${pendingUsers > 0}">PERLU OTORISASI</span>
+            <div class="dash-ico c-purple"><i class="fa-solid fa-user-check"></i></div>
+            <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">Config Menunggu Otorisasi</div></div>
+        </div>
         <div th:if="${cards.contains('gl-change-pending')}" class="dash-card" th:classappend="${pendingChanges > 0} ? 'attn'">
             <span class="dash-pill" th:if="${pendingChanges > 0}">PERLU AKSI</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-clipboard-check"></i></div>
             <div><div class="dash-num" th:text="${pendingChanges}">0</div><div class="dash-label">Perubahan GL Pending</div></div>
         </div>
+    </div>
+
+    <!--/* Role penyetuju config buatan admin memakai dashboard ini; daftar antriannya sama
+           dengan halaman Otorisasi Config, bukan hitungan semua permintaan (BUG_AUSY_00128). */-->
+    <div th:if="${cards.contains('cfg-pending')}" class="ausy-card">
+        <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-1">
+            <span><i class="fa-solid fa-user-clock text-muted"></i> Config Menunggu Otorisasi
+                <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${pendingUsers}">0</span></span>
+            <a class="btn btn-sm btn-primary ms-2 flex-shrink-0 text-nowrap" th:href="@{/config-change/review}">
+                <i class="fa-solid fa-user-check"></i> Buka Otorisasi Config</a>
+        </div>
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead><tr><th class="ps-3">Waktu</th><th>Operasi</th><th>Target</th><th>Oleh</th><th class="pe-3">Catatan</th></tr></thead>
+            <tbody>
+            <tr th:each="p : ${pendingUserList}">
+                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(p.cr.createdAt,'dd-MM-yyyy HH:mm')}"></td>
+                <td><span class="badge bg-warning-subtle text-warning" th:text="${p.opLabel}"></span></td>
+                <td th:text="${p.targetLabel}"></td>
+                <td th:text="${p.cr.maker}"></td>
+                <td class="small text-muted pe-3" th:text="${p.cr.noteMaker}"></td>
+            </tr>
+            <tr th:if="${pendingUserList == null or pendingUserList.isEmpty()}">
+                <td colspan="5" class="text-center text-muted py-4">Tidak ada permintaan yang menunggu otorisasi Anda.</td>
+            </tr>
+            </tbody>
+        </table>
     </div>
 
     <div th:if="${cards.contains('audit-recent') or cards.contains('audit-recent-admin')}" class="ausy-card">

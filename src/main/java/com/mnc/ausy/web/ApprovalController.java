@@ -26,7 +26,7 @@ public class ApprovalController {
     }
 
     @GetMapping
-    public String list(Model model) {
+    public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         Map<Integer,String> name = new HashMap<>();
         for (GroupUser g : groups.findAll()) name.put(g.getIdGroup(), g.getNamaGroup());
         List<ApprovalGroup> rows = rules.findAll();
@@ -36,7 +36,7 @@ public class ApprovalController {
         }
         model.addAttribute("rules", rows);
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
-        model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("APPROVAL"));
         return "approval/list";
     }

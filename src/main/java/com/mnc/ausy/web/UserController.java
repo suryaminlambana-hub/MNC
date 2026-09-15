@@ -30,7 +30,7 @@ public class UserController {
     }
 
     @GetMapping
-    public String list(Model model) {
+    public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         model.addAttribute("users", users.findAll());
         List<GroupUser> allGroups = groups.findAllByOrderByNamaGroupAsc();
         // BUG_AUSY_00110: kolom Group dulu menampilkan users.level (kolom lama yang tidak ikut
@@ -42,7 +42,7 @@ public class UserController {
         Set<String> resettable = new HashSet<>();     // hanya user sisi operasional (BUG_AUSY_00129)
         for (User u : users.findAll()) if (configChange.resettableByAdmin(u)) resettable.add(u.getUserId());
         model.addAttribute("resettable", resettable);
-        model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";
     }

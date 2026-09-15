@@ -50,10 +50,13 @@ public class DashboardController {
     public String dashboard(Model model, Authentication auth, @AuthenticationPrincipal AusyUserDetails principal) {
         // --- Admin / Config (1): only user & group config + user-change history (no GL/business) ---
         if (hasGroup(auth, "GROUP_1")) {
+            Integer myGroup = principal == null ? null : principal.getIdGroup();
             model.addAttribute("totalUsers", users.count());
             model.addAttribute("totalGroups", groups.count());
-            model.addAttribute("pendingUsers", configChange.countPending());
-            model.addAttribute("pendingUserList", configChange.pendingList());
+            // sisi pengaju: yang ditampilkan adalah pengajuan group ini sendiri (BUG_AUSY_00128)
+            List<ConfigChangeService.PendingUser> mine = configChange.pendingListByMakerGroup(myGroup);
+            model.addAttribute("pendingUsers", mine.size());
+            model.addAttribute("pendingUserList", mine);
             model.addAttribute("userHistory", tx.byActivityPrefix("CONFIG_CHANGE%", PageRequest.of(0, 50)));
             // FTP transfers stuck as PENDING/FAILED — Admin needs to resend from Konfigurasi FTP.
             List<com.mnc.ausy.domain.ExportTransfer> ftpResendList = ftpAdmin.needsResend();
@@ -64,8 +67,10 @@ public class DashboardController {
 
         // --- Admin Approval (2): only user approvals + recent activity scoped to admin side ---
         if (hasGroup(auth, "GROUP_2")) {
-            model.addAttribute("pendingUsers", configChange.countPending());
-            model.addAttribute("pendingUserList", configChange.pendingList());
+            // sisi penyetuju: persis yang bisa dibuka di halaman Otorisasi (BUG_AUSY_00128)
+            Integer myGroup = principal == null ? null : principal.getIdGroup();
+            model.addAttribute("pendingUsers", configChange.countPendingFor(myGroup));
+            model.addAttribute("pendingUserList", configChange.pendingListFor(myGroup));
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.groupsOnSide(AuditScopeService.CONFIG), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
@@ -119,6 +124,15 @@ public class DashboardController {
         if (cards.contains("otorisasi-pending")) model.addAttribute("pendingPakets", gl.pendingPakets().size());
         if (cards.contains("gl-change-pending")) model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
         // card aktivitas terbaru ada dua: operasional & administratif, masing-masing hak aksesnya sendiri
+        if (cards.contains("cfg-pending")) {
+            Integer myGroup = principal == null ? null : principal.getIdGroup();
+            // role penyetuju config buatan admin: isinya yang benar-benar boleh dia setujui
+            List<ConfigChangeService.PendingUser> queue = configChange.isApproverForAnyone(myGroup)
+                    ? configChange.pendingListFor(myGroup)
+                    : configChange.pendingListByMakerGroup(myGroup);
+            model.addAttribute("pendingUsers", queue.size());
+            model.addAttribute("pendingUserList", queue);
+        }
         if (cards.contains("audit-recent"))
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 8)));

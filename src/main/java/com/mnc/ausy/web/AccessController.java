@@ -27,10 +27,11 @@ public class AccessController {
     }
 
     @GetMapping
-    public String index(@RequestParam(required=false) Integer group, Model model) {
+    public String index(@RequestParam(required=false) Integer group, Model model,
+                        @AuthenticationPrincipal AusyUserDetails me) {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
         model.addAttribute("selectedGroup", group);
-        model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("ACCESS"));
         if (group != null) {
             Set<Integer> granted = new HashSet<>();

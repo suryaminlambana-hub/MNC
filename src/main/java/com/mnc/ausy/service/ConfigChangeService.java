@@ -439,6 +439,40 @@ public class ConfigChangeService {
 
     public long countPending(){ return cr.countByStatus("PENDING"); }
 
+    /**
+     * Jumlah & daftar yang benar-benar bisa disetujui group ini — dasar yang sama dengan halaman
+     * Otorisasi. Dashboard dulu memakai hitungan SELURUH permintaan pending, jadi angkanya muncul
+     * padahal halamannya kosong karena tersaring aturan Approval Group (BUG_AUSY_00128).
+     */
+    public long countPendingFor(Integer approverGroup) { return pendingReviewFor(approverGroup).size(); }
+
+    public List<PendingUser> pendingListFor(Integer approverGroup) {
+        List<PendingUser> out = new ArrayList<>();
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            if (!approval.canApprove(approverGroup, c.getMaker())) continue;
+            out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
+        }
+        return out;
+    }
+
+    /** Pengajuan yang dibuat group ini sendiri — untuk sisi pengaju (Admin) melihat miliknya. */
+    public List<PendingUser> pendingListByMakerGroup(Integer makerGroup) {
+        List<PendingUser> out = new ArrayList<>();
+        for (ConfigChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            if (makerGroup == null || !makerGroup.equals(c.getMakerGroup())) continue;
+            out.add(new PendingUser(c, targetLabel(c), entityLabel(c.getEntity()), opLabel(c.getOp())));
+        }
+        return out;
+    }
+
+    /** Apakah group ini terdaftar sebagai penyetuju untuk group mana pun? */
+    public boolean isApproverForAnyone(Integer group) {
+        if (group == null) return false;
+        for (ApprovalGroup r : approvalRules.findAll())
+            if (group.equals(r.getApproverGroup())) return true;
+        return false;
+    }
+
     /** Pending config changes for the Admin home "Perubahan Config Pending" section. */
     public record PendingUser(ConfigChangeRequest cr, String targetLabel, String entityLabel, String opLabel) {}
     public List<PendingUser> pendingList() {

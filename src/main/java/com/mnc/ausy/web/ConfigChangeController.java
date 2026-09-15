@@ -23,6 +23,9 @@ public class ConfigChangeController {
         long total = sections.stream().mapToLong(s -> s.items().size()).sum();
         model.addAttribute("sections", sections);
         model.addAttribute("total", total);
+        // Kalau kosong, bedakan "memang tidak ada" dengan "group ini belum terdaftar sebagai
+        // penyetuju" — dulu sama-sama tampil kosong tanpa penjelasan (BUG_AUSY_00128).
+        model.addAttribute("notApprover", !service.isApproverForAnyone(me.getIdGroup()));
         return "config-change/review";
     }
 

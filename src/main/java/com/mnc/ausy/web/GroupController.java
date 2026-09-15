@@ -19,9 +19,9 @@ public class GroupController {
     }
 
     @GetMapping
-    public String list(Model model) {
+    public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
-        model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("GROUP"));
         model.addAttribute("inUse", configChange.groupsInUse());   // BUG_AUSY_00111
         return "groups/list";

@@ -7,8 +7,18 @@
   <p class="text-muted">Permintaan perubahan Master Data dari Admin, dikelompokkan per section. Periksa alasan &amp; perubahan sebelum approve/reject.</p>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
 
-  <div th:if="${total == 0}" class="ausy-card text-center text-muted py-4">
-    Tidak ada permintaan perubahan config yang menunggu otorisasi.
+  <div th:if="${total == 0}" class="ausy-card text-center py-4">
+    <p th:unless="${notApprover}" class="text-muted mb-0">
+      Tidak ada permintaan perubahan config yang menunggu otorisasi.</p>
+    <!--/* BUG_AUSY_00128: kosong karena group ini belum jadi penyetuju siapa pun — jelaskan,
+           jangan diam, karena angka di dashboard bisa membuat orang mengira ada yang hilang. */-->
+    <div th:if="${notApprover}">
+      <p class="mb-1"><i class="fa-solid fa-triangle-exclamation text-warning"></i>
+        <b>Role Anda belum terdaftar sebagai penyetuju untuk role mana pun.</b></p>
+      <p class="text-muted mb-0">Selama belum terdaftar, permintaan dari role lain tidak akan muncul
+        di sini. Minta Administrator menambahkan aturan di menu <b>Approval Group</b>
+        (Role Penyetuju = role Anda, Berwenang Menyetujui = role pengaju).</p>
+    </div>
   </div>
 
   <div th:if="${total > 0}">

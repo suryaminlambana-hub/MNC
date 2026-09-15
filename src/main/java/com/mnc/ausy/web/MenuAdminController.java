@@ -23,14 +23,14 @@ public class MenuAdminController {
     }
 
     @GetMapping
-    public String list(Model model) {
+    public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc();
         Map<Integer,String> parentName = new HashMap<>();
         for (Menu m : all) if (m.getParent()==0) parentName.put(m.getIdMenu(), m.getNamaMenu());
         model.addAttribute("menus", all);
         model.addAttribute("parentName", parentName);
         model.addAttribute("parents", all.stream().filter(m -> m.getParent()==0).toList());
-        model.addAttribute("pendingConfig", configChange.countPending());
+        model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("MENU"));
         return "menus/list";
     }
