@@ -20,7 +20,12 @@
             <tbody>
             <tr th:each="u, i : ${users}">
                 <td th:text="${i.count}">1</td>
-                <td><b th:text="${u.userId}">user</b></td>
+                <td th:with="isMe=${currentUser != null and currentUser.username == u.userId}">
+                    <b th:text="${u.userId}">user</b>
+                    <!--/* BUG_AUSY_00135: tandai akun yang sedang dipakai login */-->
+                    <span th:if="${isMe}" class="badge bg-primary-subtle text-primary ms-1"
+                          title="Ini akun yang sedang Anda pakai">Akun Anda</span>
+                </td>
                 <td th:text="${u.nama}">Nama</td>
                 <td th:text="${groupNames != null and groupNames.containsKey(u.idGroup)} ? ${groupNames.get(u.idGroup)} : '—'">ROLE</td>
                 <td th:text="${u.email}">email</td>
@@ -40,7 +45,8 @@
                                 th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#resetPass"
                                 title="Reset password user ini (butuh approval Admin Approval)">Reset Password</button>
                         <!--/* BUG_AUSY_00131: akun admin & admin approver utama tidak bisa dihapus */-->
-                        <button th:unless="${protectedUsers != null and protectedUsers.contains(u.userId)}"
+                        <button th:unless="${(protectedUsers != null and protectedUsers.contains(u.userId))
+                                             or (currentUser != null and currentUser.username == u.userId)}"
                                 class="btn btn-sm btn-outline-danger btn-del"
                                 th:attr="data-uid=${u.userId}" data-bs-toggle="modal" data-bs-target="#delUser">Hapus</button>
                         <span th:if="${protectedUsers != null and protectedUsers.contains(u.userId)}"
