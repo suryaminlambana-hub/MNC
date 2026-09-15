@@ -47,7 +47,7 @@ public class AccessService {
      * supaya group yang memang hanya menyetujui tidak ikut diperingati.
      */
     private static final Set<String> SUBMIT_PAGES = Set.of(
-            "/users", "/groups", "/menus", "/access", "/approval", "/admin/ftp",
+            "/users", "/groups", "/menus", "/access", "/admin/ftp",
             "/upload", "/nala", "/gl-data", "/gl-delete", "/gl-code", "/gl-legacy/export-request");
 
     /** Apakah group ini punya halaman yang bisa mengajukan perubahan? */

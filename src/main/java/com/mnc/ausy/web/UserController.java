@@ -5,6 +5,7 @@ import com.mnc.ausy.domain.User;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.ConfigChangeService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -24,20 +25,27 @@ public class UserController {
     private final UserRepository users;
     private final GroupUserRepository groups;
     private final ConfigChangeService configChange;
+    private final ApprovalService approval;
 
-    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange) {
-        this.users = users; this.groups = groups; this.configChange = configChange;
+    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange,
+                          ApprovalService approval) {
+        this.users = users; this.groups = groups; this.configChange = configChange; this.approval = approval;
     }
 
     @GetMapping
     public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         model.addAttribute("users", users.findAll());
         List<GroupUser> allGroups = groups.findAllByOrderByNamaGroupAsc();
+        // Role yang mengotorisasi kita tidak boleh diisi/diubah dari sini (BUG_AUSY_00132)
+        boolean iAmConfigApprover = approval.configAuthorizer(me == null ? null : me.getIdGroup());
+        List<GroupUser> assignable = allGroups.stream()
+                .filter(g -> iAmConfigApprover || !approval.configAuthorizer(g.getIdGroup()))
+                .toList();
         // BUG_AUSY_00110: kolom Group dulu menampilkan users.level (kolom lama yang tidak ikut
         // terisi saat group baru dipasang) sehingga group baru tampil kosong. Ambil dari master.
         Map<Integer,String> groupNames = new HashMap<>();
         for (GroupUser g : allGroups) groupNames.put(g.getIdGroup(), g.getNamaGroup());
-        model.addAttribute("groups", allGroups);
+        model.addAttribute("groups", assignable);       // untuk dropdown Tambah/Ubah user
         model.addAttribute("groupNames", groupNames);
         Set<String> resettable = new HashSet<>();     // hanya user sisi operasional (BUG_AUSY_00129)
         Set<String> protectedIds = new HashSet<>();   // akun utama sistem (BUG_AUSY_00131)

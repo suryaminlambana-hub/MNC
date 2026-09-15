@@ -134,6 +134,7 @@ public class ConfigChangeService {
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         userId = userId==null?"":userId.toLowerCase().trim();
         if (userId.isEmpty()) return "Username tidak valid.";
+        { String no = aboveMe(idGroup, me); if (no != null) return no; }
         if (users.existsByUserId(userId)) return "Username sudah dipakai.";
         if (invalidEmail(email)) return "Format email tidak valid.";
         Map<String,String> after = new LinkedHashMap<>();
@@ -150,8 +151,10 @@ public class ConfigChangeService {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (invalidEmail(email)) return "Format email tidak valid.";
+        { String no = aboveMe(idGroup, me); if (no != null) return no; }   // pindah ke role penyetuju
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
+        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
         if (isPending("USER", userId)) return pendingMsg("USER");
         Map<String,String> after = new LinkedHashMap<>();
         after.put("userId", n(u.getUserId())); after.put("nama", n(nama)); after.put("email", n(email));
@@ -177,6 +180,7 @@ public class ConfigChangeService {
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
         // Akun bawaan sistem: tanpa keduanya tidak ada lagi yang bisa mengonfigurasi maupun
         // mengotorisasi konfigurasi (BUG_AUSY_00131). Akun buatan admin tetap bisa dihapus.
+        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
         if (u.isProtectedAccount())
             return "Akun '" + userId + "' adalah akun utama sistem dan tidak dapat dihapus."
                  + " Akun lain yang dibuat Admin tetap bisa dihapus.";
@@ -298,6 +302,7 @@ public class ConfigChangeService {
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (group==null) return "Group belum dipilih.";
+        { String no = aboveMe(group, me); if (no != null) return no; }
         if (isPending("ACCESS", group)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
         // current granted (leaf menus)
@@ -342,6 +347,19 @@ public class ConfigChangeService {
         a.put("pass", encoder.encode(newPass.trim()));
         ConfigChangeRequest c=base("USER","RESET_PASS",userId,me,note); c.setAfterJson(toJson(a));
         return saveReq(c,"USER","RESET_PASS","'"+userId+"'");
+    }
+
+    /**
+     * Role penyetuju config berada DI ATAS admin: admin diotorisasi olehnya, jadi admin tidak boleh
+     * mengisi maupun mengubah keanggotaan role itu (BUG_AUSY_00132) dan tidak boleh mengubah hak
+     * aksesnya (BUG_AUSY_00133). Yang boleh hanya role penyetuju config itu sendiri.
+     * @return alasan penolakan, atau null kalau boleh.
+     */
+    private String aboveMe(Integer targetGroup, AusyUserDetails me) {
+        if (targetGroup == null || !approval.configAuthorizer(targetGroup)) return null;
+        if (approval.configAuthorizer(me == null ? null : me.getIdGroup())) return null;
+        return "Role '" + groupName(targetGroup) + "' adalah role yang mengotorisasi Anda —"
+             + " di luar wewenang Anda untuk mengubahnya.";
     }
 
     /** User sisi operasional (Maker/Checker) — hanya mereka yang passwordnya boleh direset Admin. */

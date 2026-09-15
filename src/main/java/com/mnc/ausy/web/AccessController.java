@@ -4,6 +4,7 @@ import com.mnc.ausy.domain.GroupMenu;
 import com.mnc.ausy.domain.Menu;
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.ConfigChangeService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -20,16 +21,22 @@ public class AccessController {
     private final MenuRepository menus;
     private final GroupMenuRepository groupMenus;
     private final ConfigChangeService configChange;
+    private final ApprovalService approval;
 
     public AccessController(GroupUserRepository groups, MenuRepository menus, GroupMenuRepository groupMenus,
-                            ConfigChangeService configChange) {
+                            ConfigChangeService configChange, ApprovalService approval) {
+        this.approval = approval;
         this.groups = groups; this.menus = menus; this.groupMenus = groupMenus; this.configChange = configChange;
     }
 
     @GetMapping
     public String index(@RequestParam(required=false) Integer group, Model model,
                         @AuthenticationPrincipal AusyUserDetails me) {
-        model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc());
+        // Hak akses role yang mengotorisasi kita tidak boleh diubah dari sini (BUG_AUSY_00133)
+        boolean iAmConfigApprover = approval.configAuthorizer(me == null ? null : me.getIdGroup());
+        model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc().stream()
+                .filter(g -> iAmConfigApprover || !approval.configAuthorizer(g.getIdGroup()))
+                .toList());
         model.addAttribute("selectedGroup", group);
         model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("ACCESS"));
