@@ -1,7 +1,9 @@
 package com.mnc.ausy.service;
 
 import com.mnc.ausy.domain.ApprovalGroup;
+import com.mnc.ausy.domain.GroupUser;
 import com.mnc.ausy.repo.ApprovalGroupRepository;
+import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -9,22 +11,44 @@ import org.springframework.stereotype.Service;
 public class ApprovalService {
     private final ApprovalGroupRepository rules;
     private final UserRepository users;
+    private final GroupUserRepository groups;
+    private final AccessService access;
 
-    public ApprovalService(ApprovalGroupRepository rules, UserRepository users) {
-        this.rules = rules; this.users = users;
+    public ApprovalService(ApprovalGroupRepository rules, UserRepository users,
+                           GroupUserRepository groups, AccessService access) {
+        this.rules = rules; this.users = users; this.groups = groups; this.access = access;
+    }
+
+    /**
+     * Role yang memang bertugas mengotorisasi config — dikenali dari haknya atas aksi
+     * "Otorisasi Perubahan Config", bukan dari id group yang ditulis di kode.
+     */
+    public boolean configAuthorizer(Integer group) {
+        return group != null && access.allowed(group, "/config-change")
+                && "CONFIG".equals(access.sideOf(group));
+    }
+
+    /**
+     * Role sisi config (Admin & sejenisnya) selalu boleh diotorisasi oleh role Config Approver,
+     * tanpa perlu aturan Approval Group yang ditulis satu per satu — permintaan MNC, supaya
+     * mengganti role Config Approver tidak memutus rantai otorisasi (BUG_AUSY_00128).
+     */
+    private boolean configPairing(Integer approverGroup, Integer targetGroup) {
+        return configAuthorizer(approverGroup) && "CONFIG".equals(access.sideOf(targetGroup));
     }
 
     /**
      * May a user in {@code approverGroup} approve work submitted by {@code submitterUserId}?
-     * Strictly driven by the approval_group matrix (no super-approver bypass) — enforces
-     * segregation of duties: an approver can only approve groups explicitly assigned to it,
-     * and never its own submissions.
+     * Dari matriks Approval Group, ditambah satu pasangan bawaan: Config Approver selalu boleh
+     * mengotorisasi pengajuan dari role sisi config. Approver tetap tidak pernah bisa menyetujui
+     * pengajuan group-nya sendiri.
      */
     public boolean canApprove(Integer approverGroup, String submitterUserId) {
         Integer targetGroup = users.findByUserId(submitterUserId).map(u -> u.getIdGroup()).orElse(null);
         if (approverGroup == null || targetGroup == null) return false;
         if (approverGroup.equals(targetGroup)) return false;   // cannot approve own group
-        return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup);
+        return rules.existsByApproverGroupAndTargetGroup(approverGroup, targetGroup)
+                || configPairing(approverGroup, targetGroup);
     }
 
     /**
@@ -54,6 +78,21 @@ public class ApprovalService {
             if (approver == null || approver.equals(makerGroup)) continue;
             if (users.countByIdGroupAndStatusAccount(approver, (short) 1) > 0) return true;
         }
+        // pasangan bawaan sisi config: cukup ada Config Approver ber-user aktif
+        if ("CONFIG".equals(access.sideOf(makerGroup)))
+            for (GroupUser g : groups.findAll()) {
+                Integer id = g.getIdGroup();
+                if (id == null || id.equals(makerGroup) || !configAuthorizer(id)) continue;
+                if (users.countByIdGroupAndStatusAccount(id, (short) 1) > 0) return true;
+            }
+        return false;
+    }
+
+    /** Apakah role ini punya wewenang menyetujui — lewat aturan Approval Group atau sebagai Config Approver. */
+    public boolean isApprover(Integer group) {
+        if (group == null) return false;
+        if (configAuthorizer(group)) return true;
+        for (ApprovalGroup r : rules.findAll()) if (group.equals(r.getApproverGroup())) return true;
         return false;
     }
 

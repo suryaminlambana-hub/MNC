@@ -466,12 +466,7 @@ public class ConfigChangeService {
     }
 
     /** Apakah group ini terdaftar sebagai penyetuju untuk group mana pun? */
-    public boolean isApproverForAnyone(Integer group) {
-        if (group == null) return false;
-        for (ApprovalGroup r : approvalRules.findAll())
-            if (group.equals(r.getApproverGroup())) return true;
-        return false;
-    }
+    public boolean isApproverForAnyone(Integer group) { return approval.isApprover(group); }
 
     /** Pending config changes for the Admin home "Perubahan Config Pending" section. */
     public record PendingUser(ConfigChangeRequest cr, String targetLabel, String entityLabel, String opLabel) {}
