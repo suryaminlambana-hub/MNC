@@ -50,8 +50,17 @@
             <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
           </div>
 
+          <!--/* RESET PASSWORD: cukup sebutkan usernya + alasan, tanpa tabel before/after
+                 (BUG_AUSY_00130) */-->
+          <div th:if="${it.cr.op == 'RESET_PASS'}" class="alert alert-info py-2 mb-2">
+            <i class="fa-solid fa-key"></i>
+            Reset password untuk user <b th:text="${it.cr.targetId}">user</b>.
+            Password baru sudah ditentukan Admin dan hanya berlaku setelah Anda approve —
+            nilainya tidak ditampilkan di sini.
+          </div>
+
           <!-- ADD: only new values -->
-          <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
+          <table th:if="${it.cr.op == 'ADD' and it.cr.op != 'RESET_PASS'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
             <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
             <tbody>
             <tr th:each="d : ${it.diffs}">
@@ -62,7 +71,7 @@
           </table>
 
           <!-- EDIT / DELETE: before vs after -->
-          <table th:unless="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff">
+          <table th:unless="${it.cr.op == 'ADD' or it.cr.op == 'RESET_PASS'}" class="table table-sm align-middle mb-2 ausy-diff">
             <thead><tr><th style="width:30%">Field</th><th style="width:35%">Before</th><th style="width:35%">After</th></tr></thead>
             <tbody>
             <tr th:each="d : ${it.diffs}" th:classappend="${d.changed} ? 'table-warning'">

@@ -424,6 +424,10 @@ public class ConfigChangeService {
     }
 
     private List<Diff> diffs(ConfigChangeRequest c) {
+        // Reset password tidak punya before/after: yang berubah cuma passwordnya, dan nilainya
+        // tidak boleh ditampilkan. Tabel diff-nya dulu malah membuat username terlihat seperti
+        // ikut berubah (BUG_AUSY_00130).
+        if ("RESET_PASS".equals(c.getOp())) return List.of();
         var fields = ENTITY_FIELDS.getOrDefault(c.getEntity(), ENTITY_FIELDS.get("USER"));
         Map<String,String> b = parse(c.getBeforeJson()), a = parse(c.getAfterJson());
         List<Diff> list = new ArrayList<>();
