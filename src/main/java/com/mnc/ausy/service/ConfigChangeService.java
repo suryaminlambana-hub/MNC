@@ -308,6 +308,14 @@ public class ConfigChangeService {
         // current granted (leaf menus)
         List<Integer> cur = new ArrayList<>();
         for (GroupMenu gm : groupMenus.findByIdGroup(group)) cur.add(gm.getIdMenu());
+        // Hak milik Admin Approval tidak boleh diberikan/dicabut oleh role di bawahnya
+        // (BUG_AUSY_00136) — yang tidak berwenang tidak melihat centangannya, jadi hak yang
+        // sudah ada dipertahankan apa adanya, bukan ikut terhapus diam-diam.
+        if (!approval.configAuthorizer(me == null ? null : me.getIdGroup())) {
+            Set<Integer> locked = approverOnlyMenuIds();
+            want.removeAll(locked);
+            for (Integer id : cur) if (locked.contains(id)) want.add(id);
+        }
         Map<String,String> before = accessMap(group, cur);
         Map<String,String> after  = accessMap(group, new ArrayList<>(want));
         if (unchanged(before, after, "menuIds")) return NO_CHANGE;
@@ -360,6 +368,18 @@ public class ConfigChangeService {
         if (approval.configAuthorizer(me == null ? null : me.getIdGroup())) return null;
         return "Role '" + groupName(targetGroup) + "' adalah role yang mengotorisasi Anda —"
              + " di luar wewenang Anda untuk mengubahnya.";
+    }
+
+    /**
+     * Hak akses yang hanya boleh diatur Admin Approval sendiri: seluruh isi section Admin Approval
+     * (menu otorisasi config, aksinya, dan card-nya). Kalau admin bisa memberikannya ke role lain,
+     * role itu praktis menjadi penyetuju baru — BUG_AUSY_00136.
+     */
+    public Set<Integer> approverOnlyMenuIds() {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (Menu m : menuRepo.findAll())
+            if ("ADMIN_APV".equals(m.getSection())) out.add(m.getIdMenu());
+        return out;
     }
 
     /** User sisi operasional (Maker/Checker) — hanya mereka yang passwordnya boleh direset Admin. */

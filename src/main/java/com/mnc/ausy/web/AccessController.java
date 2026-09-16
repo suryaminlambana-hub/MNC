@@ -44,9 +44,12 @@ public class AccessController {
             Set<Integer> granted = new HashSet<>();
             for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
             // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan
+            // Section Admin Approval hanya terlihat oleh Admin Approval sendiri (BUG_AUSY_00136):
+            // aksesnya tidak boleh dibuka untuk role lain.
             List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc().stream()
                     .filter(m -> m.getActive() != null && m.getActive() == 1)
                     .filter(m -> m.getBundledWith() == null)   // aksi yang menempel ikut menunya
+                    .filter(m -> iAmConfigApprover || !"ADMIN_APV".equals(m.getSection()))
                     .toList();
             model.addAttribute("sections", sections(all));
             model.addAttribute("granted", granted);
