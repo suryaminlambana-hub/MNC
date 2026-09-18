@@ -15,4 +15,12 @@ public interface TlogActivityRepository extends JpaRepository<TlogActivity, Long
     @Query(value = "select a.* from tlog_activity a join users u on u.user_id = a.user_id " +
                    "where u.id_group in (:groups) order by a.time_activity desc", nativeQuery = true)
     List<TlogActivity> findByUserGroups(@Param("groups") Collection<Integer> groups, Pageable page);
+
+    /**
+     * Jejak milik user tertentu saja — dipakai checker, yang hanya boleh melihat aktivitas maker
+     * pasangannya (BUG_AUSY_00149), bukan seluruh maker di sisi operasional.
+     */
+    @Query(value = "select t.* from tlog_activity t where t.user_id in (:users) order by t.time_activity desc",
+           nativeQuery = true)
+    List<TlogActivity> findByUserIds(@Param("users") Collection<String> users, Pageable page);
 }

@@ -74,7 +74,7 @@ public class DashboardController {
             model.addAttribute("pendingUsers", configChange.countPendingFor(myGroup));
             model.addAttribute("pendingUserList", configChange.pendingListFor(myGroup));
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsOnSide(AuditScopeService.CONFIG), PageRequest.of(0, 15)));
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.CONFIG), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
 
@@ -117,7 +117,7 @@ public class DashboardController {
             model.addAttribute("pendingChanges", glChange.pendingVisibleCount(principal));
             model.addAttribute("pendingChangeList", glChange.pendingVisible(principal));
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 10)));
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.BUSINESS), PageRequest.of(0, 10)));
             return "dashboard-checker";
         }
 
@@ -149,10 +149,10 @@ public class DashboardController {
         }
         if (cards.contains("audit-recent"))
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 8)));
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.BUSINESS), PageRequest.of(0, 8)));
         else if (cards.contains("audit-recent-admin"))
             model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsOnSide(AuditScopeService.CONFIG), PageRequest.of(0, 8)));
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.CONFIG), PageRequest.of(0, 8)));
         model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
     }

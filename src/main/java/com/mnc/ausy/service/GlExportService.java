@@ -35,6 +35,8 @@ public class GlExportService {
     private final DataScopeService scope;
 
     @Value("${ausy.txt-dir:data/txt}") private String txtDir;
+    /** Tujuan file ACCTXT — di produksi diarahkan ke C:/inetpub/ftproot (BUG_AUSY_00146). */
+    @Value("${ausy.export-dir:${ausy.txt-dir:data/txt}}") private String exportDir;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
                            ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes,
@@ -44,6 +46,11 @@ public class GlExportService {
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
+
+    /** JPA kadang membungkus hasil agregat multi-kolom dalam Object[1][]; rapikan di satu tempat. */
+    private static Object[] unwrap(Object[] row) {
+        return (row != null && row.length == 1 && row[0] instanceof Object[] inner) ? inner : row;
+    }
 
     /** Group pengaju export: dari permintaannya, baru dari record user kalau belum tersimpan. */
     private Integer groupOf(GlExportRequest r) {
@@ -138,26 +145,36 @@ public class GlExportService {
             if (pendingRows.contains(id))
                 return "Data GL #" + id + " masih menunggu otorisasi Checker — selesaikan dulu sebelum diexport.";
 
-        List<GlTabel> rows = new ArrayList<>();
-        if (!paket.isEmpty()) rows.addAll(gl.findExportableByNoPaketIn(paket));
-        if (!ids.isEmpty())
-            for (GlTabel g : gl.findExportableByIdIn(ids))
-                if (rows.stream().noneMatch(x -> x.getId().equals(g.getId()))) rows.add(g);
         // Maker hanya boleh mengajukan barisnya sendiri, walau nomor batch / id barisnya
-        // ditebak dan dikirim langsung ke endpoint ini (BUG_AUSY_00138).
-        for (GlTabel g : rows)
-            if (!scope.canSee(me, g.getGltrus())) return DataScopeService.NOT_MY_MAKER;
-        if (rows.isEmpty()) {
+        // ditebak dan dikirim langsung ke endpoint ini (BUG_AUSY_00138). Diperiksa lewat daftar
+        // uploader-nya saja, bukan dengan memuat semua barisnya (BUG_AUSY_00148).
+        List<String> uploaders = new ArrayList<>();
+        if (!paket.isEmpty()) uploaders.addAll(gl.exportableUploadersByPaket(paket));
+        if (!ids.isEmpty()) uploaders.addAll(gl.exportableUploadersByIds(ids));
+        for (String u : uploaders)
+            if (!scope.canSee(me, u)) return DataScopeService.NOT_MY_MAKER;
+
+        // Jumlah & total dihitung di database — pengajuan export tidak lagi tergantung
+        // banyaknya baris (BUG_AUSY_00148).
+        long count = 0; BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
+        if (!paket.isEmpty()) {
+            Object[] sum = unwrap(gl.exportableSummaryByPaket(paket));
+            count += ((Number) sum[0]).longValue();
+            d = d.add((BigDecimal) sum[1]); c = c.add((BigDecimal) sum[2]);
+        }
+        if (!ids.isEmpty()) {
+            Object[] sum = unwrap(gl.exportableSummaryByIds(ids));
+            count += ((Number) sum[0]).longValue();
+            d = d.add((BigDecimal) sum[1]); c = c.add((BigDecimal) sum[2]);
+        }
+        if (count == 0) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
             return "Tidak ada GL aktif yang belum di-export.";
         }
-        BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
-        for (GlTabel g : rows) {
-            if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));
-        }
+        int rowsCount = (int) count;
         GlExportRequest req = new GlExportRequest();
         req.setRequestedBy(me.getUsername()); req.setRequesterGroup(me.getIdGroup());
-        req.setStatus("PENDING"); req.setRowsCount(rows.size()); req.setDebit(d); req.setCredit(c);
+        req.setStatus("PENDING"); req.setRowsCount(rowsCount); req.setDebit(d); req.setCredit(c);
         req.setCreatedAt(LocalDateTime.now()); req.setNoteMaker(note);
         requests.save(req);
         if (!paket.isEmpty()) gl.markExportable(req.getId(), paket);
@@ -166,8 +183,8 @@ public class GlExportService {
                 + (paket.isEmpty() || ids.isEmpty() ? "" : " + ")
                 + (ids.isEmpty() ? "" : ids.size() + " data GL manual");
         audit.transaction(me.getUsername(), "EXPORT_REQ",
-                "Ajukan export " + what + ": " + rows.size() + " baris (CR#" + req.getId() + ")");
-        return "Permintaan export diajukan (" + rows.size() + " baris) — menunggu otorisasi checker.";
+                "Ajukan export " + what + ": " + rowsCount + " baris (CR#" + req.getId() + ")");
+        return "Permintaan export diajukan (" + rowsCount + " baris) — menunggu otorisasi checker.";
     }
 
     /** Buang nilai kosong dari pilihan batch — batch kosong tidak pernah bisa dicocokkan. */
@@ -225,7 +242,7 @@ public class GlExportService {
 
         String ftpNote;
         try {
-            Path dir = Paths.get(txtDir);
+            Path dir = Paths.get(exportDir);
             Files.createDirectories(dir);
             // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
             // Export berikutnya di hari yang sama menimpa file hari itu, baik di disk maupun di FTP
@@ -257,8 +274,11 @@ public class GlExportService {
                     ftpNote = " (Gagal kirim ke FTP — masuk antrian; Admin dapat kirim ulang dari beranda Admin.)";
                 }
             } else {
-                t.setStatus("PENDING"); t.setAttempts(0);
-                ftpNote = " (FTP belum dikonfigurasi/aktif di server — file masuk antrian dan dapat dikirim ulang dari beranda Admin setelah setelannya benar.)";
+                // Tanpa setelan FTP, file ACCTXT cukup ditulis ke direktori tujuan (root FTP lokal)
+                // dan core mengambilnya dari sana — tidak ada lagi antrian kirim (BUG_AUSY_00146).
+                t.setStatus("SENT"); t.setRemotePath(out.toAbsolutePath().toString());
+                t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
+                ftpNote = " File tersimpan di " + out.toAbsolutePath() + ".";
             }
             transfers.save(t);
 
@@ -295,7 +315,7 @@ public class GlExportService {
     /** Resolve a generated text file inside the txt dir (basename only — no path traversal). */
     public Path txtFile(String name) {
         String safe = Paths.get(name == null ? "" : name).getFileName().toString();
-        return Paths.get(txtDir).resolve(safe);
+        return Paths.get(exportDir).resolve(safe);   // file ditulis di direktori export
     }
 
     @Transactional

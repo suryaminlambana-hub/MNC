@@ -23,9 +23,10 @@ public class AuditScopeService {
 
     private final GroupUserRepository groups;
     private final AccessService access;
+    private final ApprovalService approval;
 
-    public AuditScopeService(GroupUserRepository groups, AccessService access) {
-        this.groups = groups; this.access = access;
+    public AuditScopeService(GroupUserRepository groups, AccessService access, ApprovalService approval) {
+        this.groups = groups; this.access = access; this.approval = approval;
     }
 
     public static final String BUSINESS = "BUSINESS";   // jejak Maker & Checker
@@ -41,6 +42,25 @@ public class AuditScopeService {
         for (GroupUser g : groups.findAll())
             if (side != null && side.equals(access.sideOf(g.getIdGroup()))) out.add(g.getIdGroup());
         if (out.isEmpty()) out.add(-1);          // jangan pernah jatuh ke "tanpa filter"
+        return out;
+    }
+
+    /**
+     * Jejak yang boleh dilihat SEORANG penyetuju: group-nya sendiri + group yang memang
+     * diotorisasinya. Checker tidak lagi melihat aktivitas maker di luar naungannya
+     * (BUG_AUSY_00149); yang menentukan tetap matriks Approval Group, bukan "satu sisi".
+     */
+    public List<Integer> groupsVisibleTo(Integer viewerGroup, String side) {
+        List<Integer> out = new ArrayList<>();
+        if (viewerGroup == null) { out.add(-1); return out; }
+        out.add(viewerGroup);
+        for (Integer g : groupsOnSide(side)) {
+            if (g == null || g.equals(viewerGroup) || out.contains(g)) continue;
+            boolean mine = CONFIG.equals(side)
+                    ? approval.canApproveConfigGroup(viewerGroup, g)
+                    : approval.canApproveGroup(viewerGroup, g);
+            if (mine) out.add(g);
+        }
         return out;
     }
 

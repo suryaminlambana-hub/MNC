@@ -155,8 +155,11 @@
      Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
      Hanya GL aktif yang belum di-export yang disertakan.</p>
 
+  <!--/* Dipaginasi di server: 10 baris per halaman. Dulu seluruh baris (belasan ribu) dirender
+         sekaligus dan halamannya blank saat di-scroll — BUG_AUSY_00147. Kelas "dt" sengaja
+         dilepas supaya tidak ada paging ganda di sisi browser. */-->
   <div class="ausy-card">
-    <table class="table table-sm table-hover align-middle mb-0 dt">
+    <table class="table table-sm table-hover align-middle mb-0">
       <thead><tr><th>ID</th><th>Batch</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
       <tbody>
       <tr th:each="g : ${rows}">
@@ -170,8 +173,29 @@
           <span th:unless="${registered.contains(g.gltrac + '|' + g.gltrcd)}" class="badge bg-secondary-subtle text-secondary">Tidak Terdaftar</span>
         </td>
       </tr>
+      <tr th:if="${rows == null or rows.isEmpty()}">
+        <td colspan="11" class="text-center text-muted py-4">Belum ada GL aktif.</td>
+      </tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2"
+       th:if="${totalPages > 1}">
+    <span class="text-muted small">
+      Halaman <b th:text="${page + 1}">1</b> dari <b th:text="${totalPages}">1</b>
+      · <b th:text="${total}">0</b> baris
+    </span>
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
+         th:href="@{/gl-legacy(page=0)}">&laquo; Awal</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
+         th:href="@{/gl-legacy(page=${page - 1})}">Sebelumnya</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
+         th:href="@{/gl-legacy(page=${page + 1})}">Berikutnya</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
+         th:href="@{/gl-legacy(page=${totalPages - 1})}">Akhir &raquo;</a>
+    </div>
   </div>
 
   <!--/* Riwayat Export: pengajuan export milik maker ini — pending, approved, rejected (maker only) */-->

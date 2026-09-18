@@ -538,8 +538,22 @@ public class GlChangeService {
      */
     public Set<String> pendingRowPakets() {
         Set<String> out = new LinkedHashSet<>();
-        for (Long id : pendingGlRowIds())
-            gl.findById(id).ifPresent(g -> out.add(n(g.getNoPaket()).trim()));
+        // Batch yang diajukan hapus: nomornya sudah ada di permintaannya, tidak perlu membuka
+        // barisnya satu per satu — batch besar dulu membuat langkah ini sangat lambat
+        // (BUG_AUSY_00148).
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
+            out.add(n(c.getNoPaket()).trim());
+        // Permintaan per baris jumlahnya sedikit: cukup ambil batch dari baris yang ditunjuk.
+        Set<Long> rowIds = new LinkedHashSet<>();
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
+            if (c.getGlId() != null) rowIds.add(c.getGlId());
+            if (n(c.getNoPaket()).length() > 0) out.add(n(c.getNoPaket()).trim());
+            if ("BULK_EDIT".equals(c.getOp()))
+                for (Map<String,String> m : parseList(c.getAfterJson()))
+                    try { rowIds.add(Long.valueOf(m.get("id"))); } catch (Exception ignored) {}
+        }
+        for (Long id : rowIds) gl.findById(id).ifPresent(g -> out.add(n(g.getNoPaket()).trim()));
+        out.remove("");
         return out;
     }
 

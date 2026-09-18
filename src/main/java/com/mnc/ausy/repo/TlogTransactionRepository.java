@@ -16,6 +16,14 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
                    "where u.id_group in (:groups) order by t.time_activity desc", nativeQuery = true)
     List<TlogTransaction> findByUserGroups(@Param("groups") Collection<Integer> groups, Pageable page);
 
+    /**
+     * Jejak milik user tertentu saja — dipakai checker, yang hanya boleh melihat aktivitas maker
+     * pasangannya (BUG_AUSY_00149), bukan seluruh maker di sisi operasional.
+     */
+    @Query(value = "select t.* from tlog_transaction t where t.user_id in (:users) order by t.time_activity desc",
+           nativeQuery = true)
+    List<TlogTransaction> findByUserIds(@Param("users") Collection<String> users, Pageable page);
+
     /** A maker's full GL history: their own upload/add/edit/delete requests + the checker's
      *  approve/reject decisions on those requests. */
     @Query(value = "select t.* from tlog_transaction t where " +

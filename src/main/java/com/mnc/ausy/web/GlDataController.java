@@ -9,6 +9,10 @@ import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -45,6 +49,11 @@ public class GlDataController {
     }
     private static String n(String s) { return s == null ? "" : s; }
 
+    /** Hasil agregat multi-kolom kadang dibungkus Object[1][] oleh JPA. */
+    private static Object[] unwrapRow(Object[] row) {
+        return (row != null && row.length == 1 && row[0] instanceof Object[] inner) ? inner : row;
+    }
+
     /**
      * Only the Business Maker (group 3) may request an export — same rule SecurityConfig applies to
      * /gl-legacy/export-request. The Checker shares this read-only page but has no export rights
@@ -55,24 +64,39 @@ public class GlDataController {
                 .anyMatch(a -> "GROUP_3".equals(a.getAuthority()));
     }
 
+    /** Baris per halaman di List GL Aktif — datanya bisa belasan ribu (BUG_AUSY_00147). */
+    private static final int PAGE_SIZE = 10;
+
     @GetMapping("/gl-legacy")
-    public String list(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        // Only GL yang aktif & sudah lolos otorisasi — exclude PENDING dan soft-deleted (active=0).
-        // Isinya dibatasi per maker: maker hanya melihat datanya sendiri, checker melihat data
-        // maker yang dipasangkan padanya (BUG_AUSY_00138 / BUG_AUSY_00139).
-        List<GlTabel> rows = scope.filterRows(me, gl.findAll().stream()
-                .filter(r -> r.getActive() != null && r.getActive() == 1 && !"PENDING".equals(r.getStatusDual()))
-                .collect(Collectors.toList()));
+    public String list(@AuthenticationPrincipal AusyUserDetails me, Model model,
+                       @RequestParam(defaultValue = "0") int page) {
+        // GL aktif & sudah lolos otorisasi, DIAMBIL PER HALAMAN dari database. Sebelumnya seluruh
+        // tabel dimuat lalu disaring di Java, sehingga 12 ribu baris dirender sekaligus dan
+        // halamannya blank saat di-scroll (BUG_AUSY_00147).
+        // Isinya tetap dibatasi per maker: maker hanya melihat datanya sendiri, checker melihat
+        // data maker yang dipasangkan padanya (BUG_AUSY_00138 / BUG_AUSY_00139).
+        Set<String> makers = scope.visibleMakers(me);
+        Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
+        Page<GlTabel> result;
+        Object[] sum;
+        if (makers == null) {
+            result = gl.pageActive(req);
+            sum = unwrapRow(gl.activeSummary());
+        } else if (makers.isEmpty()) {
+            result = Page.empty(req);
+            sum = new Object[]{0L, BigDecimal.ZERO, 0L};
+        } else {
+            result = gl.pageActiveByMakers(makers, req);
+            sum = unwrapRow(gl.activeSummaryByMakers(makers));
+        }
         Set<String> reg = registeredKeys();
-        long registeredCount = rows.stream().filter(r -> isRegistered(reg, r)).count();
-        BigDecimal totalAmount = rows.stream()
-                .map(r -> r.getGltram() == null ? BigDecimal.ZERO : r.getGltram())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        model.addAttribute("rows", rows);
+        model.addAttribute("rows", result.getContent());
         model.addAttribute("registered", reg);
-        model.addAttribute("total", rows.size());
-        model.addAttribute("totalRegistered", registeredCount);
-        model.addAttribute("totalAmount", totalAmount);
+        model.addAttribute("total", ((Number) sum[0]).longValue());
+        model.addAttribute("totalRegistered", sum[2] == null ? 0L : ((Number) sum[2]).longValue());
+        model.addAttribute("totalAmount", sum[1] == null ? BigDecimal.ZERO : (BigDecimal) sum[1]);
+        model.addAttribute("page", result.getNumber());
+        model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
         boolean canExport = canExport(me);
         model.addAttribute("canExport", canExport);
         model.addAttribute("exportableCount", glExport.exportableCount(me));

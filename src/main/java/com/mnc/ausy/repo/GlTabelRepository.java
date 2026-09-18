@@ -1,10 +1,13 @@
 package com.mnc.ausy.repo;
 
 import com.mnc.ausy.domain.GlTabel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 
 public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
@@ -127,6 +130,59 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
          + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null"
          + " and (g.glsrc = 'm' or g.noPaket is null or g.noPaket = '') order by g.id")
     List<GlTabel> findExportableManual();
+
+    // ===== List GL Aktif: dipaginasi di database, tidak lagi memuat seluruh tabel =====
+    /** Halaman GL aktif (sudah lolos otorisasi) — tanpa batas maker. */
+    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')")
+    Page<GlTabel> pageActive(Pageable page);
+
+    /** Halaman GL aktif milik maker tertentu saja (batas per maker/checker). */
+    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
+         + " and g.gltrus in :makers")
+    Page<GlTabel> pageActiveByMakers(@Param("makers") Collection<String> makers, Pageable page);
+
+    /** Ringkasan seluruh GL aktif: jumlah baris, total nominal, dan berapa yang kodenya terdaftar. */
+    @Query("select count(g), coalesce(sum(g.gltram),0),"
+         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac"
+         + "   and upper(c.position) = upper(g.gltrcd)) then 1 else 0 end)"
+         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')")
+    Object[] activeSummary();
+
+    /** Idem, dibatasi maker tertentu. */
+    @Query("select count(g), coalesce(sum(g.gltram),0),"
+         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac"
+         + "   and upper(c.position) = upper(g.gltrcd)) then 1 else 0 end)"
+         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
+         + " and g.gltrus in :makers")
+    Object[] activeSummaryByMakers(@Param("makers") Collection<String> makers);
+
+    /**
+     * Ringkasan (jumlah baris, total debit, total credit) baris siap export untuk batch pilihan —
+     * dihitung di database. Dipakai saat maker mengajukan export supaya tidak perlu memuat
+     * belasan ribu baris ke memori (BUG_AUSY_00148).
+     */
+    @Query("select count(g), coalesce(sum(case when upper(g.gltrcd)='D' then g.gltram else 0 end),0),"
+         + " coalesce(sum(case when upper(g.gltrcd)='C' then g.gltram else 0 end),0)"
+         + " from GlTabel g where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD'"
+         + " and g.exportReqId is null and g.noPaket in :pakets")
+    Object[] exportableSummaryByPaket(@Param("pakets") List<String> pakets);
+
+    /** Idem untuk baris yang dipilih satu per satu. */
+    @Query("select count(g), coalesce(sum(case when upper(g.gltrcd)='D' then g.gltram else 0 end),0),"
+         + " coalesce(sum(case when upper(g.gltrcd)='C' then g.gltram else 0 end),0)"
+         + " from GlTabel g where g.active=1 and g.statusDual='APPROVED' and g.statusPrint='BELUM UPLOAD'"
+         + " and g.exportReqId is null and g.id in :ids")
+    Object[] exportableSummaryByIds(@Param("ids") List<Long> ids);
+
+    /** Uploader berbeda yang muncul pada baris siap export dari batch tersebut. */
+    @Query("select distinct g.gltrus from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
+         + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.noPaket in :pakets")
+    List<String> exportableUploadersByPaket(@Param("pakets") List<String> pakets);
+
+    /** Idem untuk baris pilihan. */
+    @Query("select distinct g.gltrus from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
+         + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.id in :ids")
+    List<String> exportableUploadersByIds(@Param("ids") List<Long> ids);
 
     /** GL aktif siap export berdasarkan id baris (untuk data tambahan manual). */
     @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
