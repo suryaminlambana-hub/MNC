@@ -35,7 +35,12 @@
       <div class="modal-body">
         <input type="hidden" name="idMenu" id="m_id">
         <div class="mb-2"><label class="form-label">Nama Menu <span class="text-danger">*</span></label><input class="form-control" name="namaMenu" id="m_nama" required></div>
-        <div class="mb-2"><label class="form-label">URL</label><input class="form-control" name="url" id="m_url"></div>
+        <!--/* BUG_AUSY_00145: URL hanya ditampilkan, tidak bisa diubah — mengubahnya membuat menu
+               menunjuk ke alamat yang tidak ada (whitelabel error page). Sengaja tanpa atribut
+               name= supaya nilainya tidak ikut terkirim sama sekali. */-->
+        <div class="mb-2"><label class="form-label">URL</label>
+          <input class="form-control" id="m_url" disabled readonly>
+          <div class="form-text">URL halaman tidak dapat diubah — nilainya mengikuti alamat yang dilayani aplikasi.</div></div>
         <div class="mb-2"><label class="form-label">Parent</label>
           <select class="form-select" name="parent" id="m_parent"><option value="0">(induk / tanpa parent)</option>
             <option th:each="p : ${parents}" th:value="${p.idMenu}" th:text="${p.namaMenu}"></option></select></div>

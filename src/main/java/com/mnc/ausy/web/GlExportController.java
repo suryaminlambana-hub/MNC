@@ -17,7 +17,7 @@ public class GlExportController {
 
     @PostMapping("/gl-export/approve")
     public String approve(@RequestParam Long reqId, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.approveExport(reqId, me.getIdGroup(), me.getUsername());
+        String msg = glExport.approveExport(reqId, me);
         boolean ok = msg.startsWith("Otorisasi export berhasil") && !msg.contains("Gagal kirim ke FTP");
         ra.addFlashAttribute(ok ? "ok" : "warn", msg);
         return "redirect:/otorisasi-gl";
@@ -26,7 +26,7 @@ public class GlExportController {
     @PostMapping("/gl-export/reject")
     public String reject(@RequestParam Long reqId, @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.rejectExport(reqId, me.getIdGroup(), me.getUsername(), note);
+        String msg = glExport.rejectExport(reqId, me, note);
         ra.addFlashAttribute(msg.startsWith("Permintaan export ditolak") ? "ok" : "warn", msg);
         return "redirect:/otorisasi-gl";
     }

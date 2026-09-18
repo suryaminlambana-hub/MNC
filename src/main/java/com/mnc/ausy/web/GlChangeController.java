@@ -3,6 +3,7 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.GlChangeService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,16 +24,20 @@ public class GlChangeController {
     private final GlChangeService service;
     private final GlTabelRepository gl;
     private final ExcelExportService excel;
+    private final DataScopeService scope;
 
-    public GlChangeController(GlChangeService service, GlTabelRepository gl, ExcelExportService excel) {
-        this.service = service; this.gl = gl; this.excel = excel;
+    public GlChangeController(GlChangeService service, GlTabelRepository gl, ExcelExportService excel,
+                              DataScopeService scope) {
+        this.service = service; this.gl = gl; this.excel = excel; this.scope = scope;
     }
 
     // ---- Maker ----
     @GetMapping("/gl-data")
     public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif)
-        model.addAttribute("rows", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
+        // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif),
+        // dan hanya milik maker ini sendiri (BUG_AUSY_00138)
+        model.addAttribute("rows", scope.filterRows(me,
+                gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING")));
         model.addAttribute("fields", GlChangeService.FIELDS);
         // BUG_AUSY_00099 follow-up: kunci baris + alasannya ("… Hapus Batch 01"), bukan cuma "Menunggu Otorisasi"
         model.addAttribute("pendingLabels", service.pendingGlRowLabels());
@@ -65,8 +70,10 @@ public class GlChangeController {
 
     /** Bulk edit step 1 — maker downloads current GL data as an editable Excel (ID + editable fields). */
     @GetMapping("/gl-data/bulk-export")
-    public void bulkExport(HttpServletResponse resp) throws Exception {
-        List<GlTabel> rows = gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING");
+    public void bulkExport(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
+        // Isinya sama persis dengan yang tampil di layar — termasuk batasan per maker (BUG_AUSY_00138).
+        List<GlTabel> rows = scope.filterRows(me,
+                gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
         List<List<Object>> data = new ArrayList<>();
         for (GlTabel g : rows) data.add(Arrays.asList(
                 g.getId(), s(g.getGltrac()), s(g.getGltrcd()),
@@ -107,7 +114,7 @@ public class GlChangeController {
     // ---- Checker ----
     @GetMapping("/gl-change/review")
     public String review(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        model.addAttribute("items", service.pendingReviewFor(me.getIdGroup()));
+        model.addAttribute("items", service.pendingReviewFor(me));
         return "gl-change/review";
     }
 

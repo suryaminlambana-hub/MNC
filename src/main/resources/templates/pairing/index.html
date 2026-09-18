@@ -1,0 +1,70 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Pasangan Checker - Maker — AUSY</title></head>
+<main>
+  <h1 class="ausy-page-title">Pasangan Checker - Maker</h1>
+  <p class="text-muted">Tetapkan maker mana saja yang menjadi tanggung jawab seorang checker.
+    Checker hanya melihat dan mengotorisasi pengajuan serta data GL milik maker yang dipasangkan padanya.
+    Perubahan <b>butuh alasan</b> &amp; menunggu approval Admin Approval (dual control).</p>
+
+  <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
+  <div th:if="${pendingConfig > 0}" class="alert alert-warning py-2"><i class="fa-solid fa-clock"></i>
+    <b th:text="${pendingConfig}">0</b> perubahan config menunggu otorisasi Admin Approval.</div>
+  <div th:if="${not #lists.isEmpty(unpairedMakers)}" class="alert alert-warning py-2">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    Maker berikut belum dipegang checker mana pun, sehingga pengajuannya tidak akan terlihat siapa pun:
+    <b><span th:each="u,i : ${unpairedMakers}"><span th:text="${u.userId}"></span><span th:if="${!i.last}">, </span></span></b>
+  </div>
+
+  <div class="ausy-card mb-3" style="padding:0">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th class="ps-3">Checker</th><th>Nama</th><th>Maker yang Diotorisasi</th><th class="pe-3">Aksi</th></tr></thead>
+      <tbody>
+      <tr th:each="r : ${rows}">
+        <td class="ps-3"><code th:text="${r.checker}"></code></td>
+        <td th:text="${r.nama}"></td>
+        <td>
+          <span th:if="${#lists.isEmpty(r.makers)}" class="badge bg-danger-subtle text-danger">
+            <i class="fa-solid fa-circle-exclamation"></i> Belum dipasangkan</span>
+          <span th:each="m : ${r.makers}" class="badge bg-primary-subtle text-primary me-1" th:text="${m}"></span>
+        </td>
+        <td class="pe-3">
+          <span th:if="${pendingIds != null and pendingIds.contains(r.checker)}" class="badge bg-warning-subtle text-warning">
+            <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
+          <a th:unless="${pendingIds != null and pendingIds.contains(r.checker)}"
+             class="btn btn-sm btn-outline-secondary" th:href="@{/pairing(checker=${r.checker})}">Atur</a>
+        </td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(rows)}">
+        <td colspan="4" class="text-center text-muted py-4">Belum ada user dengan role penyetuju data GL.</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="ausy-card" th:if="${selectedChecker != null and !#strings.isEmpty(selectedChecker)
+                                  and (pendingIds == null or !pendingIds.contains(selectedChecker))}"
+       style="padding:18px">
+    <h2 class="h6 mb-3">Maker untuk checker <code th:text="${selectedChecker}"></code></h2>
+    <form method="post" th:action="@{/pairing/save}">
+      <input type="hidden" name="checker" th:value="${selectedChecker}">
+      <div class="row mb-3">
+        <div class="col-md-4 mb-1" th:each="u : ${makers}">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="maker" th:value="${u.userId}"
+                   th:id="'mk'+${u.userId}" th:checked="${assigned != null and assigned.contains(u.userId)}">
+            <label class="form-check-label" th:for="'mk'+${u.userId}">
+              <span th:text="${u.userId}"></span>
+              <span class="text-muted small" th:if="${u.nama != null}" th:text="' — ' + ${u.nama}"></span>
+            </label>
+          </div>
+        </div>
+        <div th:if="${#lists.isEmpty(makers)}" class="text-muted">Belum ada user dengan role maker data GL.</div>
+      </div>
+      <div class="mb-2" style="max-width:520px"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
+        <textarea class="form-control" name="note" rows="2" required placeholder="Dikirim ke Admin Approval"></textarea></div>
+      <button class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Ajukan ke Admin Approval</button>
+    </form>
+  </div>
+</main>
+</html>

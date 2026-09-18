@@ -3,6 +3,7 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AuditService;
+import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,8 +20,15 @@ public class RekapController {
     private final GlTabelRepository gl;
     private final ExcelExportService excel;
     private final AuditService audit;
-    public RekapController(GlTabelRepository gl, ExcelExportService excel, AuditService audit) {
-        this.gl = gl; this.excel = excel; this.audit = audit;
+    private final DataScopeService scope;
+    public RekapController(GlTabelRepository gl, ExcelExportService excel, AuditService audit,
+                           DataScopeService scope) {
+        this.gl = gl; this.excel = excel; this.audit = audit; this.scope = scope;
+    }
+
+    /** Rekap hanya mencakup data GL yang boleh dilihat user ini — kolom ke-2 = gltrus (BUG_AUSY_00138). */
+    private List<Object[]> scopedPakets(AusyUserDetails me) {
+        return scope.filterArrays(me, gl.approvedPakets(), 1);
     }
 
     public record Row(String paket, String uploader, long jml, BigDecimal debit, BigDecimal credit, boolean balanced) {}
@@ -35,7 +43,7 @@ public class RekapController {
         List<String> head = List.of("Batch","Uploader","Jumlah Baris","Debit","Credit","Balance");
         List<List<Object>> data = new ArrayList<>();
         long totJml = 0; BigDecimal totD = BigDecimal.ZERO, totC = BigDecimal.ZERO;
-        for (Object[] r : gl.approvedPakets()) {
+        for (Object[] r : scopedPakets(me)) {
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
             data.add(Arrays.asList(batchLabel((String) r[0]), r[1], jml, d, c,
@@ -48,10 +56,10 @@ public class RekapController {
     }
 
     @GetMapping("/rekap")
-    public String rekap(Model model) {
+    public String rekap(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         List<Row> rows = new ArrayList<>();
         long totJml = 0; BigDecimal totD = BigDecimal.ZERO, totC = BigDecimal.ZERO; long maxJml = 1;
-        for (Object[] r : gl.approvedPakets()) {
+        for (Object[] r : scopedPakets(me)) {
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
             rows.add(new Row((String) r[0], (String) r[1], jml, d, c, d.compareTo(c) == 0));

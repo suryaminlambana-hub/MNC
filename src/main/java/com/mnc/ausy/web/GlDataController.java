@@ -6,6 +6,7 @@ import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.AuditService;
+import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,11 +27,13 @@ public class GlDataController {
     private final AuditService audit;
     private final GlChangeService changes;
     private final ApprovalService approval;
+    private final DataScopeService scope;
 
     public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport,
-                            AuditService audit, GlChangeService changes, ApprovalService approval) {
+                            AuditService audit, GlChangeService changes, ApprovalService approval,
+                            DataScopeService scope) {
         this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
-        this.changes = changes; this.approval = approval;
+        this.changes = changes; this.approval = approval; this.scope = scope;
     }
 
     /** A GL row is "registered" when its NoGL + D/C exists in the GL Code master. */
@@ -55,9 +58,11 @@ public class GlDataController {
     @GetMapping("/gl-legacy")
     public String list(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         // Only GL yang aktif & sudah lolos otorisasi — exclude PENDING dan soft-deleted (active=0).
-        List<GlTabel> rows = gl.findAll().stream()
+        // Isinya dibatasi per maker: maker hanya melihat datanya sendiri, checker melihat data
+        // maker yang dipasangkan padanya (BUG_AUSY_00138 / BUG_AUSY_00139).
+        List<GlTabel> rows = scope.filterRows(me, gl.findAll().stream()
                 .filter(r -> r.getActive() != null && r.getActive() == 1 && !"PENDING".equals(r.getStatusDual()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
         Set<String> reg = registeredKeys();
         long registeredCount = rows.stream().filter(r -> isRegistered(reg, r)).count();
         BigDecimal totalAmount = rows.stream()
@@ -70,9 +75,9 @@ public class GlDataController {
         model.addAttribute("totalAmount", totalAmount);
         boolean canExport = canExport(me);
         model.addAttribute("canExport", canExport);
-        model.addAttribute("exportableCount", glExport.exportableCount());
-        model.addAttribute("exportablePakets", glExport.exportablePakets());
-        model.addAttribute("exportableManual", glExport.exportableManualRows());   // BUG_AUSY_00124/00125
+        model.addAttribute("exportableCount", glExport.exportableCount(me));
+        model.addAttribute("exportablePakets", glExport.exportablePakets(me));
+        model.addAttribute("exportableManual", glExport.exportableManualRows(me));   // BUG_AUSY_00124/00125
         model.addAttribute("pendingPakets", glExport.pendingPaketKeys());   // BUG_AUSY_00102
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
@@ -94,8 +99,9 @@ public class GlDataController {
 
     @GetMapping("/gl-delete")
     public String deletePage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus
-        model.addAttribute("pakets", gl.deletablePakets());   // tanpa data tambahan manual (BUG_AUSY_00126)
+        // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus —
+        // hanya batch milik maker ini sendiri (BUG_AUSY_00138). Kolom ke-2 = gltrus.
+        model.addAttribute("pakets", scope.filterArrays(me, gl.deletablePakets(), 1));   // tanpa data tambahan manual (BUG_AUSY_00126)
         model.addAttribute("needApproval", true);   // dual control wajib (BUG_AUSY_00116)
         model.addAttribute("pendingKeys", changes.pendingPaketKeys());
         model.addAttribute("pendingRows", changes.pendingRowsByPaket());
@@ -108,6 +114,11 @@ public class GlDataController {
     public String delete(@RequestParam String paket, @RequestParam String inputer,
                          @RequestParam(required=false) String note,
                          @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        // Batch milik maker lain tidak boleh diajukan hapus, walau nomornya ditebak (BUG_AUSY_00138).
+        if (!scope.canSee(me, inputer)) {
+            ra.addFlashAttribute("warn", DataScopeService.NOT_MY_MAKER);
+            return "redirect:/gl-delete";
+        }
         // Selalu lewat maker->checker. Kalau group belum punya penyetuju aktif, pengajuan ditolak
         // di service dengan pesannya sendiri — data TIDAK dihapus langsung (BUG_AUSY_00116).
         GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);

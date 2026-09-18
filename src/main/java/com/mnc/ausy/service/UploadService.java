@@ -108,7 +108,9 @@ public class UploadService {
                 g.setNoPaket(paket);
                 g.setGleqam(amt);
                 g.setGlotam(amt);
-                g.setGltrus(username.length() > 10 ? username.substring(0, 10) : username);
+                // username utuh: pemiliknya harus bisa dicocokkan untuk pembatasan data per maker (BUG_AUSY_00138).
+                // Pemotongan ke 10 karakter tetap dilakukan GltrrfFormatter saat menulis file ACCTXT.
+                g.setGltrus(username);
                 g.setGltrpd1(ddmmyy);
                 g.setStatusPrint("BELUM UPLOAD");
                 g.setGlsrc("p");

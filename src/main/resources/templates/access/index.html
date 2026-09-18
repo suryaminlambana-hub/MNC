@@ -1,36 +1,45 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
-<head><title>Access Menu — AUSY</title></head>
+<head><title>Access User — AUSY</title></head>
 <main>
-  <h1 class="ausy-page-title">Access Menu</h1>
-  <p class="text-muted">Atur hak akses tiap role: <b>menu</b> yang muncul di sidebar, <b>aksi</b> tertentu
-    (mis. Ajukan Export, otorisasi), dan <b>card dashboard</b> yang boleh dilihat. Perubahan <b>butuh alasan</b>
-    &amp; menunggu approval Admin Approval (dual control).</p>
+  <h1 class="ausy-page-title">Access User</h1>
+  <p class="text-muted">Atur hak akses tiap <b>user</b>: <b>menu</b> yang muncul di sidebar, <b>aksi</b> tertentu
+    (mis. Ajukan Export, otorisasi), dan <b>card dashboard</b> yang boleh dilihat. Centangan yang tampil
+    mengikuti role user yang dipilih. Perubahan <b>butuh alasan</b> &amp; menunggu approval Admin Approval
+    (dual control).</p>
   <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
   <div th:if="${pendingConfig > 0}" class="alert alert-warning py-2"><i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> perubahan config menunggu otorisasi Admin Approval.</div>
 
   <div class="ausy-card mb-3" style="padding:18px">
     <form method="get" th:action="@{/access}" class="row g-2 align-items-end">
-      <div class="col-auto"><label class="form-label">Role</label>
-        <select class="form-select" name="group" onchange="this.form.submit()">
-          <option value="">Pilih role…</option>
-          <option th:each="g : ${groups}" th:value="${g.idGroup}" th:text="${g.namaGroup}" th:selected="${selectedGroup != null and selectedGroup == g.idGroup}"></option>
+      <div class="col-auto"><label class="form-label">User</label>
+        <select class="form-select" name="user" onchange="this.form.submit()">
+          <option value="">Pilih user…</option>
+          <option th:each="u : ${users}" th:value="${u.userId}"
+                  th:text="${u.userId} + ' — ' + ${roleName.getOrDefault(u.idGroup, '-')}"
+                  th:selected="${selectedUser != null and selectedUser == u.userId}"></option>
         </select></div>
     </form>
   </div>
 
-  <div class="ausy-card" th:if="${selectedGroup != null and pendingIds != null and pendingIds.contains('' + selectedGroup)}"
+  <div class="ausy-card" th:if="${selectedUser != null and pendingIds != null and pendingIds.contains(selectedUser)}"
        style="padding:18px">
     <span class="badge bg-warning-subtle text-warning">
       <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
-    <p class="text-muted mb-0 mt-2">Perubahan akses group ini sedang menunggu otorisasi Admin Approval —
+    <p class="text-muted mb-0 mt-2">Perubahan akses user ini sedang menunggu otorisasi Admin Approval —
       belum dapat diubah lagi sampai permintaan tersebut diputuskan.</p>
   </div>
 
-  <div class="ausy-card" th:if="${selectedGroup != null and (pendingIds == null or !pendingIds.contains('' + selectedGroup))}"
+  <div class="ausy-card" th:if="${targetUser != null and (pendingIds == null or !pendingIds.contains(selectedUser))}"
        style="padding:18px">
+    <p class="text-muted small mb-3"><i class="fa-solid fa-user-shield"></i>
+      Hak akses untuk <b th:text="${targetUser.userId}">user</b> (role <b th:text="${targetRole}">-</b>).
+      <span th:unless="${allSections}">Yang ditampilkan hanya bagian yang relevan dengan role tersebut;
+        hak di luar bagian ini tidak ikut berubah.</span>
+      <span th:if="${allSections}">Role ini belum memegang menu apa pun, jadi seluruh bagian ditampilkan
+        supaya haknya bisa mulai diisi.</span></p>
     <form method="post" th:action="@{/access/save}">
-      <input type="hidden" name="group" th:value="${selectedGroup}">
+      <input type="hidden" name="user" th:value="${selectedUser}">
       <!--/* BUG_AUSY_00115: centangan dikelompokkan per role, lalu per kelompok menu di dalamnya */-->
       <div th:each="sec : ${sections}" class="mb-4">
         <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
@@ -53,6 +62,8 @@
           </div>
         </div>
       </div>
+      <div th:if="${#lists.isEmpty(sections)}" class="text-muted py-2">
+        Belum ada item akses yang bisa diatur untuk role user ini.</div>
       <div class="mb-2" style="max-width:520px"><label class="form-label">Alasan / reason <span class="text-danger">*</span></label>
         <textarea class="form-control" name="note" rows="2" required placeholder="Dikirim ke Admin Approval"></textarea></div>
       <button class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Ajukan ke Admin Approval</button>

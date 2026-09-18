@@ -15,8 +15,8 @@ import java.nio.file.Path;
 
 /**
  * Transfer-out of generated GLTRRF/ACCTXT files to the GL FTP/FTPS server (Process Data Flow §9.g).
- * Configuration is read from the DB (managed by Admin via /admin/ftp); if the DB row has no host,
- * it falls back to the ausy.ftp.* application properties for backward compatibility.
+ * Konfigurasi dibaca dari DB (diisi langsung di database, bukan lewat website — BUG_AUSY_00141);
+ * kalau baris DB belum punya host, dipakai properti ausy.ftp.* dari deployment.
  */
 @Service
 public class FtpService {

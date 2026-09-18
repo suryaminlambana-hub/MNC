@@ -37,11 +37,18 @@ public class MenuAdminController {
 
     // Tambah & Hapus menu tidak ada dalam requirement — tombol dan endpoint-nya dihapus
     // (BUG_AUSY_00119). Yang tersisa hanya Ubah, tetap lewat approval Admin Approval.
+    //
+    // BUG_AUSY_00145 — URL TIDAK ikut diubah. URL menu adalah alamat halaman yang benar-benar ada
+    // di aplikasi; begitu diganti, menunya menunjuk ke alamat yang tidak dilayani siapa pun dan
+    // yang terbuka adalah whitelabel error page. URL juga dipakai AccessService untuk menentukan
+    // siapa pemilik sebuah path, jadi mengubahnya diam-diam ikut merusak hak akses. Nilai yang
+    // dikirim dari form diabaikan: yang dipakai selalu URL yang sekarang tersimpan.
     @PostMapping("/edit")
-    public String edit(@RequestParam Integer idMenu, @RequestParam String namaMenu, @RequestParam(required=false) String url,
+    public String edit(@RequestParam Integer idMenu, @RequestParam String namaMenu,
                        @RequestParam Integer parent, @RequestParam(defaultValue="0") Integer urutan,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        String url = menus.findById(idMenu).map(Menu::getUrl).orElse(null);
         ra.addFlashAttribute("ok", configChange.submitMenuEdit(idMenu, namaMenu, url, parent, urutan, me, note));
         return "redirect:/menus";
     }

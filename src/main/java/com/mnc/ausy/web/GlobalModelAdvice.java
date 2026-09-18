@@ -29,7 +29,7 @@ public class GlobalModelAdvice {
     public boolean submitBlocked(@AuthenticationPrincipal AusyUserDetails user) {
         if (user == null) return false;
         Integer g = user.getIdGroup();
-        if (!access.canSubmit(g)) return false;
+        if (!access.canSubmitUser(user.getUsername())) return false;
         // sisi config memakai aturan config (role Otorisasi Config sudah cukup), sisanya matriks
         boolean ok = "CONFIG".equals(access.sideOf(g))
                 ? approval.hasActiveApproverForConfig(g)
@@ -40,10 +40,10 @@ public class GlobalModelAdvice {
     @ModelAttribute("submitBlockedMsg")
     public String submitBlockedMsg() { return ApprovalService.NO_APPROVER; }
 
-    /** Card dashboard yang boleh dilihat group ini — tiap card di-guard dengan ini (BUG_AUSY_00112). */
+    /** Card dashboard yang boleh dilihat user ini — tiap card di-guard dengan ini (BUG_AUSY_00112). */
     @ModelAttribute("cards")
     public java.util.Set<String> cards(@AuthenticationPrincipal AusyUserDetails user) {
-        return user == null ? java.util.Set.of() : access.cardsFor(user.getIdGroup());
+        return user == null ? java.util.Set.of() : access.cardsForUser(user.getUsername());
     }
 
     @ModelAttribute("currentUser")
@@ -53,7 +53,7 @@ public class GlobalModelAdvice {
 
     @ModelAttribute("sidebar")
     public Object sidebar(@AuthenticationPrincipal AusyUserDetails user) {
-        return user == null ? java.util.List.of() : menuService.sidebarFor(user.getIdGroup());
+        return user == null ? java.util.List.of() : menuService.sidebarForUser(user.getUsername());
     }
 
     /** Path inside the app (context-path stripped), for highlighting the active menu. */

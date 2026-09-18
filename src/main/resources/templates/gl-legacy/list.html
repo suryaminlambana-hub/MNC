@@ -9,10 +9,16 @@
         <span th:text="${totalRegistered}">0</span> terdaftar ·
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
     </div>
-    <button th:if="${canExport}" type="button" class="btn btn-primary" id="btnAjukanExport">
-      <i class="fa-solid fa-paper-plane"></i> Ajukan Export
-      <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
-    </button>
+    <div class="d-flex gap-2 flex-wrap">
+      <!--/* BUG_AUSY_00137: unduh daftar ini sebagai PDF. Isinya sama dengan yang tampil di tabel,
+             termasuk pembatasan per maker. */-->
+      <a class="btn btn-outline-secondary" th:href="@{/gl-legacy/pdf}">
+        <i class="fa-solid fa-file-pdf"></i> Download PDF</a>
+      <button th:if="${canExport}" type="button" class="btn btn-primary" id="btnAjukanExport">
+        <i class="fa-solid fa-paper-plane"></i> Ajukan Export
+        <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
+      </button>
+    </div>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>

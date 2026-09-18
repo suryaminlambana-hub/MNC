@@ -13,11 +13,16 @@ public class MenuService {
 
     public MenuService(MenuRepository menus) { this.menus = menus; }
 
-    /** Parent menus (with their accessible children) for a group's sidebar. */
-    public List<Menu> sidebarFor(Integer idGroup) {
-        if (idGroup == null) return List.of();
-        List<Menu> children = menus.findAccessibleChildren(idGroup);
+    /**
+     * Sidebar milik SATU user. Hak akses melekat pada user sejak BUG_AUSY_00143, jadi dua user
+     * dengan role sama bisa punya sidebar berbeda.
+     */
+    public List<Menu> sidebarForUser(String userId) {
+        if (userId == null) return List.of();
+        return group(menus.findAccessibleChildrenForUser(userId));
+    }
 
+    private List<Menu> group(List<Menu> children) {
         // group children under their parent id, preserving order
         Map<Integer, List<Menu>> byParent = new LinkedHashMap<>();
         for (Menu c : children) {

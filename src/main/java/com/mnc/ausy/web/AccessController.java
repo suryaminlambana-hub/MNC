@@ -1,9 +1,11 @@
 package com.mnc.ausy.web;
 
-import com.mnc.ausy.domain.GroupMenu;
 import com.mnc.ausy.domain.Menu;
+import com.mnc.ausy.domain.User;
+import com.mnc.ausy.domain.UserMenu;
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.ConfigChangeService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,51 +16,84 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.*;
 
+/**
+ * Access User — hak akses diatur per USER (BUG_AUSY_00143).
+ *
+ * Sebelumnya layar ini memilih ROLE dan mengubah {@code group_menu}, sehingga semua user dengan
+ * role yang sama selalu memegang menu yang persis sama. Sekarang yang dipilih adalah user, dan
+ * yang disimpan adalah {@code user_menu} miliknya sendiri.
+ *
+ * Centangan yang ditampilkan dibatasi ke section milik role user tersebut: memilih user ber-role
+ * Maker hanya memperlihatkan bagian Maker, sehingga layarnya tidak lagi menyodorkan hak yang
+ * memang bukan urusan role itu.
+ */
 @Controller
 @RequestMapping("/access")
 public class AccessController {
     private final GroupUserRepository groups;
+    private final UserRepository users;
     private final MenuRepository menus;
-    private final GroupMenuRepository groupMenus;
+    private final UserMenuRepository userMenus;
     private final ConfigChangeService configChange;
     private final ApprovalService approval;
+    private final AccessService access;
 
-    public AccessController(GroupUserRepository groups, MenuRepository menus, GroupMenuRepository groupMenus,
-                            ConfigChangeService configChange, ApprovalService approval) {
-        this.approval = approval;
-        this.groups = groups; this.menus = menus; this.groupMenus = groupMenus; this.configChange = configChange;
+    public AccessController(GroupUserRepository groups, UserRepository users, MenuRepository menus,
+                            UserMenuRepository userMenus, ConfigChangeService configChange,
+                            ApprovalService approval, AccessService access) {
+        this.groups = groups; this.users = users; this.menus = menus; this.userMenus = userMenus;
+        this.configChange = configChange; this.approval = approval; this.access = access;
     }
 
     @GetMapping
-    public String index(@RequestParam(required=false) Integer group, Model model,
+    public String index(@RequestParam(required=false) String user, Model model,
                         @AuthenticationPrincipal AusyUserDetails me) {
-        // Hak akses role yang mengotorisasi kita tidak boleh diubah dari sini (BUG_AUSY_00133)
+        // Hak akses user dari role yang mengotorisasi kita tidak boleh diubah dari sini (BUG_AUSY_00133)
         boolean iAmConfigApprover = approval.configAuthorizer(me == null ? null : me.getIdGroup());
-        model.addAttribute("groups", groups.findAllByOrderByNamaGroupAsc().stream()
-                .filter(g -> iAmConfigApprover || !approval.configAuthorizer(g.getIdGroup()))
-                .toList());
-        model.addAttribute("selectedGroup", group);
+        Map<Integer,String> roleName = new HashMap<>();
+        for (var g : groups.findAllByOrderByNamaGroupAsc()) roleName.put(g.getIdGroup(), g.getNamaGroup());
+
+        List<User> selectable = users.findAll().stream()
+                .filter(u -> iAmConfigApprover || !approval.configAuthorizer(u.getIdGroup()))
+                .sorted(Comparator.comparing(u -> u.getUserId() == null ? "" : u.getUserId()))
+                .toList();
+        model.addAttribute("users", selectable);
+        model.addAttribute("roleName", roleName);
+        model.addAttribute("selectedUser", user);
         model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("ACCESS"));
-        if (group != null) {
+
+        User target = user == null ? null : users.findByUserId(user).orElse(null);
+        if (target != null) {
             Set<Integer> granted = new HashSet<>();
-            for (GroupMenu gm : groupMenus.findByIdGroup(group)) granted.add(gm.getIdMenu());
-            // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan
-            // Section Admin Approval hanya terlihat oleh Admin Approval sendiri (BUG_AUSY_00136):
-            // aksesnya tidak boleh dibuka untuk role lain.
+            for (UserMenu um : userMenus.findByUserId(target.getUserId())) granted.add(um.getIdMenu());
+
+            // Hanya section yang relevan untuk role user ini — inti dari BUG_AUSY_00143.
+            // Role yang belum memegang apa pun (role baru buatan admin) tetap ditampilkan penuh,
+            // kalau tidak hak-nya tidak akan pernah bisa mulai diisi.
+            Set<String> allowedSections = access.sectionsOf(target.getIdGroup());
+            boolean allSections = allowedSections.isEmpty();
+            model.addAttribute("allSections", allSections);
+            // hanya item aktif — menu lama yang sudah dilebur tidak perlu muncul sebagai centangan.
+            // Section Admin Approval hanya terlihat oleh Admin Approval sendiri (BUG_AUSY_00136).
             List<Menu> all = menus.findAllByOrderByParentAscUrutanAsc().stream()
                     .filter(m -> m.getActive() != null && m.getActive() == 1)
                     .filter(m -> m.getBundledWith() == null)   // aksi yang menempel ikut menunya
                     .filter(m -> iAmConfigApprover || !"ADMIN_APV".equals(m.getSection()))
+                    .filter(m -> allSections
+                              || m.getParent() != null && m.getParent() == 0
+                              || allowedSections.contains(m.getSection() == null ? "" : m.getSection()))
                     .toList();
             model.addAttribute("sections", sections(all));
             model.addAttribute("granted", granted);
+            model.addAttribute("targetUser", target);
+            model.addAttribute("targetRole", roleName.get(target.getIdGroup()));
         }
         return "access/index";
     }
 
     /**
-     * Tambahkan aksi yang menempel pada menu yang dicentang. Tanpa ini, role penyetuju baru bisa
+     * Tambahkan aksi yang menempel pada menu yang dicentang. Tanpa ini, user penyetuju baru bisa
      * membuka halaman otorisasi tapi tidak berwenang menyetujui apa pun, karena endpoint
      * approve/reject-nya ada di baris hak akses yang terpisah.
      */
@@ -71,7 +106,7 @@ public class AccessController {
 
     /** Satu kelompok centangan di dalam sebuah section, mis. "Data" atau "Card Dashboard". */
     public record AccessGroup(String title, String kind, List<Menu> items) {}
-    /** Satu bagian per role di halaman Access Menu (BUG_AUSY_00115). */
+    /** Satu bagian per role di halaman Access User (BUG_AUSY_00115). */
     public record AccessSection(String label, List<AccessGroup> groups) {}
 
     /** Urutan & judul section — item tanpa section masuk "Lainnya" di paling bawah. */
@@ -87,11 +122,11 @@ public class AccessController {
     /**
      * Susun centangan per role (Maker / Checker / Admin / Admin Approval), lalu di dalamnya
      * dikelompokkan lagi per parent menu supaya tetap terbaca "Data", "GL", "Card Dashboard".
-     * Section hanya penataan tampilan — admin tetap bebas memberi item apa pun ke group mana pun.
      */
     private List<AccessSection> sections(List<Menu> all) {
         Map<Integer,String> parentName = new HashMap<>();
-        for (Menu m : all) if (m.getParent() != null && m.getParent() == 0) parentName.put(m.getIdMenu(), m.getNamaMenu());
+        for (Menu m : menus.findAllByOrderByParentAscUrutanAsc())
+            if (m.getParent() != null && m.getParent() == 0) parentName.put(m.getIdMenu(), m.getNamaMenu());
 
         // section -> judul kelompok -> item
         Map<String, LinkedHashMap<String, List<Menu>>> bySection = new LinkedHashMap<>();
@@ -116,11 +151,11 @@ public class AccessController {
 
     // Simpan hak akses menu -> config dual control (butuh alasan + approval Admin Approval).
     @PostMapping("/save")
-    public String save(@RequestParam Integer group,
+    public String save(@RequestParam String user,
                        @RequestParam(name="menu", required=false) List<Integer> menuIds,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        ra.addFlashAttribute("ok", configChange.submitAccess(group, withBundledActions(menuIds), me, note));
-        return "redirect:/access?group=" + group;
+        ra.addFlashAttribute("ok", configChange.submitAccess(user, withBundledActions(menuIds), me, note));
+        return "redirect:/access?user=" + user;
     }
 }

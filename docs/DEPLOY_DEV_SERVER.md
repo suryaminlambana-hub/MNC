@@ -75,8 +75,14 @@ DB_PORT=5432
 DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
-# FTP diisi lewat menu "Konfigurasi FTP" di aplikasi (Admin), boleh dibiarkan kosong
+# FTP diisi DI SINI — bukan lewat website. Menu "Konfigurasi FTP" sudah dihapus
+# (BUG_AUSY_00141) supaya host & kredensial tidak bisa dilihat/diubah dari antarmuka.
+# Kosongkan FTP_HOST untuk mematikan push; file GLTRRF tetap dibuat lokal di data/txt.
 FTP_HOST=
+FTP_PORT=21
+FTP_USER=
+FTP_PASS=
+FTP_DIR=
 ```
 
 ```bash
@@ -136,7 +142,8 @@ Kelola Data GL (ajukan perubahan → approve) → Ajukan Export → Otorisasi Ex
 
 - [ ] Ganti password 4 akun seed (`admin123`/`user123`/`spv123`) lewat menu User.
 - [ ] Password `ausy_user` bukan default, dan `.env` mode `600` milik user `ausy`.
-- [ ] Isi Konfigurasi FTP (menu Admin) kalau export ke core sudah mau diuji.
+- [ ] Isi `FTP_*` di `.env` kalau export ke core sudah mau diuji — setelan FTP tidak lagi bisa
+      diubah dari website. Kirim ulang transfer yang gagal ada di beranda Admin.
 - [ ] Tentukan siapa yang boleh akses port 8080 (reverse proxy/HTTPS kalau keluar jaringan dev).
 - [ ] Backup: `pg_dump ausy` terjadwal di server DB.
 

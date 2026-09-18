@@ -22,9 +22,9 @@ public class OtorisasiGlController {
 
     @GetMapping("/otorisasi-gl")
     public String page(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        model.addAttribute("pakets", otorisasi.pendingFor(me.getIdGroup()));
-        model.addAttribute("items", glChange.pendingReviewFor(me.getIdGroup()));
-        model.addAttribute("exportReqs", glExport.pendingExportFor(me.getIdGroup()));
+        model.addAttribute("pakets", otorisasi.pendingFor(me));
+        model.addAttribute("items", glChange.pendingReviewFor(me));
+        model.addAttribute("exportReqs", glExport.pendingExportFor(me));
         return "otorisasi-gl/index";
     }
 }

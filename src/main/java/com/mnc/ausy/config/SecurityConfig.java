@@ -41,8 +41,9 @@ public class SecurityConfig {
             String path = req.getRequestURI();
             String cp = req.getContextPath();
             if (cp != null && !cp.isEmpty() && path.startsWith(cp)) path = path.substring(cp.length());
-            Integer group = (a.getPrincipal() instanceof AusyUserDetails u) ? u.getIdGroup() : null;
-            return new AuthorizationDecision(access.allowed(group, path));
+            // Hak akses melekat pada user, bukan role (BUG_AUSY_00143).
+            String userId = (a.getPrincipal() instanceof AusyUserDetails u) ? u.getUsername() : null;
+            return new AuthorizationDecision(access.allowedUser(userId, path));
         };
     }
 

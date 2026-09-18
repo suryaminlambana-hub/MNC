@@ -2,6 +2,7 @@ package com.mnc.ausy.service;
 
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlTabelRepository;
+import com.mnc.ausy.security.AusyUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,21 +20,27 @@ public class OtorisasiService {
     private final GlTabelRepository gl;
     private final ApprovalService approval;
     private final AuditService audit;
+    private final DataScopeService scope;
 
-    public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit) {
-        this.gl = gl; this.approval = approval; this.audit = audit;
+    public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit,
+                            DataScopeService scope) {
+        this.gl = gl; this.approval = approval; this.audit = audit; this.scope = scope;
     }
 
     public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced,
                         LocalDateTime uploadedAt) {}
 
-    /** Pending pakets this approver-group is allowed to authorize. */
-    public List<Paket> pendingFor(Integer approverGroup) {
+    /**
+     * Pending pakets this checker may authorize: role-nya berwenang (matriks approval_group) DAN
+     * maker-nya memang dipasangkan padanya di menu Pasangan Checker - Maker (BUG_AUSY_00139).
+     */
+    public List<Paket> pendingFor(AusyUserDetails me) {
         List<Paket> out = new ArrayList<>();
         for (Object[] r : gl.pendingPakets()) {
             String paket = (String) r[0];
             String inputer = (String) r[1];
-            if (!approval.canApprove(approverGroup, inputer)) continue;
+            if (!approval.canApprove(me == null ? null : me.getIdGroup(), inputer)) continue;
+            if (!scope.canSee(me, inputer)) continue;
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
             out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, toLocalDateTime(r[5])));
@@ -53,9 +60,11 @@ public class OtorisasiService {
 
     /** Otorisasi UPLOAD: approve a pending paket → mark active (status_dual=APPROVED). No export/FTP here. */
     @Transactional
-    public ExportResult export(String paket, String inputer, Integer approverGroup, String checker) {
-        if (!approval.canApprove(approverGroup, inputer))
+    public ExportResult export(String paket, String inputer, AusyUserDetails me) {
+        String checker = me.getUsername();
+        if (!approval.canApprove(me.getIdGroup(), inputer))
             return new ExportResult(false, "Group Anda tidak berwenang meng-approve batch dari group tersebut.", 0, null);
+        if (!scope.canSee(me, inputer)) return new ExportResult(false, DataScopeService.NOT_MY_MAKER, 0, null);
 
         List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
@@ -82,9 +91,11 @@ public class OtorisasiService {
 
     /** Reject a pending paket (Workflow 8.1.e / 8.2.d): data removed from temp, decision note recorded. */
     @Transactional
-    public ExportResult reject(String paket, String inputer, Integer approverGroup, String checker, String note) {
-        if (!approval.canApprove(approverGroup, inputer))
+    public ExportResult reject(String paket, String inputer, AusyUserDetails me, String note) {
+        String checker = me.getUsername();
+        if (!approval.canApprove(me.getIdGroup(), inputer))
             return new ExportResult(false, "Group Anda tidak berwenang menolak batch dari group tersebut.", 0, null);
+        if (!scope.canSee(me, inputer)) return new ExportResult(false, DataScopeService.NOT_MY_MAKER, 0, null);
         if (note == null || note.isBlank())
             return new ExportResult(false, "Catatan penolakan wajib diisi.", 0, null);
 

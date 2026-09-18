@@ -14,10 +14,22 @@ import java.util.List;
 @Service
 public class ExcelExportService {
 
+    /**
+     * Nama sheet yang pasti diterima Excel: tanpa karakter terlarang {@code : \ / ? * [ ]} dan
+     * maksimal 31 karakter. Nama tab di layar boleh memakai karakter itu (mis. "Aktivitas / Login"),
+     * jadi pembersihan dilakukan di sini supaya export tidak pernah gagal karenanya.
+     */
+    static String safeSheetName(String name) {
+        String s = (name == null || name.isBlank()) ? "Sheet1" : name.trim();
+        s = s.replaceAll("[:\\\\/?*\\[\\]]", " ").replaceAll("\\s+", " ").trim();
+        if (s.isEmpty()) s = "Sheet1";
+        return s.length() > 31 ? s.substring(0, 31) : s;
+    }
+
     public void download(HttpServletResponse resp, String sheetName, String filePrefix,
                          List<String> headers, List<List<Object>> rows, boolean boldLastRow) throws IOException {
         try (Workbook wb = new XSSFWorkbook()) {
-            Sheet sh = wb.createSheet(sheetName);
+            Sheet sh = wb.createSheet(safeSheetName(sheetName));
             CellStyle bold = wb.createCellStyle();
             Font bf = wb.createFont(); bf.setBold(true); bold.setFont(bf);
 
@@ -53,7 +65,7 @@ public class ExcelExportService {
             CellStyle bold = wb.createCellStyle();
             Font bf = wb.createFont(); bf.setBold(true); bold.setFont(bf);
             for (SheetData spec : sheets) {
-                Sheet sh = wb.createSheet(spec.name());
+                Sheet sh = wb.createSheet(safeSheetName(spec.name()));
                 Row hr = sh.createRow(0);
                 for (int i = 0; i < spec.headers().size(); i++) {
                     Cell c = hr.createCell(i); c.setCellValue(spec.headers().get(i)); c.setCellStyle(bold);

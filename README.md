@@ -51,12 +51,20 @@ Buka **http://localhost:8080/ausy**.
 
 | User | Password | Role | Akses |
 |------|----------|------|-------|
-| `admin` | admin123 | ① CONFIG / SETTING | Master Data (User/Group/Menu/Access/Approval) + GL Code (parameter); membuat semua user |
+| `admin` | admin123 | ① CONFIG / SETTING | Master Data (User/Role/Menu/Access User/Pasangan Checker–Maker); membuat semua user |
 | `adminapv` | admin123 | ② CONFIG APPROVER | approve perubahan config (monitoring: Audit/Rekap) |
 | `user` | user123 | ③ BUSINESS MAKER | Upload/NALA + Kelola Data GL |
 | `spv` | spv123 | ④ BUSINESS APPROVER | Otorisasi + Otorisasi Perubahan GL (approve-only) |
 
 Prinsip: yang meng-**approve tidak boleh** add/edit/delete; **CONFIG tidak** memproses data bisnis; **MAKER tidak** meng-approve. Ditegakkan di level menu (RBAC) & URL (Spring Security). Matriks approval: ④→③ (bisnis), ②→① (config).
+
+**Hak akses & pemisahan data:**
+- Hak akses melekat pada **user**, bukan role — diatur di menu *Access User*. Role tetap dipakai
+  sebagai cetakan: user baru lahir dengan hak role-nya, lalu bisa dipersempit per orang.
+- Maker **hanya melihat data GL miliknya sendiri**; antar-maker tertutup.
+- Checker melihat & mengotorisasi data maker yang dipasangkan padanya di menu
+  *Pasangan Checker–Maker*. Checker tanpa pasangan tidak melihat pengajuan siapa pun.
+- Setelan **FTP** hanya dari `.env`/database, tidak ada layar konfigurasinya.
 
 **Catatan:**
 - **Wajib** set `DB_NAME/DB_USER/DB_PASS` di depan perintah — default di `application.yml` menunjuk DB dev penulis, jadi tanpa override akan gagal konek.

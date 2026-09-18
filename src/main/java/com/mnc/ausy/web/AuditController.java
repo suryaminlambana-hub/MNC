@@ -79,9 +79,13 @@ public class AuditController {
             actRows.add(Arrays.asList(a.getTimeActivity() == null ? "" : a.getTimeActivity().format(TS),
                     a.getUserId(), a.getIp(), a.getNameActivity(), a.getInfo()));
         String name = AuditScopeService.CONFIG.equals(side) ? "Audit_Trail_Admin" : "Audit_Trail_Maker_Checker";
+        // Nama sheet mengikuti nama tab di halaman Audit Trail (BUG_AUSY_00144): sheet pertama
+        // berisi tab "Aktivitas Terakhir", bukan lagi ditulis "Transaksi" yang tidak ada di layar.
+        // Tab kedua "Aktivitas / Login" ditulis tanpa garis miring — karakter itu terlarang di
+        // nama sheet Excel dan akan membuat file gagal dibuat.
         excel.downloadSheets(resp, name, List.of(
-                new ExcelExportService.SheetData("Transaksi", List.of("Waktu", "User", "Aksi", "Detail"), txRows),
-                new ExcelExportService.SheetData("Login", List.of("Waktu", "User", "IP", "Aktivitas", "Info"), actRows)
+                new ExcelExportService.SheetData("Aktivitas Terakhir", List.of("Waktu", "User", "Aksi", "Detail"), txRows),
+                new ExcelExportService.SheetData("Aktivitas Login", List.of("Waktu", "User", "IP", "Aktivitas", "Info"), actRows)
         ));
     }
 }

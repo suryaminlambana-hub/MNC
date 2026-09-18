@@ -32,13 +32,15 @@ public class GlExportService {
     private final AuditService audit;
     private final FtpService ftp;
     private final GlChangeService changes;
+    private final DataScopeService scope;
 
     @Value("${ausy.txt-dir:data/txt}") private String txtDir;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
-                           ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes) {
+                           ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes,
+                           DataScopeService scope) {
         this.gl = gl; this.requests = requests; this.transfers = transfers;
-        this.approval = approval; this.audit = audit; this.ftp = ftp; this.changes = changes;
+        this.approval = approval; this.audit = audit; this.ftp = ftp; this.changes = changes; this.scope = scope;
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
@@ -53,6 +55,11 @@ public class GlExportService {
     /** All pending export requests, unscoped — for the maker dashboard's "Perubahan GL Pending" overview. */
     public List<GlExportRequest> allPending() {
         return requests.findByStatusOrderByCreatedAtDesc("PENDING");
+    }
+
+    /** Idem, dibatasi maker yang boleh dilihat user ini (BUG_AUSY_00138). */
+    public List<GlExportRequest> allPending(AusyUserDetails me) {
+        return scope.filterBy(me, allPending(), GlExportRequest::getRequestedBy);
     }
 
     /** Maker's own pending export requests (still waiting on checker) — shown so they don't re-submit blindly. */
@@ -78,8 +85,20 @@ public class GlExportService {
         return gl.countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull((short)1, "APPROVED", "BELUM UPLOAD");
     }
 
+    /** Idem, hanya baris milik maker yang boleh dilihat user ini (BUG_AUSY_00138). */
+    public long exportableCount(AusyUserDetails me) {
+        Set<String> allowed = scope.visibleMakers(me);
+        if (allowed == null) return exportableCount();
+        return allowed.isEmpty() ? 0 : gl.countExportableForMakers(allowed);
+    }
+
     /** Exportable rows grouped by paket, so the maker can pick which one(s) to submit. */
     public List<Object[]> exportablePakets() { return gl.exportablePakets(); }
+
+    /** Idem, hanya batch milik maker yang boleh dilihat user ini — kolom ke-5 adalah gltrus. */
+    public List<Object[]> exportablePakets(AusyUserDetails me) {
+        return scope.filterArrays(me, gl.exportablePakets(), 4);
+    }
 
     /**
      * Baris GL tambahan manual yang siap diexport, dipilih satu per satu — batch-nya bisa kosong
@@ -92,6 +111,11 @@ public class GlExportService {
         List<GlTabel> out = new ArrayList<>();
         for (GlTabel g : gl.findExportableManual()) if (!pending.contains(g.getId())) out.add(g);
         return out;
+    }
+
+    /** Idem, hanya baris milik maker yang boleh dilihat user ini (BUG_AUSY_00138). */
+    public List<GlTabel> exportableManualRows(AusyUserDetails me) {
+        return scope.filterRows(me, exportableManualRows());
     }
 
     // ---------- Maker: Ajukan Export ----------
@@ -119,6 +143,10 @@ public class GlExportService {
         if (!ids.isEmpty())
             for (GlTabel g : gl.findExportableByIdIn(ids))
                 if (rows.stream().noneMatch(x -> x.getId().equals(g.getId()))) rows.add(g);
+        // Maker hanya boleh mengajukan barisnya sendiri, walau nomor batch / id barisnya
+        // ditebak dan dikirim langsung ke endpoint ini (BUG_AUSY_00138).
+        for (GlTabel g : rows)
+            if (!scope.canSee(me, g.getGltrus())) return DataScopeService.NOT_MY_MAKER;
         if (rows.isEmpty()) {
             if (pendingCount() > 0) return "Export sebelumnya sedang menunggu approval checker.";
             return "Tidak ada GL aktif yang belum di-export.";
@@ -167,19 +195,23 @@ public class GlExportService {
     public Set<String> pendingPaketKeys() { return changes.pendingRowPakets(); }
 
     // ---------- Checker: Otorisasi Export ----------
-    public List<GlExportRequest> pendingExportFor(Integer approverGroup) {
+    /** Antrian export milik checker ini — hanya maker yang dipasangkan padanya (BUG_AUSY_00139). */
+    public List<GlExportRequest> pendingExportFor(AusyUserDetails me) {
         List<GlExportRequest> out = new ArrayList<>();
         for (GlExportRequest r : requests.findByStatusOrderByCreatedAtDesc("PENDING"))
-            if (approval.canApproveGroup(approverGroup, groupOf(r))) out.add(r);
+            if (approval.canApproveGroup(me == null ? null : me.getIdGroup(), groupOf(r))
+                    && scope.canSee(me, r.getRequestedBy())) out.add(r);
         return out;
     }
 
     @Transactional
-    public String approveExport(Long reqId, Integer approverGroup, String checker) {
+    public String approveExport(Long reqId, AusyUserDetails me) {
+        String checker = me.getUsername();
         GlExportRequest req = requests.findById(reqId).orElse(null);
         if (req == null || !"PENDING".equals(req.getStatus())) return "Permintaan export tidak ditemukan / sudah diproses.";
-        if (!approval.canApproveGroup(approverGroup, groupOf(req)))
+        if (!approval.canApproveGroup(me.getIdGroup(), groupOf(req)))
             return "Group Anda tidak berwenang meng-approve export dari group tersebut.";
+        if (!scope.canSee(me, req.getRequestedBy())) return DataScopeService.NOT_MY_MAKER;
         List<GlTabel> rows = gl.findByExportReqIdOrderById(reqId);
         if (rows.isEmpty()) return "Tidak ada baris GL untuk permintaan ini.";
 
@@ -195,13 +227,20 @@ public class GlExportService {
         try {
             Path dir = Paths.get(txtDir);
             Files.createDirectories(dir);
-            // Nama file AS400: ACCTXT.<YYMMDD>. Hindari overwrite bila ada export lain di hari yang sama.
+            // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
+            // Export berikutnya di hari yang sama menimpa file hari itu, baik di disk maupun di FTP
+            // (nama remote-nya sama), sehingga core hanya pernah menemukan hasil export terakhir.
+            // Sebelumnya file kedua dibuat dengan akhiran "_<reqId>" sehingga menumpuk beberapa
+            // file untuk satu tanggal dan tidak jelas mana yang berlaku.
             String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
             String fileName = "ACCTXT." + yymmdd;
             Path out = dir.resolve(fileName);
-            if (Files.exists(out)) { fileName = "ACCTXT." + yymmdd + "_" + reqId; out = dir.resolve(fileName); }
+            boolean replaced = Files.exists(out);
             Files.writeString(out, content.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            if (replaced)
+                audit.transaction(checker, "EXPORT_REPLACE",
+                        "File " + fileName + " ditimpa oleh export CR#" + reqId + " (satu file per hari).");
 
             ExportTransfer t = new ExportTransfer();
             t.setFileName(fileName); t.setPaket("EXPORT#" + reqId); t.setInputer(req.getRequestedBy());
@@ -215,11 +254,11 @@ public class GlExportService {
                 } catch (Exception fe) {
                     t.setStatus("FAILED"); t.setError(fe.getMessage()); t.setAttempts(1);
                     audit.transaction(checker, "FTP_FAILED", "Export CR#" + reqId + " gagal kirim FTP: " + fe.getMessage());
-                    ftpNote = " (Gagal kirim ke FTP — masuk antrian; Admin dapat kirim ulang dari Konfigurasi FTP.)";
+                    ftpNote = " (Gagal kirim ke FTP — masuk antrian; Admin dapat kirim ulang dari beranda Admin.)";
                 }
             } else {
                 t.setStatus("PENDING"); t.setAttempts(0);
-                ftpNote = " (FTP belum dikonfigurasi/aktif — file masuk antrian; Admin dapat mengirim setelah konfigurasi.)";
+                ftpNote = " (FTP belum dikonfigurasi/aktif di server — file masuk antrian dan dapat dikirim ulang dari beranda Admin setelah setelannya benar.)";
             }
             transfers.save(t);
 
@@ -236,11 +275,13 @@ public class GlExportService {
     }
 
     @Transactional
-    public String rejectExport(Long reqId, Integer approverGroup, String checker, String note) {
+    public String rejectExport(Long reqId, AusyUserDetails me, String note) {
+        String checker = me.getUsername();
         GlExportRequest req = requests.findById(reqId).orElse(null);
         if (req == null || !"PENDING".equals(req.getStatus())) return "Permintaan export tidak ditemukan / sudah diproses.";
-        if (!approval.canApproveGroup(approverGroup, groupOf(req)))
+        if (!approval.canApproveGroup(me.getIdGroup(), groupOf(req)))
             return "Group Anda tidak berwenang menolak export dari group tersebut.";
+        if (!scope.canSee(me, req.getRequestedBy())) return DataScopeService.NOT_MY_MAKER;
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         gl.revertExport(reqId);
         req.setStatus("REJECTED"); req.setChecker(checker); req.setDecidedAt(LocalDateTime.now()); req.setNoteChecker(note);
@@ -262,7 +303,7 @@ public class GlExportService {
         ExportTransfer t = transfers.findById(transferId).orElse(null);
         if (t == null) return "Data transfer tidak ditemukan.";
         if ("SENT".equals(t.getStatus())) return "File sudah terkirim sebelumnya.";
-        if (!ftp.enabled()) return "FTP belum dikonfigurasi/aktif. Isi & aktifkan konfigurasi FTP dulu.";
+        if (!ftp.enabled()) return "FTP belum dikonfigurasi/aktif di server. Hubungi Administrator sistem untuk melengkapi setelannya.";
         Path f = txtFile(t.getFileName());
         t.setAttempts((t.getAttempts()==null?0:t.getAttempts()) + 1);
         if (!Files.exists(f)) {

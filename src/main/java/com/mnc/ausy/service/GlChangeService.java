@@ -91,6 +91,7 @@ public class GlChangeService {
     private final GlCodeService glCodeService;
     private final GlExportRequestRepository exportRequests;
     private final SequenceService seq;
+    private final DataScopeService scope;
     private final ObjectMapper json = new ObjectMapper();
 
     /** Posting date format the core expects (same as the Excel upload path). */
@@ -98,9 +99,10 @@ public class GlChangeService {
 
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
                            AuditService audit, GlCodeService glCodeService,
-                           GlExportRequestRepository exportRequests, SequenceService seq) {
+                           GlExportRequestRepository exportRequests, SequenceService seq,
+                           DataScopeService scope) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
-        this.exportRequests = exportRequests; this.seq = seq;
+        this.exportRequests = exportRequests; this.seq = seq; this.scope = scope;
     }
 
     // ---- maps & json helpers ----
@@ -158,6 +160,7 @@ public class GlChangeService {
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
+        if (!scope.canSee(me, g.getGltrus())) return new Res(false, DataScopeService.NOT_MY_MAKER);   // BUG_AUSY_00138
         if (pendingGlRowIds().contains(glId))
             return new Res(false, lockReason(g));
 
@@ -212,6 +215,8 @@ public class GlChangeService {
             if (pending.contains(id)) { held++; continue; }     // sedang menunggu otorisasi
             GlTabel g = gl.findById(id).orElse(null);
             if (g == null) { skipped++; continue; }
+            // Baris milik maker lain diabaikan, walau id-nya diketik manual di Excel (BUG_AUSY_00138)
+            if (!scope.canSee(me, g.getGltrus())) { skipped++; continue; }
             Map<String,String> cur = rowMap(g);
             Map<String,String> neu = new LinkedHashMap<>(cur);
             for (String k : FIELDS.keySet()) if (row.get(k) != null) {
@@ -257,6 +262,7 @@ public class GlChangeService {
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlTabel g = gl.findById(glId).orElse(null);
         if (g == null) return new Res(false, "Baris GL tidak ditemukan.");
+        if (!scope.canSee(me, g.getGltrus())) return new Res(false, DataScopeService.NOT_MY_MAKER);   // BUG_AUSY_00138
         if (pendingGlRowIds().contains(glId))
             return new Res(false, lockReason(g));
         GlChangeRequest c = base("DELETE", T_GL_ROW, glId, me, note);
@@ -601,10 +607,15 @@ public class GlChangeService {
     public record ReviewItem(GlChangeRequest cr, List<Diff> diffs, int bulkCount,
                              List<Map<String,String>> rows, String targetLabel) {}
 
-    public List<ReviewItem> pendingReviewFor(Integer approverGroup) {
+    /**
+     * Antrian otorisasi seorang checker: role-nya berwenang (matriks approval_group) DAN maker-nya
+     * dipasangkan padanya di menu Pasangan Checker - Maker (BUG_AUSY_00139).
+     */
+    public List<ReviewItem> pendingReviewFor(AusyUserDetails me) {
         List<ReviewItem> out = new ArrayList<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
-            if (!approval.canApproveGroup(approverGroup, makerGroupOf(c))) continue;
+            if (!approval.canApproveGroup(me == null ? null : me.getIdGroup(), makerGroupOf(c))) continue;
+            if (!scope.canSee(me, c.getMaker())) continue;
             if (isStale(c)) continue;
             String label = targetLabel(c.getTarget());
             if ("BULK_EDIT".equals(c.getOp()))
@@ -624,6 +635,12 @@ public class GlChangeService {
         return out;
     }
     public long pendingVisibleCount() { return pendingVisible().size(); }
+
+    /** Idem, tapi hanya milik maker yang boleh dilihat user ini (BUG_AUSY_00138/00139). */
+    public List<GlChangeRequest> pendingVisible(AusyUserDetails me) {
+        return scope.filterBy(me, pendingVisible(), GlChangeRequest::getMaker);
+    }
+    public long pendingVisibleCount(AusyUserDetails me) { return pendingVisible(me).size(); }
 
     /** Pending requests older than this are treated as abandoned/junk and auto-hidden. */
     private static final int STALE_DAYS = 7;
@@ -681,6 +698,7 @@ public class GlChangeService {
             return new Res(false, "Maker tidak boleh mengotorisasi permintaannya sendiri.");
         if (!approval.canApproveGroup(me.getIdGroup(), makerGroupOf(c)))
             return new Res(false, "Group Anda tidak berwenang meng-approve permintaan dari maker tersebut.");
+        if (!scope.canSee(me, c.getMaker())) return new Res(false, DataScopeService.NOT_MY_MAKER);
 
         String err = apply(c);
         if (err != null) return new Res(false, err);
@@ -767,6 +785,7 @@ public class GlChangeService {
             return "Maker tidak boleh memutuskan permintaannya sendiri.";
         if (!approval.canApproveGroup(me.getIdGroup(), makerGroupOf(c)))
             return "Group Anda tidak berwenang menolak permintaan dari maker tersebut.";
+        if (!scope.canSee(me, c.getMaker())) return DataScopeService.NOT_MY_MAKER;
         if (note == null || note.isBlank()) return "Catatan penolakan wajib diisi.";
         // rejected: live GL data is left unchanged (8.3.d)
         c.setStatus("REJECTED"); c.setChecker(me.getUsername());
@@ -787,7 +806,7 @@ public class GlChangeService {
         g.setGltrac(code); g.setGltrcd(dc);
         g.setGltram(amount); g.setGltrds(a.get("gltrds"));
         g.setNoPaket(a.get("noPaket"));
-        g.setGltrus(maker.length()>10?maker.substring(0,10):maker);
+        g.setGltrus(maker);   // username utuh — lihat BUG_AUSY_00138 di UploadService
         // Baris manual dulu hanya mengisi 5 kolom, sehingga tanggal posting kosong di List GL Aktif
         // dan baris itu masuk ACCTXT tanpa tanggal / nominal ekuivalen / referensi. Lengkapi di sini,
         // memakai bentuk yang sama dengan jalur Upload Excel. Tanggal = saat GL benar-benar aktif

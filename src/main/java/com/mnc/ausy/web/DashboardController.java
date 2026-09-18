@@ -5,6 +5,7 @@ import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.ConfigChangeService;
+import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
@@ -33,14 +34,15 @@ public class DashboardController {
     private final FtpAdminService ftpAdmin;
     private final AccessService access;
     private final AuditScopeService auditScope;
+    private final DataScopeService scope;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
                                ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin,
-                               AccessService access, AuditScopeService auditScope) {
+                               AccessService access, AuditScopeService auditScope, DataScopeService scope) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
         this.glChange = glChange; this.configChange = configChange; this.glExport = glExport; this.ftpAdmin = ftpAdmin;
-        this.access = access; this.auditScope = auditScope;
+        this.access = access; this.auditScope = auditScope; this.scope = scope;
     }
 
     @GetMapping("/")
@@ -78,13 +80,19 @@ public class DashboardController {
 
         // --- Maker (3): task-focused home (no audit trail) ---
         if (hasGroup(auth, "GROUP_3")) {
-            model.addAttribute("activeGl", gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
-            model.addAttribute("glActiveList", gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING"));
+            // Semua angka & daftar GL di beranda dibatasi ke data maker ini sendiri (BUG_AUSY_00138).
+            // Angkanya dihitung di database, bukan dari ukuran daftar — daftarnya dibatasi 200 baris,
+            // jadi memakai size() akan berhenti di 200 untuk maker yang datanya lebih banyak.
+            model.addAttribute("activeGl", scope.restricted(principal)
+                    ? gl.countActiveNotPendingForMakers((short) 1, "PENDING", scope.visibleMakers(principal))
+                    : gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
+            model.addAttribute("glActiveList", scope.filterRows(principal,
+                    gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING")));
             // "Perubahan GL Pending" = upload paket + change request (add/edit/delete) + export GL, menunggu otorisasi
-            List<Object[]> pendingPaketList = gl.pendingPakets();
+            List<Object[]> pendingPaketList = scope.filterArrays(principal, gl.pendingPakets(), 1);
             normalizeUploadedAt(pendingPaketList);
-            List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible();
-            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.allPending();
+            List<com.mnc.ausy.domain.GlChangeRequest> pendingChangeList = glChange.pendingVisible(principal);
+            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.allPending(principal);
             List<PendingRow> pendingList = pendingRows(pendingPaketList, pendingChangeList, pendingExportList);
             model.addAttribute("pendingList", pendingList);
             model.addAttribute("pendingChanges", pendingList.size());
@@ -99,14 +107,15 @@ public class DashboardController {
 
         // --- Checker (4): only what needs authorizing + audit-trail recent (scoped Maker+Checker) ---
         if (hasGroup(auth, "GROUP_4")) {
-            // "Paket Menunggu Otorisasi" = upload paket + export GL (keduanya di tab Otorisasi Upload/Export GL)
-            List<Object[]> pendingPaketList = gl.pendingPakets();
-            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.pendingExportFor(principal.getIdGroup());
+            // "Paket Menunggu Otorisasi" = upload paket + export GL (keduanya di tab Otorisasi Upload/Export GL),
+            // dibatasi ke maker yang dipasangkan pada checker ini (BUG_AUSY_00139).
+            List<Object[]> pendingPaketList = scope.filterArrays(principal, gl.pendingPakets(), 1);
+            List<com.mnc.ausy.domain.GlExportRequest> pendingExportList = glExport.pendingExportFor(principal);
             model.addAttribute("pendingPaketList", pendingPaketList);
             model.addAttribute("pendingExportList", pendingExportList);
             model.addAttribute("pendingPakets", pendingPaketList.size() + pendingExportList.size());
-            model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
-            model.addAttribute("pendingChangeList", glChange.pendingVisible());
+            model.addAttribute("pendingChanges", glChange.pendingVisibleCount(principal));
+            model.addAttribute("pendingChangeList", glChange.pendingVisible(principal));
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.groupsOnSide(AuditScopeService.BUSINESS), PageRequest.of(0, 10)));
             return "dashboard-checker";
@@ -115,14 +124,19 @@ public class DashboardController {
         // --- Group lain (mis. group baru buatan admin): isinya murni dari Access Menu ---
         // Tidak ada card yang dicentang = dashboard kosong, bukan menampilkan semuanya
         // seperti sebelumnya (BUG_AUSY_00112). Query pun hanya dijalankan untuk card yang diberikan.
-        java.util.Set<String> cards = access.cardsFor(principal == null ? null : principal.getIdGroup());
+        java.util.Set<String> cards = access.cardsForUser(principal == null ? null : principal.getUsername());
         if (cards.contains("cfg-stats")) {
             model.addAttribute("totalUsers", users.count());
             model.addAttribute("totalGroups", groups.count());
         }
-        if (cards.contains("gl-active")) model.addAttribute("activeGl", gl.countByActive((short) 1));
-        if (cards.contains("otorisasi-pending")) model.addAttribute("pendingPakets", gl.pendingPakets().size());
-        if (cards.contains("gl-change-pending")) model.addAttribute("pendingChanges", glChange.pendingVisibleCount());
+        if (cards.contains("gl-active"))
+            model.addAttribute("activeGl", scope.restricted(principal)
+                    ? gl.countByActiveForMakers((short) 1, scope.visibleMakers(principal))
+                    : gl.countByActive((short) 1));
+        if (cards.contains("otorisasi-pending"))
+            model.addAttribute("pendingPakets", scope.filterArrays(principal, gl.pendingPakets(), 1).size());
+        if (cards.contains("gl-change-pending"))
+            model.addAttribute("pendingChanges", glChange.pendingVisibleCount(principal));
         // card aktivitas terbaru ada dua: operasional & administratif, masing-masing hak aksesnya sendiri
         if (cards.contains("cfg-pending")) {
             Integer myGroup = principal == null ? null : principal.getIdGroup();

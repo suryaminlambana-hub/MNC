@@ -73,9 +73,20 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     List<GlTabel> findTop200ByActiveOrderByIdDesc(Short active);
     long countByActive(Short active);
 
+    /** Idem, dibatasi ke maker tertentu — card dashboard yang pandangannya dibatasi (BUG_AUSY_00138). */
+    @Query("select count(g) from GlTabel g where g.active=:active and g.gltrus in :makers")
+    long countByActiveForMakers(@Param("active") Short active, @Param("makers") java.util.Collection<String> makers);
+
     // "GL Aktif" excludes rows still awaiting checker otorisasi (statusDual = PENDING)
     List<GlTabel> findTop200ByActiveAndStatusDualNotOrderByIdDesc(Short active, String statusDual);
     long countByActiveAndStatusDualNot(Short active, String statusDual);
+
+    /** Idem, dibatasi ke maker tertentu — beranda maker/checker (BUG_AUSY_00138/00139). */
+    @Query("select count(g) from GlTabel g where g.active=:active"
+         + " and (g.statusDual is null or g.statusDual <> :statusDual) and g.gltrus in :makers")
+    long countActiveNotPendingForMakers(@Param("active") Short active,
+                                        @Param("statusDual") String statusDual,
+                                        @Param("makers") java.util.Collection<String> makers);
 
     // how many GL rows still exist for a paket (0 = paket sudah tidak ada -> pending ADD jadi stale)
     long countByNoPaket(String noPaket);
@@ -96,13 +107,20 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
      * satu per satu di daftarnya sendiri, karena batch-nya bisa saja kosong sehingga tidak
      * pernah bisa tercentang lewat daftar batch (BUG_AUSY_00124/00125).
      */
+    /* Kolom ke-5 (gltrus) ditambahkan supaya daftarnya bisa disaring per maker tanpa mengubah
+       urutan kolom yang sudah dipakai template (BUG_AUSY_00138). */
     @Query(value = "select no_paket, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
-                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0), gltrus " +
                    "from gl_tabel where active=1 and status_dual='APPROVED' and status_print='BELUM UPLOAD' " +
                    "and export_req_id is null and coalesce(glsrc,'p') <> 'm' and coalesce(no_paket,'') <> '' " +
-                   "group by no_paket order by no_paket", nativeQuery = true)
+                   "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> exportablePakets();
+
+    /** Idem {@link #countByActiveAndStatusDualAndStatusPrintAndExportReqIdIsNull}, dibatasi satu maker. */
+    @Query("select count(g) from GlTabel g where g.active=1 and g.statusDual='APPROVED'"
+         + " and g.statusPrint='BELUM UPLOAD' and g.exportReqId is null and g.gltrus in :makers")
+    long countExportableForMakers(@Param("makers") java.util.Collection<String> makers);
 
     /** Baris GL tambahan manual yang siap diexport — dipilih satu per satu oleh maker. */
     @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED'"

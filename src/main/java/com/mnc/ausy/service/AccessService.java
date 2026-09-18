@@ -9,17 +9,25 @@ import java.util.*;
 /**
  * Hak akses sebagai data, bukan daftar group yang di-hardcode (BUG_AUSY_00112/00113/00114).
  *
- * Semua yang bisa dibuka seseorang berasal dari satu tempat: baris {@code group_menu} milik
- * group-nya. Tiga jenis item (kolom {@code menu.kind}):
+ * Tiga jenis item (kolom {@code menu.kind}):
  * <ul>
  *   <li>{@code MENU}   — halaman: muncul di sidebar dan URL-nya boleh dibuka</li>
  *   <li>{@code ACTION} — endpoint tanpa menu sendiri, mis. "Ajukan Export" yang tidak boleh
  *       ikut terbuka hanya karena group punya halaman List GL Aktif</li>
- *   <li>{@code CARD}   — card/section dashboard ({@code url = 'card:<key>'})</li>
+ *   <li>{@code CARD}   — card/section dashboard (url diisi "card:" + key)</li>
+ * </ul>
+ *
+ * <b>Sejak BUG_AUSY_00143 hak akses melekat pada USER, bukan role.</b> Dua sumber dipakai
+ * berdampingan dan perannya berbeda:
+ * <ul>
+ *   <li>{@code user_menu}  — hak yang berlaku saat seseorang memakai aplikasi: sidebar, izin URL,
+ *       card dashboard. Inilah yang diatur di halaman Access User.</li>
+ *   <li>{@code group_menu} — cetakan milik role: nilai awal user baru, dan dasar pertanyaan yang
+ *       memang setingkat role ("role ini penyetuju config?", "sisi kerja role ini apa?").</li>
  * </ul>
  *
  * Aturan URL: <b>pemilik terpanjang yang menang</b>. Untuk sebuah path dicari item dengan URL
- * terpanjang yang cocok (sama persis atau diikuti "/"), lalu ditanyakan apakah group memilikinya.
+ * terpanjang yang cocok (sama persis atau diikuti "/"), lalu ditanyakan apakah user memilikinya.
  * Jadi {@code /gl-legacy/export-request} dimiliki ACTION-nya sendiri, bukan menu {@code /gl-legacy},
  * dan {@code /gl-data/bulk-export} ikut menu {@code /gl-data}. Path yang tidak dimiliki item mana
  * pun (dashboard, ganti password, dsb.) terbuka untuk semua yang sudah login — sama seperti
@@ -32,14 +40,36 @@ public class AccessService {
 
     public AccessService(MenuRepository menus) { this.menus = menus; }
 
-    /** Card dashboard yang boleh dilihat group ini (tanpa prefix 'card:'). */
-    public Set<String> cardsFor(Integer idGroup) {
+    // ---------------------------------------------------------------- per user (yang berlaku)
+
+    /** Card dashboard yang boleh dilihat user ini (tanpa prefix "card:"). */
+    public Set<String> cardsForUser(String userId) {
         Set<String> out = new LinkedHashSet<>();
-        if (idGroup == null) return out;
-        for (Menu m : menus.findGrantedItems(idGroup))
+        if (userId == null) return out;
+        for (Menu m : menus.findGrantedItemsForUser(userId))
             if ("CARD".equals(m.getKind()) && !m.getCardKey().isEmpty()) out.add(m.getCardKey());
         return out;
     }
+
+    /** Boleh atau tidak user ini membuka sebuah path aplikasi (context-path sudah dilepas). */
+    public boolean allowedUser(String userId, String path) {
+        Menu owner = ownerOf(path);
+        if (owner == null) return true;                 // tidak dimiliki item mana pun
+        if (userId == null) return false;
+        for (Menu m : menus.findGrantedItemsForUser(userId))
+            if (owner.getIdMenu().equals(m.getIdMenu())) return true;
+        return false;
+    }
+
+    /** Apakah user ini punya halaman yang bisa mengajukan perubahan? */
+    public boolean canSubmitUser(String userId) {
+        if (userId == null) return false;
+        for (Menu m : menus.findGrantedItemsForUser(userId))
+            if (m.getUrl() != null && SUBMIT_PAGES.contains(m.getUrl().trim())) return true;
+        return false;
+    }
+
+    // ---------------------------------------------------------------- per role (cetakan)
 
     /**
      * Halaman yang isinya pengajuan (maker/admin), bukan halaman baca atau halaman otorisasi.
@@ -47,14 +77,22 @@ public class AccessService {
      * supaya group yang memang hanya menyetujui tidak ikut diperingati.
      */
     private static final Set<String> SUBMIT_PAGES = Set.of(
-            "/users", "/groups", "/menus", "/access", "/admin/ftp",
-            "/upload", "/nala", "/gl-data", "/gl-delete", "/gl-code", "/gl-legacy/export-request");
+            "/users", "/groups", "/menus", "/access", "/pairing",
+            "/upload", "/nala", "/gl-data", "/gl-delete", "/gl-legacy/export-request");
 
-    /** Apakah group ini punya halaman yang bisa mengajukan perubahan? */
-    public boolean canSubmit(Integer idGroup) {
+    /** Bagian dari {@link #SUBMIT_PAGES} yang benar-benar memasukkan/mengubah DATA GL. */
+    private static final Set<String> GL_SUBMIT_PAGES = Set.of(
+            "/upload", "/nala", "/gl-data", "/gl-delete", "/gl-legacy/export-request");
+
+    /**
+     * Apakah role ini mengerjakan data GL (bukan sekadar membacanya)? Dipakai membedakan checker
+     * bisnis — yang pandangannya dibatasi pasangan maker — dari penyetuju sisi config yang
+     * halaman GL-nya murni monitoring (BUG_AUSY_00138/00139).
+     */
+    public boolean canSubmitGl(Integer idGroup) {
         if (idGroup == null) return false;
         for (Menu m : menus.findGrantedItems(idGroup))
-            if (m.getUrl() != null && SUBMIT_PAGES.contains(m.getUrl().trim())) return true;
+            if (m.getUrl() != null && GL_SUBMIT_PAGES.contains(m.getUrl().trim())) return true;
         return false;
     }
 
@@ -64,8 +102,8 @@ public class AccessService {
     private static final Set<Integer> BUSINESS_PARENTS = Set.of(100, 300, 400, 500);
 
     /**
-     * Sisi kerja sebuah group dilihat dari menu yang dipegangnya: {@code "CONFIG"} (admin &
-     * admin approval), {@code "BUSINESS"} (maker & checker), atau null kalau memegang keduanya
+     * Sisi kerja sebuah group dilihat dari menu yang dipegangnya: {@code "CONFIG"} (admin &amp;
+     * admin approval), {@code "BUSINESS"} (maker &amp; checker), atau null kalau memegang keduanya
      * / tidak memegang apa pun. Dipakai memisahkan isi Audit Trail tanpa mengunci id group
      * tertentu di kode (BUG_AUSY_00115).
      */
@@ -81,7 +119,31 @@ public class AccessService {
         return cfg ? "CONFIG" : "BUSINESS";
     }
 
-    /** Boleh atau tidak group ini membuka sebuah path aplikasi (context-path sudah dilepas). */
+    /**
+     * Section Access User yang relevan untuk sebuah role — dibaca dari item yang dipegang cetakan
+     * role-nya. Halaman Access User memakainya supaya user ber-role Maker hanya memperlihatkan
+     * centangan bagian Maker (BUG_AUSY_00143).
+     *
+     * <b>Kosong berarti "belum bisa disimpulkan", bukan "tidak boleh apa-apa"</b>: role buatan
+     * admin memang sengaja lahir tanpa hak apa pun (BUG_AUSY_00112), jadi kalau hasilnya dipakai
+     * mentah-mentah layar Access User-nya akan kosong dan role itu tidak akan pernah bisa diberi
+     * hak. Pemanggilnya menafsirkan set kosong sebagai "tampilkan semua section" — lihat
+     * {@link #showAllSections(Integer)}.
+     */
+    public Set<String> sectionsOf(Integer idGroup) {
+        Set<String> out = new LinkedHashSet<>();
+        if (idGroup == null) return out;
+        for (Menu m : menus.findGrantedItems(idGroup)) {
+            if (m.getParent() == null || m.getParent() == 0) continue;
+            out.add(m.getSection() == null ? "" : m.getSection());
+        }
+        return out;
+    }
+
+    /** Role ini belum memegang apa pun, jadi seluruh section ditampilkan agar bisa mulai diisi. */
+    public boolean showAllSections(Integer idGroup) { return sectionsOf(idGroup).isEmpty(); }
+
+    /** Boleh atau tidak sebuah ROLE membuka path — pertanyaan setingkat role, bukan per user. */
     public boolean allowed(Integer idGroup, String path) {
         Menu owner = ownerOf(path);
         if (owner == null) return true;                 // tidak dimiliki item mana pun

@@ -25,7 +25,8 @@ public class ConfigChangeService {
         ENTITY_FIELDS.put("USER", fields("userId","Username","nama","Nama","email","Email","group","Role","status","Status"));
         ENTITY_FIELDS.put("GROUP", fields("namaGroup","Nama Role","inisial","Inisial","level","Level"));
         ENTITY_FIELDS.put("MENU", fields("namaMenu","Nama Menu","url","URL","parent","Parent","urutan","Urutan"));
-        ENTITY_FIELDS.put("ACCESS", fields("group","Role","aksesMenu","Menu yang Diberi Akses"));
+        ENTITY_FIELDS.put("ACCESS", fields("user","User","group","Role","aksesMenu","Menu yang Diberi Akses"));
+        ENTITY_FIELDS.put("PAIRING", fields("checker","Checker","makers","Maker yang Diotorisasi"));
         ENTITY_FIELDS.put("APPROVAL", fields("approver","Role Penyetuju","target","Berwenang Menyetujui"));
     }
     private static LinkedHashMap<String,String> fields(String... kv){
@@ -34,7 +35,8 @@ public class ConfigChangeService {
         return m;
     }
     private static String entityLabel(String e){
-        return switch (e==null?"":e){ case "GROUP"->"Role"; case "MENU"->"Menu"; case "ACCESS"->"Access Menu";
+        return switch (e==null?"":e){ case "GROUP"->"Role"; case "MENU"->"Menu"; case "ACCESS"->"Access User";
+            case "PAIRING"->"Pasangan Checker - Maker";
             case "APPROVAL"->"Approval Group"; default->"User"; };
     }
     /** Kept for backward compat (GL/user forms may reference it). */
@@ -44,21 +46,25 @@ public class ConfigChangeService {
     private final GroupUserRepository groups;
     private final MenuRepository menuRepo;
     private final GroupMenuRepository groupMenus;
+    private final UserMenuRepository userMenus;
     private final ApprovalGroupRepository approvalRules;
     private final ConfigChangeRequestRepository cr;
     private final ApprovalService approval;
     private final AuditService audit;
     private final PasswordEncoder encoder;
     private final AccessService access;
+    private final PairingService pairing;
     private final ObjectMapper json = new ObjectMapper();
 
     public ConfigChangeService(UserRepository users, GroupUserRepository groups, MenuRepository menuRepo,
-                               GroupMenuRepository groupMenus, ApprovalGroupRepository approvalRules,
+                               GroupMenuRepository groupMenus, UserMenuRepository userMenus,
+                               ApprovalGroupRepository approvalRules,
                                ConfigChangeRequestRepository cr, ApprovalService approval, AuditService audit,
-                               PasswordEncoder encoder, AccessService access) {
+                               PasswordEncoder encoder, AccessService access, PairingService pairing) {
         this.users = users; this.groups = groups; this.menuRepo = menuRepo; this.groupMenus = groupMenus;
+        this.userMenus = userMenus;
         this.approvalRules = approvalRules; this.cr = cr; this.approval = approval; this.audit = audit; this.encoder = encoder;
-        this.access = access;
+        this.access = access; this.pairing = pairing;
     }
 
     private static String n(String s){ return s==null?"":s; }
@@ -296,18 +302,25 @@ public class ConfigChangeService {
         return saveReq(c,"MENU","DELETE","'"+m.getNamaMenu()+"'");
     }
 
-    // ================= ACCESS (group_menu) =================
+    // ================= ACCESS (user_menu) =================
+    /**
+     * Hak akses diajukan per USER, bukan per role (BUG_AUSY_00143). Yang diubah adalah baris
+     * {@code user_menu} milik user tersebut; cetakan role di {@code group_menu} tidak disentuh,
+     * karena itu yang dipakai menyiapkan hak user baru dan menjawab pertanyaan setingkat role.
+     */
     @Transactional
-    public String submitAccess(Integer group, List<Integer> menuIds, AusyUserDetails me, String note){
+    public String submitAccess(String userId, List<Integer> menuIds, AusyUserDetails me, String note){
         if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
-        if (group==null) return "Group belum dipilih.";
-        { String no = aboveMe(group, me); if (no != null) return no; }
-        if (isPending("ACCESS", group)) return pendingMsg("ACCESS");
+        if (userId==null||userId.isBlank()) return "User belum dipilih.";
+        User u = users.findByUserId(userId).orElse(null);
+        if (u == null) return "User tidak ditemukan.";
+        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
+        if (isPending("ACCESS", userId)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
-        // current granted (leaf menus)
+        // hak yang berlaku sekarang untuk user ini
         List<Integer> cur = new ArrayList<>();
-        for (GroupMenu gm : groupMenus.findByIdGroup(group)) cur.add(gm.getIdMenu());
+        for (UserMenu um : userMenus.findByUserId(userId)) cur.add(um.getIdMenu());
         // Hak milik Admin Approval tidak boleh diberikan/dicabut oleh role di bawahnya
         // (BUG_AUSY_00136) — yang tidak berwenang tidak melihat centangannya, jadi hak yang
         // sudah ada dipertahankan apa adanya, bukan ikut terhapus diam-diam.
@@ -316,20 +329,80 @@ public class ConfigChangeService {
             want.removeAll(locked);
             for (Integer id : cur) if (locked.contains(id)) want.add(id);
         }
-        Map<String,String> before = accessMap(group, cur);
-        Map<String,String> after  = accessMap(group, new ArrayList<>(want));
+        // Centangan yang tidak ditampilkan untuk role user ini (section lain) tidak ikut terkirim
+        // dari form, jadi hak lama di luar section itu dipertahankan — kalau tidak, membuka layar
+        // dan menyimpan akan diam-diam mencabut hak yang tidak pernah terlihat. Untuk role yang
+        // seluruh section-nya memang ditampilkan, tidak ada yang perlu dipertahankan.
+        if (!access.showAllSections(u.getIdGroup())) {
+            Set<String> shown = access.sectionsOf(u.getIdGroup());
+            for (Integer id : cur) if (!inSections(id, shown)) want.add(id);
+        }
+
+        Map<String,String> before = accessMap(u, cur);
+        Map<String,String> after  = accessMap(u, new ArrayList<>(want));
         if (unchanged(before, after, "menuIds")) return NO_CHANGE;
-        ConfigChangeRequest c=base("ACCESS","EDIT",String.valueOf(group),me,note);
+        ConfigChangeRequest c=base("ACCESS","EDIT",userId,me,note);
         c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
-        return saveReq(c,"ACCESS","EDIT","'"+groupName(group)+"'");
+        return saveReq(c,"ACCESS","EDIT","'"+userId+"'");
     }
-    private Map<String,String> accessMap(Integer group, List<Integer> ids){
+    /** Apakah item akses ini termasuk salah satu section yang sedang ditampilkan? */
+    private boolean inSections(Integer idMenu, Set<String> sections){
+        Menu m = menuRepo.findById(idMenu).orElse(null);
+        if (m == null) return false;
+        return sections.contains(m.getSection()==null? "" : m.getSection());
+    }
+    private Map<String,String> accessMap(User u, List<Integer> ids){
         Collections.sort(ids);
         List<String> names=new ArrayList<>(); for(Integer id:ids) names.add(menuName(id));
         Map<String,String> m=new LinkedHashMap<>();
-        m.put("group", groupName(group));
+        m.put("user", n(u.getUserId()));
+        m.put("group", groupName(u.getIdGroup()));
         m.put("aksesMenu", names.isEmpty()? "(tidak ada)" : String.join(", ", names));
         m.put("menuIds", ids.stream().map(String::valueOf).reduce((x,y)->x+","+y).orElse(""));
+        return m;
+    }
+
+    // ================= PAIRING (checker_maker) =================
+    /**
+     * Pemasangan checker dengan maker-nya (BUG_AUSY_00139) — tetap dual control seperti perubahan
+     * config lain: Admin mengajukan dengan alasan, Admin Approval yang menerapkannya.
+     */
+    @Transactional
+    public String submitPairing(String checker, List<String> makers, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
+        if (checker==null||checker.isBlank()) return "Checker belum dipilih.";
+        User chk = users.findByUserId(checker).orElse(null);
+        if (chk == null) return "User checker tidak ditemukan.";
+        if (!pairing.isChecker(chk))
+            return "User '" + checker + "' bukan role penyetuju data GL, jadi tidak bisa dipasangkan ke maker.";
+        if (isPending("PAIRING", checker)) return pendingMsg("PAIRING");
+
+        List<String> want = new ArrayList<>();
+        if (makers != null) for (String m : makers) {
+            if (m == null || m.isBlank()) continue;
+            String id = m.trim();
+            User mk = users.findByUserId(id).orElse(null);
+            if (mk == null) return "User maker '" + id + "' tidak ditemukan.";
+            if (!pairing.isMaker(mk)) return "User '" + id + "' bukan role maker data GL.";
+            if (id.equals(checker)) return "Checker tidak dapat dipasangkan pada dirinya sendiri.";
+            if (!want.contains(id)) want.add(id);
+        }
+        List<String> cur = new ArrayList<>(pairing.makersOf(checker));
+        Map<String,String> before = pairingMap(checker, cur);
+        Map<String,String> after  = pairingMap(checker, want);
+        if (unchanged(before, after, "makerIds")) return NO_CHANGE;
+        ConfigChangeRequest c=base("PAIRING","EDIT",checker,me,note);
+        c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
+        return saveReq(c,"PAIRING","EDIT","'"+checker+"'");
+    }
+    private Map<String,String> pairingMap(String checker, List<String> makers){
+        List<String> sorted = new ArrayList<>(makers);
+        Collections.sort(sorted);
+        Map<String,String> m=new LinkedHashMap<>();
+        m.put("checker", n(checker));
+        m.put("makers", sorted.isEmpty()? "(tidak ada)" : String.join(", ", sorted));
+        m.put("makerIds", String.join(",", sorted));
         return m;
     }
 
@@ -453,7 +526,7 @@ public class ConfigChangeService {
 
     /** One section per Master Data entity, fixed order; only non-empty sections returned. */
     public record ReviewSection(String entity, String label, List<ReviewItem> items) {}
-    private static final String[] SECTION_ORDER = {"USER","GROUP","MENU","ACCESS","APPROVAL"};
+    private static final String[] SECTION_ORDER = {"USER","GROUP","MENU","ACCESS","PAIRING","APPROVAL"};
     public List<ReviewSection> pendingReviewSectionsFor(Integer approverGroup) {
         Map<String,List<ReviewItem>> byEntity = new LinkedHashMap<>();
         for (ReviewItem it : pendingReviewFor(approverGroup))
@@ -534,7 +607,8 @@ public class ConfigChangeService {
         return switch (n(c.getEntity())) {
             case "GROUP"    -> ref!=null && ref.get("namaGroup")!=null ? ref.get("namaGroup") : ("Group #"+n(c.getTargetId()));
             case "MENU"     -> ref!=null && ref.get("namaMenu")!=null ? ref.get("namaMenu") : ("Menu #"+n(c.getTargetId()));
-            case "ACCESS"   -> ref!=null && ref.get("group")!=null ? ref.get("group") : ("Group #"+n(c.getTargetId()));
+            case "ACCESS"   -> ref!=null && ref.get("user")!=null ? ref.get("user") : n(c.getTargetId());
+            case "PAIRING"  -> ref!=null && ref.get("checker")!=null ? ref.get("checker") : n(c.getTargetId());
             case "APPROVAL" -> ref!=null ? n(ref.get("approver"))+" → "+n(ref.get("target")) : "Aturan #"+n(c.getTargetId());
             default -> {
                 String t=c.getTargetId();
@@ -554,6 +628,7 @@ public class ConfigChangeService {
             case "GROUP"    -> applyGroup(c);
             case "MENU"     -> applyMenu(c);
             case "ACCESS"   -> applyAccess(c);
+            case "PAIRING"  -> applyPairing(c);
             case "APPROVAL" -> applyApproval(c);
             default          -> applyUser(c);
         };
@@ -602,7 +677,9 @@ public class ConfigChangeService {
         u.setUserId(uid); u.setPass(a.get("pass")); u.setNama(a.get("nama")); u.setEmail(a.get("email"));
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount((short)1); u.setCreDate(LocalDateTime.now()); u.setAddby(maker);
-        users.save(u); return null;
+        users.save(u);
+        seedAccessFromRole(uid, idGroup);       // hak awal = cetakan role (BUG_AUSY_00143)
+        return null;
     }
     private String applyPasswordReset(String targetId, Map<String,String> a) {
         if (a == null || a.get("pass") == null) return "Data permintaan rusak.";
@@ -617,11 +694,21 @@ public class ConfigChangeService {
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
         Integer idGroup = gid(a);
+        Integer oldGroup = u.getIdGroup();
         u.setNama(a.get("nama")); u.setEmail(a.get("email"));
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount("Active".equals(a.get("status")) ? (short)1 : (short)0);
         if (a.get("pass") != null && !a.get("pass").isBlank()) u.setPass(a.get("pass"));
-        users.save(u); return null;
+        users.save(u);
+        // Pindah role = pindah pekerjaan: haknya disusun ulang dari cetakan role yang baru, bukan
+        // membawa hak role lama yang sudah tidak relevan (BUG_AUSY_00143). Pasangan otorisasinya
+        // ikut dilepas karena perannya sebagai checker/maker bisa berubah (BUG_AUSY_00139).
+        if (oldGroup != null && !oldGroup.equals(idGroup)) {
+            userMenus.deleteByUserId(targetId);
+            seedAccessFromRole(targetId, idGroup);
+            pairing.forget(targetId);
+        }
+        return null;
     }
     private String applyUserDelete(String targetId) {
         User guard = users.findByUserId(targetId).orElse(null);
@@ -629,7 +716,12 @@ public class ConfigChangeService {
             return "Tidak dapat diterapkan: '" + targetId + "' adalah akun utama sistem.";
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
-        users.delete(u); return null;
+        users.delete(u);
+        // Jangan tinggalkan hak akses & pasangan otorisasi milik user yang sudah tidak ada —
+        // kalau username-nya dipakai lagi, semuanya akan hidup kembali tanpa pernah diajukan.
+        userMenus.deleteByUserId(targetId);
+        pairing.forget(targetId);
+        return null;
     }
 
     private String applyGroup(ConfigChangeRequest c){
@@ -665,26 +757,69 @@ public class ConfigChangeService {
                 if(m==null) return "Menu sudah tidak ada."; if(a==null) return "Data rusak.";
                 m.setNamaMenu(a.get("namaMenu")); String u=a.get("url"); m.setUrl(u==null||u.isBlank()?null:u.trim());
                 m.setParent(toInt(a.getOrDefault("parent","0"))); m.setUrutan(toInt(a.getOrDefault("urutan","0"))); menuRepo.save(m); }
-            case "DELETE" -> { Integer id=toInt(c.getTargetId()); if(id!=null){ groupMenus.deleteByIdMenu(id); if(menuRepo.existsById(id)) menuRepo.deleteById(id); } }
+            case "DELETE" -> { Integer id=toInt(c.getTargetId());
+                if(id!=null){
+                    // Hak akses menu ini harus lepas dari dua tempat: cetakan role (group_menu)
+                    // dan hak per user (user_menu) — kalau tidak, barisnya menunjuk menu yang
+                    // sudah tidak ada (BUG_AUSY_00143).
+                    groupMenus.deleteByIdMenu(id); userMenus.deleteByIdMenu(id);
+                    if(menuRepo.existsById(id)) menuRepo.deleteById(id);
+                } }
             default -> { return "Operasi tidak dikenal."; }
         }
         return null;
     }
     private String applyAccess(ConfigChangeRequest c){
         Map<String,String> a = parse(c.getAfterJson());
-        Integer group = toInt(c.getTargetId());
-        if (a==null || group==null) return "Data rusak.";
+        String userId = c.getTargetId();
+        if (a==null || userId==null || userId.isBlank()) return "Data rusak.";
+        // Permintaan Access yang diajukan sebelum hak akses pindah ke user (BUG_AUSY_00143)
+        // menyimpan id ROLE, bukan username — isinya tidak bisa diterapkan lagi. Beri tahu apa
+        // adanya supaya Admin Approval menolaknya dan admin mengajukan ulang per user.
+        if (a.get("user") == null)
+            return "Permintaan ini dibuat saat hak akses masih diatur per role dan tidak dapat"
+                 + " diterapkan lagi. Tolak permintaan ini, lalu ajukan ulang lewat menu Access User.";
+        if (!users.existsByUserId(userId)) return "User sudah tidak ada.";
         Set<Integer> want = new HashSet<>();
         String ids = a.get("menuIds");
         if (ids!=null && !ids.isBlank()) for(String s: ids.split(",")) { Integer id=toInt(s); if(id!=null) want.add(id); }
         for (Menu m : menuRepo.findAllByOrderByParentAscUrutanAsc()) {
             if (m.getParent()==0) continue;                       // only leaf menus
-            boolean has = groupMenus.existsByIdGroupAndIdMenu(group, m.getIdMenu());
+            boolean has = userMenus.existsByUserIdAndIdMenu(userId, m.getIdMenu());
             boolean w   = want.contains(m.getIdMenu());
-            if (w && !has) { GroupMenu gm=new GroupMenu(); gm.setIdGroup(group); gm.setIdMenu(m.getIdMenu()); groupMenus.save(gm); }
-            else if (!w && has) groupMenus.deleteByIdGroupAndIdMenu(group, m.getIdMenu());
+            if (w && !has) { UserMenu um=new UserMenu(); um.setUserId(userId); um.setIdMenu(m.getIdMenu()); userMenus.save(um); }
+            else if (!w && has) userMenus.deleteByUserIdAndIdMenu(userId, m.getIdMenu());
         }
         return null;
+    }
+
+    private String applyPairing(ConfigChangeRequest c){
+        Map<String,String> a = parse(c.getAfterJson());
+        String checker = c.getTargetId();
+        if (a==null || checker==null || checker.isBlank()) return "Data rusak.";
+        if (!users.existsByUserId(checker)) return "User checker sudah tidak ada.";
+        String ids = n(a.get("makerIds"));
+        List<String> makers = new ArrayList<>();
+        if (!ids.isBlank()) for (String s : ids.split(",")) {
+            String m = s.trim();
+            if (!m.isEmpty() && users.existsByUserId(m)) makers.add(m);
+        }
+        pairing.replaceMakers(checker, makers);
+        return null;
+    }
+
+    /**
+     * Hak awal seorang user baru = cetakan role-nya. Tanpa ini user hasil "Tambah User" tidak
+     * memegang apa pun dan sidebar-nya kosong, karena yang dibaca saat runtime adalah
+     * {@code user_menu}, bukan {@code group_menu} (BUG_AUSY_00143).
+     */
+    private void seedAccessFromRole(String userId, Integer idGroup){
+        if (userId == null || idGroup == null) return;
+        for (GroupMenu gm : groupMenus.findByIdGroup(idGroup))
+            if (!userMenus.existsByUserIdAndIdMenu(userId, gm.getIdMenu())) {
+                UserMenu um = new UserMenu(); um.setUserId(userId); um.setIdMenu(gm.getIdMenu());
+                userMenus.save(um);
+            }
     }
     private String applyApproval(ConfigChangeRequest c){
         Map<String,String> a = parse(c.getAfterJson());
