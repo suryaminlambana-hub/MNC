@@ -17,8 +17,21 @@ import java.util.List;
 @Service
 public class FtpAdminService {
     private final ExportTransferRepository transfers;
+    private final FtpService ftp;
 
-    public FtpAdminService(ExportTransferRepository transfers) { this.transfers = transfers; }
+    public FtpAdminService(ExportTransferRepository transfers, FtpService ftp) {
+        this.transfers = transfers; this.ftp = ftp;
+    }
+
+    /**
+     * Dari mana setelan FTP yang berlaku dibaca — ditampilkan di card beranda Admin.
+     *
+     * Setelah layar Konfigurasi FTP dihapus (BUG_AUSY_00141) tidak ada lagi tempat melihat setelan
+     * yang sedang dipakai, sehingga sisa baris {@code ftp_config} dari layar lama bisa menimpa .env
+     * tanpa seorang pun tahu. Ini bukan mengembalikan layar konfigurasinya: host & kredensial tetap
+     * tidak ditampilkan maupun bisa diubah dari website, yang disebut hanya SUMBER-nya.
+     */
+    public String configSource() { return ftp.sourceLabel(); }
 
     public List<ExportTransfer> recentTransfers() { return transfers.findTop50ByOrderByCreatedAtDesc(); }
     public long pendingCount() { return transfers.countByStatus("PENDING") + transfers.countByStatus("FAILED"); }

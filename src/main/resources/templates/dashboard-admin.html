@@ -68,7 +68,8 @@
         <!--/* BUG_AUSY_00141: halaman Konfigurasi FTP dihapus — setelan FTP hanya dari database/deploy.
                Kirim ulang bukan konfigurasi, jadi tombolnya pindah ke sini, satu per baris. */-->
         <p class="text-muted small px-3 mb-2"><i class="fa-solid fa-circle-info"></i>
-            Setelan FTP (host &amp; kredensial) dibaca dari konfigurasi server dan tidak diatur dari website.</p>
+            Setelan FTP (host &amp; kredensial) dibaca dari konfigurasi server dan tidak diatur dari website.
+            Sumber yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.</p>
         <table class="table table-sm table-hover align-middle mb-0">
             <thead><tr>
                 <th class="ps-3">Waktu</th><th>File</th><th>Batch</th><th>Maker</th>

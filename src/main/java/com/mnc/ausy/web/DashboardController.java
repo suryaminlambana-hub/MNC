@@ -66,6 +66,7 @@ public class DashboardController {
             List<com.mnc.ausy.domain.ExportTransfer> ftpResendList = ftpAdmin.needsResend();
             model.addAttribute("ftpResendList", ftpResendList);
             model.addAttribute("ftpResendCount", ftpResendList.size());
+            model.addAttribute("ftpSource", ftpAdmin.configSource());   // BUG_AUSY_00141 follow-up
             return "dashboard-admin";
         }
 
