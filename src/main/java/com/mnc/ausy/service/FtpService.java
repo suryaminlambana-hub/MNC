@@ -22,7 +22,17 @@ import java.nio.file.Path;
 public class FtpService {
     private final FtpConfigRepository repo;
 
-    // Fallback (deploy-time) properties — used only when the DB config has no host.
+    /**
+     * Saklar tegas: {@code FTP_ENABLED=false} mematikan push FTP apa pun isi sumber lain.
+     *
+     * Tanpa ini tidak ada cara mematikan FTP dari .env. Mengosongkan {@code FTP_HOST} tidak cukup —
+     * kosong berarti "tidak diatur di sini", sehingga justru jatuh ke baris {@code ftp_config}
+     * peninggalan layar lama dan FTP menyala lagi dengan kredensial yang tidak dikenal siapa pun.
+     * Kosong = otomatis (perilaku lama), jadi lingkungan yang sudah jalan tidak berubah.
+     */
+    @Value("${ausy.ftp.enabled:}")     private String pEnabled;
+
+    // Deploy-time properties.
     @Value("${ausy.ftp.host:}")        private String pHost;
     @Value("${ausy.ftp.port:21}")      private int pPort;
     @Value("${ausy.ftp.user:}")        private String pUser;
@@ -51,6 +61,8 @@ public class FtpService {
      * operator-lah yang dipakai.
      */
     public Settings settings() {
+        if (forcedOff())
+            return new Settings("", pPort, "", "", pDir, pSecure, pPassive, false, SRC_OFF);
         if (pHost != null && !pHost.isBlank())
             return new Settings(pHost, pPort, pUser, pPass, pDir, pSecure, pPassive, true, SRC_ENV);
         FtpConfig c = repo.findById(1).orElse(null);
@@ -65,6 +77,13 @@ public class FtpService {
     private static final String SRC_ENV  = "FTP_* di .env";
     private static final String SRC_DB   = "tabel ftp_config (baris id=1)";
     private static final String SRC_NONE = "tidak dikonfigurasi";
+    private static final String SRC_OFF  = "dimatikan lewat FTP_ENABLED=false";
+
+    /** {@code FTP_ENABLED} diisi tegas "false"/"0"/"no"/"off". Kosong = otomatis. */
+    private boolean forcedOff() {
+        String v = pEnabled == null ? "" : pEnabled.trim().toLowerCase();
+        return v.equals("false") || v.equals("0") || v.equals("no") || v.equals("off");
+    }
 
     /** Dari mana setelan FTP dibaca saat ini — dicatat di log start & disebut di pesan gagal. */
     public String sourceLabel() { return settings().source(); }

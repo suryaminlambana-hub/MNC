@@ -75,14 +75,14 @@ DB_PORT=5432
 DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
-# Kalau FTP server-nya ada di mesin yang sama, JANGAN pakai FTP_* — cukup arahkan
-# AUSY_EXPORT_DIR ke root FTP-nya (BUG_AUSY_00146), file ACCTXT langsung ditulis di sana.
+# Kalau FTP server-nya ada di mesin yang sama, JANGAN pakai FTP_* — arahkan AUSY_EXPORT_DIR
+# ke root FTP-nya (BUG_AUSY_00146) dan matikan push-nya. File ACCTXT langsung ditulis di sana.
 AUSY_EXPORT_DIR=C:/inetpub/ftproot
+FTP_ENABLED=false
 
 # FTP_* hanya untuk kirim ke server FTP LAIN. Diisi DI SINI, bukan lewat website: menu
 # "Konfigurasi FTP" sudah dihapus (BUG_AUSY_00141) supaya host & kredensial tidak bisa
-# dilihat/diubah dari antarmuka. Kosongkan FTP_HOST untuk mematikan push.
-# FTP_DIR = folder DI SERVER FTP (mis. /gl), bukan path lokal Windows.
+# dilihat/diubah dari antarmuka. FTP_DIR = folder DI SERVER FTP (mis. /gl), bukan path lokal.
 FTP_HOST=
 FTP_PORT=21
 FTP_USER=
@@ -90,11 +90,18 @@ FTP_PASS=
 FTP_DIR=
 ```
 
-> Kalau `FTP_HOST` diisi, nilainya **menang** atas baris di tabel `ftp_config`. Baris itu adalah
-> peninggalan layar Konfigurasi FTP yang lama dan hanya dipakai kalau `FTP_HOST` kosong. Saat
-> aplikasi start, log menyebut sumber yang sedang berlaku:
-> `Setelan FTP dibaca dari FTP_* di .env — host=…, user=…`. Kalau yang tercetak bukan yang kamu
-> harapkan, bersihkan sisa baris lama: `UPDATE ftp_config SET host = '' WHERE id = 1;`
+> **Mematikan FTP: pakai `FTP_ENABLED=false`.** Mengosongkan `FTP_HOST` saja tidak cukup — kosong
+> berarti "tidak diatur di sini", sehingga aplikasi jatuh ke baris tabel `ftp_config` peninggalan
+> layar Konfigurasi FTP yang lama dan FTP menyala lagi dengan kredensial yang tidak tertulis di
+> mana pun.
+>
+> Urutan sumbernya: `FTP_ENABLED=false` → mati. Selain itu, `FTP_HOST` di `.env` kalau diisi,
+> baru baris `ftp_config`, baru "tidak dikonfigurasi". Sumber yang berlaku disebut di log saat
+> start dan di card **Export FTP Gagal / Tertunda** pada beranda Admin:
+> `Setelan FTP dibaca dari dimatikan lewat FTP_ENABLED=false`.
+>
+> Membersihkan sisa baris lama (opsional, tidak wajib lagi):
+> `UPDATE ftp_config SET host = '' WHERE id = 1;`
 
 ```bash
 # d. uji jalan di foreground dulu (Ctrl+C untuk berhenti)
