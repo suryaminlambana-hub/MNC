@@ -9,7 +9,9 @@ import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -80,14 +82,14 @@ public class DashboardController {
 
         // --- Maker (3): task-focused home (no audit trail) ---
         if (hasGroup(auth, "GROUP_3")) {
-            // Semua angka & daftar GL di beranda dibatasi ke data maker ini sendiri (BUG_AUSY_00138).
-            // Angkanya dihitung di database, bukan dari ukuran daftar — daftarnya dibatasi 200 baris,
-            // jadi memakai size() akan berhenti di 200 untuk maker yang datanya lebih banyak.
-            model.addAttribute("activeGl", scope.restricted(principal)
-                    ? gl.countActiveNotPendingForMakers((short) 1, "PENDING", scope.visibleMakers(principal))
-                    : gl.countByActiveAndStatusDualNot((short) 1, "PENDING"));
-            model.addAttribute("glActiveList", scope.filterRows(principal,
-                    gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short) 1, "PENDING")));
+            // Semua angka & daftar GL di beranda dibatasi ke data maker ini sendiri (BUG_AUSY_00138),
+            // dan memakai definisi "GL Aktif" yang sama dengan halaman-halamannya (BUG_AUSY_00150).
+            // Angkanya dari getTotalElements() — bukan ukuran daftar, yang sengaja dipotong karena
+            // ini cuma pratinjau beranda.
+            Page<com.mnc.ausy.domain.GlTabel> aktif = gl.pageGlAktif(scope.visibleMakers(principal),
+                    PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "id")));
+            model.addAttribute("activeGl", aktif.getTotalElements());
+            model.addAttribute("glActiveList", aktif.getContent());
             // "Perubahan GL Pending" = upload paket + change request (add/edit/delete) + export GL, menunggu otorisasi
             List<Object[]> pendingPaketList = scope.filterArrays(principal, gl.pendingPakets(), 1);
             normalizeUploadedAt(pendingPaketList);
@@ -129,10 +131,11 @@ public class DashboardController {
             model.addAttribute("totalUsers", users.count());
             model.addAttribute("totalGroups", groups.count());
         }
+        // Card "Baris GL Aktif" memakai definisi yang sama dengan halamannya: baris yang masih
+        // menunggu otorisasi tidak ikut dihitung (BUG_AUSY_00150).
         if (cards.contains("gl-active"))
-            model.addAttribute("activeGl", scope.restricted(principal)
-                    ? gl.countByActiveForMakers((short) 1, scope.visibleMakers(principal))
-                    : gl.countByActive((short) 1));
+            model.addAttribute("activeGl", gl.pageGlAktif(scope.visibleMakers(principal),
+                    PageRequest.of(0, 1)).getTotalElements());
         if (cards.contains("otorisasi-pending"))
             model.addAttribute("pendingPakets", scope.filterArrays(principal, gl.pendingPakets(), 1).size());
         if (cards.contains("gl-change-pending"))

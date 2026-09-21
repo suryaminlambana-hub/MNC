@@ -7,6 +7,10 @@ import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.GlChangeService;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -31,13 +35,23 @@ public class GlChangeController {
         this.service = service; this.gl = gl; this.excel = excel; this.scope = scope;
     }
 
+    /** Sama dengan List GL Aktif — dua halaman ini harus menampilkan hal yang sama. */
+    private static final int PAGE_SIZE = 10;
+
     // ---- Maker ----
     @GetMapping("/gl-data")
-    public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        // hanya GL yang sudah lolos otorisasi (baris PENDING belum boleh dikelola/tampil sebagai aktif),
-        // dan hanya milik maker ini sendiri (BUG_AUSY_00138)
-        model.addAttribute("rows", scope.filterRows(me,
-                gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING")));
+    public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model,
+                           @RequestParam(defaultValue = "0") int page) {
+        // Persis daftar yang sama dengan List GL Aktif: satu definisi "GL Aktif" dipakai berdua
+        // (BUG_AUSY_00150) dan dipaginasi dengan cara yang sama. Dulu halaman ini memakai query
+        // turunan yang menjatuhkan baris ber-status_dual NULL dan berhenti di 200 baris, sehingga
+        // isinya tidak pernah sama dengan List GL Aktif. Dibatasi per maker (BUG_AUSY_00138).
+        Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
+        Page<GlTabel> result = gl.pageGlAktif(scope.visibleMakers(me), req);
+        model.addAttribute("rows", result.getContent());
+        model.addAttribute("total", result.getTotalElements());
+        model.addAttribute("page", result.getNumber());
+        model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
         model.addAttribute("fields", GlChangeService.FIELDS);
         // BUG_AUSY_00099 follow-up: kunci baris + alasannya ("… Hapus Batch 01"), bukan cuma "Menunggu Otorisasi"
         model.addAttribute("pendingLabels", service.pendingGlRowLabels());
@@ -71,9 +85,11 @@ public class GlChangeController {
     /** Bulk edit step 1 — maker downloads current GL data as an editable Excel (ID + editable fields). */
     @GetMapping("/gl-data/bulk-export")
     public void bulkExport(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        // Isinya sama persis dengan yang tampil di layar — termasuk batasan per maker (BUG_AUSY_00138).
-        List<GlTabel> rows = scope.filterRows(me,
-                gl.findTop200ByActiveAndStatusDualNotOrderByIdDesc((short)1, "PENDING"));
+        // Unduhan harus memuat SELURUH baris yang dikelola maker ini, bukan sepotong halaman —
+        // definisi "GL Aktif" yang sama dengan layarnya (BUG_AUSY_00150), batas per maker tetap
+        // berlaku (BUG_AUSY_00138). Sebelumnya berhenti di 200 baris, jadi file Excel-nya diam-diam
+        // terpotong dan bulk edit tidak pernah bisa menyentuh baris selebihnya.
+        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me));
         List<List<Object>> data = new ArrayList<>();
         for (GlTabel g : rows) data.add(Arrays.asList(
                 g.getId(), s(g.getGltrac()), s(g.getGltrcd()),

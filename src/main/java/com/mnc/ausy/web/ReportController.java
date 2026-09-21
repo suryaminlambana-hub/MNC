@@ -17,9 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Controller
 public class ReportController {
@@ -41,10 +39,10 @@ public class ReportController {
      */
     @GetMapping("/gl-legacy/pdf")
     public void listGlAktif(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        List<GlTabel> rows = scope.filterRows(me, gl.findAll().stream()
-                .filter(r -> r.getActive() != null && r.getActive() == 1 && !"PENDING".equals(r.getStatusDual()))
-                .sorted(Comparator.comparing(GlTabel::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .collect(Collectors.toList()));
+        // Definisi "GL Aktif" yang sama dengan halamannya, supaya PDF-nya tidak pernah berisi baris
+        // yang berbeda dari yang dilihat di layar (BUG_AUSY_00150). PDF memuat SEMUA baris, bukan
+        // hanya halaman yang sedang dibuka — itu memang gunanya diunduh.
+        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me));
 
         String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         resp.setContentType("application/pdf");

@@ -3,6 +3,7 @@ package com.mnc.ausy.repo;
 import com.mnc.ausy.domain.GlTabel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,24 +74,6 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query("select g from GlTabel g where g.noPaket=:p and g.gltrus=:u and coalesce(g.glsrc,'p') <> 'm' order by g.id")
     List<GlTabel> findBatchRows(@Param("p") String paket, @Param("u") String inputer);
     List<GlTabel> findByNoPaketOrderById(String paket);
-    List<GlTabel> findTop200ByActiveOrderByIdDesc(Short active);
-    long countByActive(Short active);
-
-    /** Idem, dibatasi ke maker tertentu — card dashboard yang pandangannya dibatasi (BUG_AUSY_00138). */
-    @Query("select count(g) from GlTabel g where g.active=:active and g.gltrus in :makers")
-    long countByActiveForMakers(@Param("active") Short active, @Param("makers") java.util.Collection<String> makers);
-
-    // "GL Aktif" excludes rows still awaiting checker otorisasi (statusDual = PENDING)
-    List<GlTabel> findTop200ByActiveAndStatusDualNotOrderByIdDesc(Short active, String statusDual);
-    long countByActiveAndStatusDualNot(Short active, String statusDual);
-
-    /** Idem, dibatasi ke maker tertentu — beranda maker/checker (BUG_AUSY_00138/00139). */
-    @Query("select count(g) from GlTabel g where g.active=:active"
-         + " and (g.statusDual is null or g.statusDual <> :statusDual) and g.gltrus in :makers")
-    long countActiveNotPendingForMakers(@Param("active") Short active,
-                                        @Param("statusDual") String statusDual,
-                                        @Param("makers") java.util.Collection<String> makers);
-
     // how many GL rows still exist for a paket (0 = paket sudah tidak ada -> pending ADD jadi stale)
     long countByNoPaket(String noPaket);
 
@@ -140,6 +123,33 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
          + " and g.gltrus in :makers")
     Page<GlTabel> pageActiveByMakers(@Param("makers") Collection<String> makers, Pageable page);
+
+    /**
+     * "GL Aktif" dengan batas per maker sekaligus — SATU pintu untuk semua layar (BUG_AUSY_00150).
+     *
+     * Sebelumnya tiap layar menulis definisinya sendiri dan keduanya menyimpang: List GL Aktif
+     * menyaring di Java dengan {@code !"PENDING".equals(statusDual)} (baris ber-status_dual NULL
+     * ikut tampil), sementara Kelola Data GL memakai query turunan {@code ...AndStatusDualNot...}
+     * yang menjadi {@code status_dual <> 'PENDING'} — di SQL, {@code NULL <> 'PENDING'} bernilai
+     * UNKNOWN, jadi baris NULL hilang diam-diam. Kelola Data GL juga berhenti di 200 baris
+     * sementara List GL Aktif tidak. Keduanya sekarang lewat sini.
+     *
+     * {@code makers} null = tanpa batas; kosong = memang tidak ada yang boleh dilihat.
+     */
+    default Page<GlTabel> pageGlAktif(Collection<String> makers, Pageable page) {
+        if (makers == null) return pageActive(page);
+        if (makers.isEmpty()) return Page.empty(page);
+        return pageActiveByMakers(makers, page);
+    }
+
+    /**
+     * Seluruh baris GL Aktif sekaligus — hanya untuk unduhan (PDF / Excel bulk edit) yang memang
+     * harus memuat semuanya. Layar tetap memakai {@link #pageGlAktif} supaya tidak merender
+     * belasan ribu baris (BUG_AUSY_00147).
+     */
+    default List<GlTabel> findGlAktifAll(Collection<String> makers) {
+        return pageGlAktif(makers, Pageable.unpaged(Sort.by(Sort.Direction.DESC, "id"))).getContent();
+    }
 
     /** Ringkasan seluruh GL aktif: jumlah baris, total nominal, dan berapa yang kodenya terdaftar. */
     @Query("select count(g), coalesce(sum(g.gltram),0),"

@@ -45,9 +45,29 @@
                 class="text-muted small" th:title="${pendingLabels.get(r.id)}">—</span>
         </td>
       </tr>
-      <tr th:if="${rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
+      <tr th:if="${rows == null or rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!--/* Dipaginasi di server persis seperti List GL Aktif — isinya harus sama (BUG_AUSY_00150)
+         dan halamannya tidak boleh merender belasan ribu baris (BUG_AUSY_00147). */-->
+  <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2"
+       th:if="${totalPages > 1}">
+    <span class="text-muted small">
+      Halaman <b th:text="${page + 1}">1</b> dari <b th:text="${totalPages}">1</b>
+      · <b th:text="${total}">0</b> baris
+    </span>
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
+         th:href="@{/gl-data(page=0)}">&laquo; Awal</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
+         th:href="@{/gl-data(page=${page - 1})}">Sebelumnya</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
+         th:href="@{/gl-data(page=${page + 1})}">Berikutnya</a>
+      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
+         th:href="@{/gl-data(page=${totalPages - 1})}">Akhir &raquo;</a>
+    </div>
   </div>
 
   <!-- Add / Edit modal -->
