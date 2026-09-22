@@ -4,8 +4,15 @@
 <main>
   <h1 class="ausy-page-title">Manajemen Otorisasi GL</h1>
   <p class="text-muted">Otorisasi upload GL (export ke core banking), otorisasi perubahan GL &amp; otorisasi export GL — dalam satu halaman.</p>
-  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
-  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+  <div th:if="${ok}" class="alert alert-success py-2 mb-1" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2 mb-1" th:text="${warn}"></div>
+  <!--/* BUG_AUSY_00151: path di pesan sukses bisa langsung dibuka isinya dari sini. Link file://
+         dari halaman http diblokir browser, jadi yang dipencet adalah halaman daftar isi folder. */-->
+  <p class="small mb-3" th:if="${exportDirPath != null}">
+    <i class="fa-solid fa-folder-open text-muted"></i>
+    Direktori hasil export: <code th:text="${exportDirPath}"></code>
+    <a class="ms-1" th:href="@{/export-dir}" th:if="${canSeeExportDir}">Lihat isinya →</a>
+  </p>
 
   <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabUpload" type="button">

@@ -1,0 +1,71 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Direktori Hasil Export — AUSY</title></head>
+<main>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+    <div>
+      <h1 class="ausy-page-title">Direktori Hasil Export</h1>
+      <p class="text-muted mb-0">Folder tujuan file ACCTXT di server tempat aplikasi ini berjalan, beserta isinya.</p>
+    </div>
+    <a class="btn btn-outline-secondary" th:href="@{/export-dir}"><i class="fa-solid fa-rotate-right"></i> Muat ulang</a>
+  </div>
+
+  <div class="ausy-card p-3 mb-3">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="text-muted small">Folder:</span>
+      <code id="dirPath" class="fs-6" th:text="${dir.path}">—</code>
+      <button class="btn btn-sm btn-outline-secondary" type="button" id="copyPath">
+        <i class="fa-regular fa-copy"></i> Copy path</button>
+      <span class="badge bg-success-subtle text-success" th:if="${dir.writable}">bisa ditulis</span>
+      <span class="badge bg-danger-subtle text-danger" th:unless="${dir.exists}">folder belum ada</span>
+      <span class="badge bg-danger-subtle text-danger" th:if="${dir.exists and !dir.writable}">tidak bisa ditulis</span>
+    </div>
+    <p class="text-muted small mb-0 mt-2">
+      <i class="fa-solid fa-circle-info"></i>
+      Diatur lewat <code>AUSY_EXPORT_DIR</code> di konfigurasi server, bukan dari website.
+      <span th:if="${ftpActive}">Setelah file dibuat, file juga dikirim ke FTP (setelan dibaca dari <b th:text="${ftpSource}"></b>).</span>
+      <span th:unless="${ftpActive}">Push FTP tidak aktif (<b th:text="${ftpSource}"></b>) — file di folder ini yang diambil core.</span>
+      File ACCTXT tidak bisa diunduh dari website; hanya diambil core dari folder/FTP.
+    </p>
+  </div>
+
+  <div class="ausy-card">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-folder-open text-muted"></i> Isi folder
+      <span class="badge bg-secondary-subtle text-secondary" th:text="${#lists.size(dir.files)}">0</span>
+    </h2>
+    <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="2" data-order-dir="desc">
+      <thead><tr><th class="ps-3">File</th><th class="text-end">Ukuran</th><th class="pe-3">Terakhir diubah</th></tr></thead>
+      <tbody>
+      <tr th:each="f : ${dir.files}">
+        <td class="ps-3 font-monospace small" th:text="${f.name}"></td>
+        <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(f.size,1,'POINT')} + ' B'"></td>
+        <td class="pe-3 text-muted small text-nowrap" th:text="${#temporals.format(f.modified,'dd-MM-yyyy HH:mm:ss')}"></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(dir.files)}">
+        <td colspan="3" class="text-center text-muted py-4">
+          <span th:if="${dir.exists}">Folder ini masih kosong — belum ada hasil export yang ditulis ke sini.</span>
+          <span th:unless="${dir.exists}">Folder belum ada. Cek <code>AUSY_EXPORT_DIR</code> di konfigurasi server.</span>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script th:inline="none">
+    document.getElementById('copyPath')?.addEventListener('click', function () {
+      var p = document.getElementById('dirPath').textContent.trim();
+      var done = function () {
+        var b = document.getElementById('copyPath');
+        var old = b.innerHTML;
+        b.innerHTML = '<i class="fa-solid fa-check"></i> Tercopy';
+        setTimeout(function () { b.innerHTML = old; }, 1500);
+      };
+      if (navigator.clipboard) { navigator.clipboard.writeText(p).then(done, function () {}); return; }
+      var t = document.createElement('textarea');
+      t.value = p; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); done(); } finally { document.body.removeChild(t); }
+    });
+  </script>
+</main>
+</html>

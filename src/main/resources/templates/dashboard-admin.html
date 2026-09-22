@@ -69,7 +69,9 @@
                Kirim ulang bukan konfigurasi, jadi tombolnya pindah ke sini, satu per baris. */-->
         <p class="text-muted small px-3 mb-2"><i class="fa-solid fa-circle-info"></i>
             Setelan FTP (host &amp; kredensial) dibaca dari konfigurasi server dan tidak diatur dari website.
-            Sumber yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.</p>
+            Sumber yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.
+            <span th:if="${canSeeExportDir}">File ACCTXT dibuat di <code th:text="${exportDirPath}"></code> —
+            <a th:href="@{/export-dir}">lihat isinya</a>.</span></p>
         <table class="table table-sm table-hover align-middle mb-0">
             <thead><tr>
                 <th class="ps-3">Waktu</th><th>File</th><th>Batch</th><th>Maker</th>

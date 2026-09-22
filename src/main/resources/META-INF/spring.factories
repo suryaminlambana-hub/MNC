@@ -1,0 +1,3 @@
+# Baca .env di folder kerja sebelum aplikasi berdiri (lihat DotEnvEnvironmentPostProcessor).
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.mnc.ausy.config.DotEnvEnvironmentPostProcessor

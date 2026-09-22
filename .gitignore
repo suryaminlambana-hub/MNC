@@ -6,3 +6,6 @@ data/
 *.iml
 .vscode/
 .DS_Store
+
+# Setelan lokal/deploy (kredensial DB, FTP, direktori export) — jangan ikut di-commit.
+.env

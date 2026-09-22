@@ -89,7 +89,10 @@ winget install PostgreSQL.PostgreSQL.16
 ```cmd
 psql -U postgres -f packaging\setup-db.sql
 ```
-2. Jalankan aplikasi:
+2. Jalankan aplikasi — **cara singkat:** `run.bat` (bikin `.env` kalau belum ada, lalu jalan).
+   Setelah itu setelan diubah dengan mengedit `.env`, tidak perlu `set ...` lagi.
+
+   Atau manual:
 
    **Command Prompt (cmd):**
    ```cmd

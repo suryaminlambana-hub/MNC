@@ -67,6 +67,8 @@ public class DashboardController {
             model.addAttribute("ftpResendList", ftpResendList);
             model.addAttribute("ftpResendCount", ftpResendList.size());
             model.addAttribute("ftpSource", ftpAdmin.configSource());   // BUG_AUSY_00141 follow-up
+            model.addAttribute("exportDirPath", glExport.exportDirPath()); // BUG_AUSY_00151
+            model.addAttribute("canSeeExportDir", access.allowedUser(auth.getName(), "/export-dir"));
             return "dashboard-admin";
         }
 

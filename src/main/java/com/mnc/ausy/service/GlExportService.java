@@ -361,6 +361,42 @@ public class GlExportService {
     }
 
     // ---------- Admin: resend a queued/failed transfer ----------
+    /** Satu file di direktori export, untuk halaman "Direktori Hasil Export". */
+    public record ExportFile(String name, long size, LocalDateTime modified) {}
+
+    /** Keterangan direktori export + isinya — dipakai halaman /export-dir. */
+    public record ExportDirView(String path, boolean exists, boolean writable, List<ExportFile> files) {}
+
+    /**
+     * Isi direktori export, terbaru dulu.
+     *
+     * Ada supaya pertanyaan "hasil export-nya ke mana?" bisa dijawab dari dalam aplikasi
+     * (BUG_AUSY_00151): link file:// dari halaman http diblokir browser, jadi menunjukkan
+     * daftarnya sendiri adalah satu-satunya cara yang benar-benar bisa dipencet.
+     * File-nya tidak diunduh — ACCTXT memang tidak untuk turun ke komputer siapa pun.
+     */
+    public ExportDirView exportDirView() {
+        Path dir = exportDir();
+        List<ExportFile> files = new ArrayList<>();
+        boolean exists = Files.isDirectory(dir);
+        if (exists) {
+            try (var paths = Files.list(dir)) {
+                for (Path f : paths.filter(Files::isRegularFile).toList()) {
+                    LocalDateTime at = LocalDateTime.ofInstant(
+                            Files.getLastModifiedTime(f).toInstant(), java.time.ZoneId.systemDefault());
+                    files.add(new ExportFile(f.getFileName().toString(), Files.size(f), at));
+                }
+            } catch (Exception e) {
+                LOG.warn("Direktori export {} tidak bisa dibaca: {}", dir, e.getMessage());
+            }
+            files.sort(Comparator.comparing(ExportFile::modified).reversed());
+        }
+        return new ExportDirView(dir.toString(), exists, exists && Files.isWritable(dir), files);
+    }
+
+    /** Path direktori export apa adanya — ditempel di halaman otorisasi & beranda Admin. */
+    public String exportDirPath() { return exportDir().toString(); }
+
     /** Resolve a generated text file inside the txt dir (basename only — no path traversal). */
     public Path txtFile(String name) {
         String safe = Paths.get(name == null ? "" : name).getFileName().toString();

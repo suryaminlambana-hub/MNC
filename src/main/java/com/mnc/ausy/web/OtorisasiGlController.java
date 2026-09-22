@@ -1,6 +1,7 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
 import com.mnc.ausy.service.OtorisasiService;
@@ -15,9 +16,11 @@ public class OtorisasiGlController {
     private final OtorisasiService otorisasi;
     private final GlChangeService glChange;
     private final GlExportService glExport;
+    private final AccessService access;
 
-    public OtorisasiGlController(OtorisasiService otorisasi, GlChangeService glChange, GlExportService glExport) {
-        this.otorisasi = otorisasi; this.glChange = glChange; this.glExport = glExport;
+    public OtorisasiGlController(OtorisasiService otorisasi, GlChangeService glChange, GlExportService glExport,
+                                 AccessService access) {
+        this.otorisasi = otorisasi; this.glChange = glChange; this.glExport = glExport; this.access = access;
     }
 
     @GetMapping("/otorisasi-gl")
@@ -25,6 +28,11 @@ public class OtorisasiGlController {
         model.addAttribute("pakets", otorisasi.pendingFor(me));
         model.addAttribute("items", glChange.pendingReviewFor(me));
         model.addAttribute("exportReqs", glExport.pendingExportFor(me));
+        // Folder tujuan file ACCTXT disebut di halaman ini, bukan hanya di pesan sekali lewat
+        // setelah approve (BUG_AUSY_00151). Link ke isinya menyesuaikan hak akses user.
+        model.addAttribute("exportDirPath", glExport.exportDirPath());
+        model.addAttribute("canSeeExportDir",
+                access.allowedUser(me == null ? null : me.getUsername(), "/export-dir"));
         return "otorisasi-gl/index";
     }
 }
