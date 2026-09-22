@@ -98,10 +98,15 @@ Urutannya begini:
    `run.bat` sebagai Administrator atau beri izin Modify ke user yang menjalankan aplikasi.
 3. `WARN AUSY_EXPORT_DIR menunjuk ... yang tidak bisa dipakai` → setelan itu diabaikan dan dipakai
    folder bawaan. Ini muncul kalau foldernya **dan** folder induknya tidak ada, yang praktis selalu
-   berarti salah tulis (mis. `C:\inethub\ftproot`). Dulu folder salah itu dibuat begitu saja dan
-   hasil export terbit di tempat yang tidak dipantau siapa pun.
-4. `AUSY_EXPORT_DIR` yang ditulis tapi dibiarkan **kosong** dianggap tidak diisi → folder bawaan.
-5. Pesan setelah checker approve menyebut nama file yang dibuat.
+   berarti salah tulis. Dulu folder salah itu dibuat begitu saja dan hasil export terbit di tempat
+   yang tidak dipantau siapa pun.
+4. `WARN AUSY_EXPORT_DIR menyebut folder "inethub" ...` → salah tulis satu huruf untuk `inetpub`.
+   Aplikasi memakai `inetpub`-nya sendiri, jadi hasil export tetap mendarat di tempat yang benar
+   walaupun `C:\inethub\` terlanjur ada (dibuat versi lama, sehingga aturan nomor 3 tidak
+   menangkapnya). `run.bat` sekalian memperbaiki baris itu di `.env`; folder `C:\inethub\` yang
+   lama boleh dihapus.
+5. `AUSY_EXPORT_DIR` yang ditulis tapi dibiarkan **kosong** dianggap tidak diisi → folder bawaan.
+6. Pesan setelah checker approve menyebut nama file yang dibuat.
 
 ```bash
 # d. uji jalan di foreground dulu (Ctrl+C untuk berhenti)

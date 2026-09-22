@@ -22,11 +22,6 @@ if not exist ".env" (
   >> .env echo # Folder tempat file ACCTXT hasil export dibuat. Kalau server FTP-nya di mesin ini,
   >> .env echo # arahkan ke root FTP-nya. Pakai garis miring / walau di Windows.
   >> .env echo AUSY_EXPORT_DIR=C:/inetpub/ftproot
-  >> .env echo.
-  >> .env echo # Kirim ke server FTP di mesin LAIN: isi tiga baris di bawah. Kosong = push FTP mati.
-  >> .env echo FTP_HOST=
-  >> .env echo FTP_USER=
-  >> .env echo FTP_PASS=
   echo.
 )
 
@@ -45,7 +40,22 @@ if not defined EXPDIR (
 )
 
 set "EXPDIR=%EXPDIR: =%"
-set "EXPCHK=%EXPDIR:/=\%"
+
+REM inethub -> inetpub: sekali diperbaiki di .env, tidak perlu diingat lagi. Folder salahnya
+REM sering sudah terlanjur ada (dibuat versi lama), jadi pengecekan "folder induknya ada" di
+REM bawah tidak menangkapnya.
+set "EXPFIX=%EXPDIR:inethub=inetpub%"
+if /i not "%EXPFIX%"=="%EXPDIR%" (
+  echo *** AUSY_EXPORT_DIR salah tulis: %EXPDIR%
+  echo     Diperbaiki di .env menjadi %EXPFIX%. Folder inethub yang lama boleh dihapus.
+  echo.
+  > .env.tmp findstr /v /i /b /c:"AUSY_EXPORT_DIR=" .env
+  >> .env.tmp echo AUSY_EXPORT_DIR=%EXPFIX%
+  move /y .env.tmp .env >nul
+  set "EXPDIR=%EXPFIX%"
+)
+
+set "EXPCHK=%EXPFIX:/=\%"
 for %%i in ("%EXPCHK%") do set "EXPPARENT=%%~dpi"
 if not exist "%EXPCHK%" if not exist "%EXPPARENT%" (
   echo.

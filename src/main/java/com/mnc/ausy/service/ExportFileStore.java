@@ -36,6 +36,9 @@ public class ExportFileStore {
     private static final String DEFAULT_DIR = "data/txt";
     /** Akhiran berkas sementara saat menulis; tidak pernah ikut ditampilkan sebagai hasil export. */
     private static final String PART = ".part";
+    /** Salah tulis satu huruf yang sudah dua kali membuat hasil export "hilang". */
+    private static final String TYPO = "inethub";
+    private static final String TYPO_FIX = "inetpub";
 
     @Value("${ausy.export-dir:}") private String exportDir;
     @Value("${ausy.txt-dir:}")    private String txtDir;
@@ -59,15 +62,56 @@ public class ExportFileStore {
      * kerja proses, dan file mendarat di sana tanpa error apa pun.
      *
      * Setelan yang TIDAK BISA DIPAKAI juga diabaikan: kalau foldernya belum ada dan folder
-     * induknya pun tidak ada, itu praktis selalu salah tulis (mis. {@code C:\inethub\ftproot}).
-     * Dulu folder salah itu dibuat begitu saja dan hasil export terbit di tempat yang tidak
-     * dipantau siapa pun; sekarang dipakai bawaannya, dan sumber yang berlaku disebut di log
-     * saat start.
+     * induknya pun tidak ada, itu praktis selalu salah tulis. Dulu folder salah itu dibuat begitu
+     * saja dan hasil export terbit di tempat yang tidak dipantau siapa pun; sekarang dipakai
+     * bawaannya, dan sumber yang berlaku disebut di log saat start.
+     *
+     * Salah tulis {@code inethub} untuk {@code inetpub} diperbaiki sendiri — lihat
+     * {@link #withoutTypo(Path)}.
      */
     public Path dir() {
+        return resolved().dir();
+    }
+
+    /** Folder yang dipakai + alasannya, kalau yang dipakai bukan persis isi setelannya. */
+    record Resolved(Path dir, String note) {}
+
+    Resolved resolved() {
         Path configured = configuredDir();
-        if (configured == null) return defaultDir();
-        return usable(configured) ? configured : defaultDir();
+        if (configured == null) return new Resolved(defaultDir(), null);
+
+        Path fixed = withoutTypo(configured);
+        if (fixed != null && usable(fixed))
+            return new Resolved(fixed, "AUSY_EXPORT_DIR menyebut folder \"" + TYPO + "\" ("
+                    + configured + "); ejaan yang benar \"" + TYPO_FIX + "\"");
+
+        if (!usable(configured))
+            return new Resolved(defaultDir(), "AUSY_EXPORT_DIR menunjuk " + configured
+                    + " yang tidak bisa dipakai (folder itu dan folder induknya tidak ada —"
+                    + " biasanya salah tulis)");
+
+        return new Resolved(configured, null);
+    }
+
+    /**
+     * Perbaiki {@code inethub} menjadi {@code inetpub} di nama folder.
+     *
+     * Aturan "folder induknya ada berarti wajar" di bawah tidak menangkap salah tulis ini begitu
+     * folder salahnya sudah terlanjur ada — versi lama membuatnya sendiri, dan sejak itu
+     * {@code C:\inethub\ftproot} tampak sah: hasil export terus terbit di folder yang tidak
+     * dipantau siapa pun. Dicocokkan per nama folder, bukan potongan teks, supaya folder yang
+     * kebetulan mengandung kata itu tidak ikut diubah. Null = tidak ada yang perlu diperbaiki.
+     */
+    private static Path withoutTypo(Path p) {
+        Path out = p.getRoot();
+        if (out == null) return null;
+        boolean found = false;
+        for (Path seg : p) {
+            String name = seg.toString();
+            if (name.equalsIgnoreCase(TYPO)) { name = TYPO_FIX; found = true; }
+            out = out.resolve(name);
+        }
+        return found ? out : null;
     }
 
     /** Isi {@code AUSY_EXPORT_DIR} (atau {@code AUSY_TXT_DIR}) apa adanya; null kalau tidak diisi. */
@@ -173,12 +217,11 @@ public class ExportFileStore {
      */
     @jakarta.annotation.PostConstruct
     void logDir() {
-        Path configured = configuredDir();
-        Path d = dir();
-        if (configured != null && !configured.equals(d))
-            LOG.warn("AUSY_EXPORT_DIR menunjuk {} yang tidak bisa dipakai (folder itu dan folder"
-                    + " induknya tidak ada — biasanya salah tulis). Dipakai folder bawaan {}."
-                    + " Perbaiki AUSY_EXPORT_DIR kalau maksudnya folder lain.", configured, d);
+        Resolved r = resolved();
+        Path d = r.dir();
+        if (r.note() != null)
+            LOG.warn("{}. Hasil export ditulis ke {}. Perbaiki AUSY_EXPORT_DIR kalau maksudnya"
+                    + " folder lain.", r.note(), d);
         boolean isNew = !Files.isDirectory(d);
         try {
             Files.createDirectories(d);
