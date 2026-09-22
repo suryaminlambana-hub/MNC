@@ -30,8 +30,42 @@ if not exist ".env" (
   echo.
 )
 
+REM --- folder hasil export: pastikan masuk akal sebelum aplikasi jalan ---------------
+REM Salah tulis satu huruf (C:\inethub\ftproot untuk C:\inetpub\ftproot) dulu tidak terlihat:
+REM folder itu dibuat begitu saja dan hasil export terbit di tempat yang tidak dipantau siapa pun.
+set "EXPDIR="
+for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
+  if /i "%%a"=="AUSY_EXPORT_DIR" set "EXPDIR=%%b"
+)
+
+if not defined EXPDIR (
+  echo .env belum punya AUSY_EXPORT_DIR — ditambahkan: C:/inetpub/ftproot
+  >> .env echo AUSY_EXPORT_DIR=C:/inetpub/ftproot
+  set "EXPDIR=C:/inetpub/ftproot"
+)
+
+set "EXPDIR=%EXPDIR: =%"
+set "EXPCHK=%EXPDIR:/=\%"
+for %%i in ("%EXPCHK%") do set "EXPPARENT=%%~dpi"
+if not exist "%EXPCHK%" if not exist "%EXPPARENT%" (
+  echo.
+  echo *** PERHATIAN: folder hasil export di .env ^-^> %EXPDIR%
+  echo     Folder itu belum ada, dan folder induknya ^(%EXPPARENT%^) juga tidak ada.
+  echo     Biasanya ini salah tulis.
+  if exist "C:\inetpub\" (
+    echo     Untuk run ini dipakai C:/inetpub/ftproot. Perbaiki baris AUSY_EXPORT_DIR di .env
+    echo     supaya tidak perlu diperbaiki lagi tiap kali.
+    set "AUSY_EXPORT_DIR=C:/inetpub/ftproot"
+    set "EXPDIR=C:/inetpub/ftproot"
+  ) else (
+    echo     Perbaiki baris AUSY_EXPORT_DIR di .env lebih dulu.
+  )
+  echo.
+)
+
 echo === Setelan yang dipakai (.env) ===
 type .env | findstr /v "^#" | findstr /v "PASS="
+echo Folder hasil export : %EXPDIR%
 echo.
 
 where java >nul 2>nul

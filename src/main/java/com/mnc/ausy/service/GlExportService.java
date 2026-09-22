@@ -69,15 +69,28 @@ public class GlExportService {
     @jakarta.annotation.PostConstruct
     void logExportDir() {
         Path d = exportDir();
+        boolean isNew = !Files.isDirectory(d);
+        // Folder induk yang juga tidak ada = nyaris pasti salah tulis (mis. "C:\inethub\ftproot"
+        // untuk "C:\inetpub\ftproot"). Tanpa peringatan ini, folder salah itu dibuat begitu saja
+        // dan hasil export terbit di tempat yang tidak dilihat siapa pun.
+        Path parent = d.getParent();
+        boolean orphan = isNew && parent != null && !Files.isDirectory(parent);
         try {
             Files.createDirectories(d);
-            if (!Files.isWritable(d))
-                LOG.warn("Direktori export {} TIDAK BISA DITULIS — file ACCTXT akan gagal dibuat."
-                        + " Cek izin folder / AUSY_EXPORT_DIR.", d);
-            else
+            if (!Files.isWritable(d)) {
+                LOG.warn("Folder hasil export {} TIDAK BISA DITULIS — file export akan gagal dibuat."
+                        + " Cek izin folder / setelan AUSY_EXPORT_DIR.", d);
+            } else if (orphan) {
+                LOG.warn("Folder hasil export {} DIBUAT BARU, dan folder induknya ({}) juga belum ada."
+                        + " Periksa ejaan AUSY_EXPORT_DIR — hasil export akan terbit di folder ini,"
+                        + " bukan di folder yang mungkin Anda maksud.", d, parent);
+            } else if (isNew) {
+                LOG.info("File hasil export ditulis ke {} (folder baru dibuat)", d);
+            } else {
                 LOG.info("File ACCTXT ditulis ke {}", d);
+            }
         } catch (Exception e) {
-            LOG.warn("Direktori export {} tidak bisa disiapkan: {}. Cek AUSY_EXPORT_DIR & izin folder.",
+            LOG.warn("Folder hasil export {} tidak bisa disiapkan: {}. Cek AUSY_EXPORT_DIR & izin folder.",
                     d, e.getMessage());
         }
     }
