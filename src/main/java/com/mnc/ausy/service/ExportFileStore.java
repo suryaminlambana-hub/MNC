@@ -80,10 +80,14 @@ public class ExportFileStore {
         Path configured = configuredDir();
         if (configured == null) return new Resolved(defaultDir(), null);
 
+        // Sekali ketahuan salah tulis, folder salahnya tidak pernah dipakai — walau folder itu ada
+        // dan ejaan yang benarnya belum ada. Yang belum ada tinggal dibuat saat start; yang tidak
+        // dipantau siapa pun tidak akan pernah terbaca core.
         Path fixed = withoutTypo(configured);
-        if (fixed != null && usable(fixed))
-            return new Resolved(fixed, "AUSY_EXPORT_DIR menyebut folder \"" + TYPO + "\" ("
-                    + configured + "); ejaan yang benar \"" + TYPO_FIX + "\"");
+        if (fixed != null)
+            return new Resolved(usable(fixed) ? fixed : defaultDir(),
+                    "AUSY_EXPORT_DIR menyebut folder \"" + TYPO + "\" (" + configured
+                    + "); ejaan yang benar \"" + TYPO_FIX + "\"");
 
         if (!usable(configured))
             return new Resolved(defaultDir(), "AUSY_EXPORT_DIR menunjuk " + configured
