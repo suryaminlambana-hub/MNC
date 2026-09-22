@@ -7,12 +7,10 @@ import com.mnc.ausy.repo.ExportTransferRepository;
 import com.mnc.ausy.repo.GlExportRequestRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -34,72 +32,16 @@ public class GlExportService {
     private final GlChangeService changes;
     private final DataScopeService scope;
 
-    @Value("${ausy.txt-dir:}") private String txtDir;
-    /** Tujuan file ACCTXT — di produksi diarahkan ke C:/inetpub/ftproot (BUG_AUSY_00146). */
-    @Value("${ausy.export-dir:}") private String exportDir;
-
-    private static final String DEFAULT_EXPORT_DIR = "data/txt";
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(GlExportService.class);
-
-    /**
-     * Direktori tujuan ACCTXT, selalu absolut.
-     *
-     * Nilai KOSONG diperlakukan seperti tidak diisi (BUG_AUSY_00151). Default placeholder Spring
-     * hanya berlaku kalau variabelnya tidak ada sama sekali, sedangkan {@code .env.example} justru
-     * mengirim {@code AUSY_EXPORT_DIR=} kosong: hasilnya {@code Paths.get("")}, yaitu direktori
-     * kerja proses — file ACCTXT nyangkut di situ, bukan di folder yang dituju, tanpa error apa pun.
-     *
-     * Absolut supaya path yang dicatat & ditampilkan bisa langsung dibuka, bukan "data/txt" yang
-     * artinya tergantung dari mana aplikasi dijalankan.
-     */
-    Path exportDir() {
-        String v = exportDir == null ? "" : exportDir.trim();
-        if (v.isEmpty()) v = txtDir == null ? "" : txtDir.trim();
-        if (v.isEmpty()) v = DEFAULT_EXPORT_DIR;
-        return Paths.get(v).toAbsolutePath().normalize();
-    }
-
-    /**
-     * Sebutkan direktorinya saat start, sekalian pastikan bisa ditulis.
-     *
-     * Kegagalan menulis ACCTXT dulu baru ketahuan saat checker menekan approve, dan yang dicari
-     * orang ("kenapa tidak muncul di inetpub/ftproot") justru tidak pernah disebut di mana pun
-     * (BUG_AUSY_00151). Sekarang salah setelan atau folder tanpa izin tulis kelihatan sejak boot.
-     */
-    @jakarta.annotation.PostConstruct
-    void logExportDir() {
-        Path d = exportDir();
-        boolean isNew = !Files.isDirectory(d);
-        // Folder induk yang juga tidak ada = nyaris pasti salah tulis (mis. "C:\inethub\ftproot"
-        // untuk "C:\inetpub\ftproot"). Tanpa peringatan ini, folder salah itu dibuat begitu saja
-        // dan hasil export terbit di tempat yang tidak dilihat siapa pun.
-        Path parent = d.getParent();
-        boolean orphan = isNew && parent != null && !Files.isDirectory(parent);
-        try {
-            Files.createDirectories(d);
-            if (!Files.isWritable(d)) {
-                LOG.warn("Folder hasil export {} TIDAK BISA DITULIS — file export akan gagal dibuat."
-                        + " Cek izin folder / setelan AUSY_EXPORT_DIR.", d);
-            } else if (orphan) {
-                LOG.warn("Folder hasil export {} DIBUAT BARU, dan folder induknya ({}) juga belum ada."
-                        + " Periksa ejaan AUSY_EXPORT_DIR — hasil export akan terbit di folder ini,"
-                        + " bukan di folder yang mungkin Anda maksud.", d, parent);
-            } else if (isNew) {
-                LOG.info("File hasil export ditulis ke {} (folder baru dibuat)", d);
-            } else {
-                LOG.info("File ACCTXT ditulis ke {}", d);
-            }
-        } catch (Exception e) {
-            LOG.warn("Folder hasil export {} tidak bisa disiapkan: {}. Cek AUSY_EXPORT_DIR & izin folder.",
-                    d, e.getMessage());
-        }
-    }
+    /** Semua penulisan & pembacaan file hasil export lewat sini. */
+    private final ExportFileStore files;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
                            ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes,
-                           DataScopeService scope) {
+                           DataScopeService scope, ExportFileStore files) {
         this.gl = gl; this.requests = requests; this.transfers = transfers;
         this.approval = approval; this.audit = audit; this.ftp = ftp; this.changes = changes; this.scope = scope;
+        this.files = files;
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
@@ -307,8 +249,6 @@ public class GlExportService {
 
         String ftpNote;
         try {
-            Path dir = exportDir();
-            Files.createDirectories(dir);
             // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
             // Export berikutnya di hari yang sama menimpa file hari itu, baik di disk maupun di FTP
             // (nama remote-nya sama), sehingga core hanya pernah menemukan hasil export terakhir.
@@ -316,10 +256,10 @@ public class GlExportService {
             // file untuk satu tanggal dan tidak jelas mana yang berlaku.
             String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
             String fileName = "ACCTXT." + yymmdd;
-            Path out = dir.resolve(fileName);
-            boolean replaced = Files.exists(out);
-            Files.writeString(out, content.toString(), StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            boolean replaced = Files.exists(files.resolve(fileName));
+            // Ditulis lewat ExportFileStore: berkas sementara lalu dipindah atomik, supaya core
+            // tidak pernah membaca ACCTXT yang masih separuh ditulis.
+            Path out = files.write(fileName, content.toString());
             if (replaced)
                 audit.transaction(checker, "EXPORT_REPLACE",
                         "File " + fileName + " ditimpa oleh export CR#" + reqId + " (satu file per hari).");
@@ -385,18 +325,9 @@ public class GlExportService {
     }
 
     // ---------- Admin: resend a queued/failed transfer ----------
-    /** Satu file di direktori export, untuk halaman "Direktori Hasil Export". */
-    public record ExportFile(String name, long size, String sizeText, LocalDateTime modified) {
-        static ExportFile of(String name, long size, LocalDateTime modified) {
-            String t = size < 1024 ? size + " byte"
-                     : size < 1024 * 1024 ? String.format("%.1f KB", size / 1024.0)
-                     : String.format("%.1f MB", size / (1024.0 * 1024));
-            return new ExportFile(name, size, t, modified);
-        }
-    }
-
-    /** Keterangan direktori export + isinya — dipakai halaman /export-dir. */
-    public record ExportDirView(String path, boolean exists, boolean writable, List<ExportFile> files) {}
+    /** Keterangan folder hasil export + isinya — dipakai halaman /export-dir. */
+    public record ExportDirView(String path, boolean exists, boolean writable,
+                                List<ExportFileStore.StoredFile> files) {}
 
     /**
      * Isi direktori export, terbaru dulu.
@@ -407,32 +338,14 @@ public class GlExportService {
      * File-nya tidak diunduh — ACCTXT memang tidak untuk turun ke komputer siapa pun.
      */
     public ExportDirView exportDirView() {
-        Path dir = exportDir();
-        List<ExportFile> files = new ArrayList<>();
-        boolean exists = Files.isDirectory(dir);
-        if (exists) {
-            try (var paths = Files.list(dir)) {
-                for (Path f : paths.filter(Files::isRegularFile).toList()) {
-                    LocalDateTime at = LocalDateTime.ofInstant(
-                            Files.getLastModifiedTime(f).toInstant(), java.time.ZoneId.systemDefault());
-                    files.add(ExportFile.of(f.getFileName().toString(), Files.size(f), at));
-                }
-            } catch (Exception e) {
-                LOG.warn("Direktori export {} tidak bisa dibaca: {}", dir, e.getMessage());
-            }
-            files.sort(Comparator.comparing(ExportFile::modified).reversed());
-        }
-        return new ExportDirView(dir.toString(), exists, exists && Files.isWritable(dir), files);
+        return new ExportDirView(files.dir().toString(), files.exists(), files.writable(), files.list());
     }
 
-    /** Path direktori export apa adanya — ditempel di halaman otorisasi & beranda Admin. */
-    public String exportDirPath() { return exportDir().toString(); }
+    /** Path folder hasil export apa adanya — ditempel di halaman otorisasi & beranda Admin. */
+    public String exportDirPath() { return files.dir().toString(); }
 
-    /** Resolve a generated text file inside the txt dir (basename only — no path traversal). */
-    public Path txtFile(String name) {
-        String safe = Paths.get(name == null ? "" : name).getFileName().toString();
-        return exportDir().resolve(safe);   // file ditulis di direktori export
-    }
+    /** Lokasi satu file hasil export (nama saja — tidak bisa menunjuk ke luar folder). */
+    public Path txtFile(String name) { return files.resolve(name); }
 
     @Transactional
     public String resend(Long transferId, String admin) {
