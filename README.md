@@ -96,13 +96,22 @@ psql -U postgres -f packaging\setup-db.sql
    set DB_NAME=ausy
    set DB_USER=ausy_user
    set DB_PASS=ausy_pass_2026
+   set AUSY_EXPORT_DIR=C:/inetpub/ftproot
    mvnw.cmd spring-boot:run
    ```
    **PowerShell:**
    ```powershell
    $env:DB_NAME="ausy"; $env:DB_USER="ausy_user"; $env:DB_PASS="ausy_pass_2026"
+   $env:AUSY_EXPORT_DIR="C:/inetpub/ftproot"
    .\mvnw.cmd spring-boot:run
    ```
+   > `AUSY_EXPORT_DIR` = folder tempat file ACCTXT hasil export dibuat. Kalau server FTP-nya di
+   > mesin ini juga, arahkan ke root FTP-nya (mis. `C:/inetpub/ftproot`) — file langsung terbit di
+   > sana. **Tanpa ini** file jatuh ke `data\txt` di folder repo dan tidak akan muncul di ftproot
+   > (BUG_AUSY_00151). Pakai garis miring `/` walau di Windows, dan pastikan user yang menjalankan
+   > aplikasi punya izin tulis ke folder itu. Folder yang berlaku dicetak saat start:
+   > `File ACCTXT ditulis ke ...`. Kalau FTP-nya di mesin LAIN, folder ini bukan tujuan akhir —
+   > isi `FTP_HOST`/`FTP_USER`/`FTP_PASS` (lihat `packaging/.env.example`).
 3. Buka **http://localhost:8080/ausy** — login sesuai role — `admin`(config), `adminapv`(config-approver), `user`(maker), `spv`(approver). Lihat tabel Role di atas.
 
 > Ganti port: tambah `set SERVER_PORT=9090` (cmd) atau `$env:SERVER_PORT="9090"` (PowerShell) sebelum menjalankan.
