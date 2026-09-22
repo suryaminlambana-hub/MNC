@@ -323,13 +323,26 @@ public class GlExportService {
         ExportTransfer t = transfers.findById(transferId).orElse(null);
         if (t == null) return "Data transfer tidak ditemukan.";
         if ("SENT".equals(t.getStatus())) return "File sudah terkirim sebelumnya.";
-        if (!ftp.enabled()) return "FTP belum dikonfigurasi/aktif di server. Hubungi Administrator sistem untuk melengkapi setelannya.";
         Path f = txtFile(t.getFileName());
         t.setAttempts((t.getAttempts()==null?0:t.getAttempts()) + 1);
         if (!Files.exists(f)) {
             t.setStatus("FAILED"); t.setError("File lokal tidak ditemukan: " + t.getFileName());
             transfers.save(t);
             return "Gagal: file lokal '" + t.getFileName() + "' tidak ditemukan.";
+        }
+        // Push FTP mati: file di direktori export ITU pengirimannya (BUG_AUSY_00146) — persis seperti
+        // export baru yang langsung ditandai SENT. Sebelumnya tombol Kirim Ulang hanya menolak, jadi
+        // transfer yang gagal sewaktu FTP masih menyala tidak pernah bisa diselesaikan: barisnya
+        // menetap FAILED di card beranda Admin (dan di peringatan maker) tanpa satu pun jalan keluar.
+        if (!ftp.enabled()) {
+            String at = f.toAbsolutePath().toString();
+            t.setStatus("SENT"); t.setRemotePath(at); t.setSentAt(LocalDateTime.now()); t.setError(null);
+            transfers.save(t);
+            audit.transaction(admin, "FTP_SENT", "Resend " + t.getFileName() + ": push FTP tidak aktif ("
+                    + ftp.sourceLabel() + "), file diserahkan lewat direktori export " + at);
+            return "Push FTP tidak aktif (" + ftp.sourceLabel() + "). File '" + t.getFileName()
+                    + "' sudah tersedia di direktori export (" + at + ") untuk diambil core — transfer"
+                    + " ditandai selesai.";
         }
         try {
             String remote = ftp.push(f);

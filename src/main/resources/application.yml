@@ -45,9 +45,11 @@ ausy:
   export-dir: ${AUSY_EXPORT_DIR:${AUSY_TXT_DIR:data/txt}}
   ftp:
     # false = push FTP dimatikan, apa pun isi FTP_HOST maupun baris tabel ftp_config.
-    # Kosong = otomatis: pakai FTP_HOST kalau diisi, kalau tidak baru lihat ftp_config.
+    # true  = hidup, dan boleh memakai baris ftp_config kalau FTP_HOST kosong.
+    # kosong = pakai FTP_HOST kalau diisi; kalau tidak, push FTP MATI dan baris ftp_config
+    #          peninggalan layar Konfigurasi FTP yang lama diabaikan (BUG_AUSY_00141).
     enabled: ${FTP_ENABLED:}
-    host: ${FTP_HOST:}          # empty -> lihat ftp_config; pakai FTP_ENABLED=false untuk mematikan
+    host: ${FTP_HOST:}          # kosong -> push FTP mati (file ACCTXT diambil dari direktori export)
     port: ${FTP_PORT:21}
     user: ${FTP_USER:}
     pass: ${FTP_PASS:}

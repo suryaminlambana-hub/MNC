@@ -76,9 +76,10 @@ DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
 # Kalau FTP server-nya ada di mesin yang sama, JANGAN pakai FTP_* — arahkan AUSY_EXPORT_DIR
-# ke root FTP-nya (BUG_AUSY_00146) dan matikan push-nya. File ACCTXT langsung ditulis di sana.
+# ke root FTP-nya (BUG_AUSY_00146). File ACCTXT langsung ditulis di sana dan push FTP mati sendiri
+# karena FTP_HOST kosong; FTP_ENABLED tidak perlu diisi.
 AUSY_EXPORT_DIR=C:/inetpub/ftproot
-FTP_ENABLED=false
+FTP_ENABLED=
 
 # FTP_* hanya untuk kirim ke server FTP LAIN. Diisi DI SINI, bukan lewat website: menu
 # "Konfigurasi FTP" sudah dihapus (BUG_AUSY_00141) supaya host & kredensial tidak bisa
@@ -90,18 +91,23 @@ FTP_PASS=
 FTP_DIR=
 ```
 
-> **Mematikan FTP: pakai `FTP_ENABLED=false`.** Mengosongkan `FTP_HOST` saja tidak cukup — kosong
-> berarti "tidak diatur di sini", sehingga aplikasi jatuh ke baris tabel `ftp_config` peninggalan
-> layar Konfigurasi FTP yang lama dan FTP menyala lagi dengan kredensial yang tidak tertulis di
-> mana pun.
+> **Push FTP mati kalau `FTP_HOST` kosong.** Urutan sumbernya:
 >
-> Urutan sumbernya: `FTP_ENABLED=false` → mati. Selain itu, `FTP_HOST` di `.env` kalau diisi,
-> baru baris `ftp_config`, baru "tidak dikonfigurasi". Sumber yang berlaku disebut di log saat
-> start dan di card **Export FTP Gagal / Tertunda** pada beranda Admin:
-> `Setelan FTP dibaca dari dimatikan lewat FTP_ENABLED=false`.
+> 1. `FTP_ENABLED=false` → mati, apa pun isi yang lain.
+> 2. `FTP_HOST` diisi di `.env` → itu yang dipakai.
+> 3. `FTP_HOST` kosong → **mati**. Baris tabel `ftp_config` peninggalan layar Konfigurasi FTP yang
+>    lama sengaja diabaikan: tidak ada satu pun layar untuk melihat/mengubahnya, jadi kalau dipakai
+>    diam-diam setiap otorisasi export gagal dengan kredensial yang tidak bisa diperbaiki dari
+>    website. Log start menyebutkannya sebagai `WARN Push FTP MATI: ...`.
+> 4. Masih mau memakai baris `ftp_config` itu → `FTP_ENABLED=true`.
 >
-> Membersihkan sisa baris lama (opsional, tidak wajib lagi):
-> `UPDATE ftp_config SET host = '' WHERE id = 1;`
+> Sumber yang berlaku disebut di log saat start dan di card **Export FTP Gagal / Tertunda** pada
+> beranda Admin. Kalau card itu masih memuat baris `FAILED` dari sebelum FTP dimatikan, tombol
+> **Kirim Ulang** akan menyelesaikannya: dengan push FTP mati, file ACCTXT di `AUSY_EXPORT_DIR`
+> itulah pengirimannya, jadi barisnya ditandai `SENT` (tercatat di audit trail) selama file-nya
+> masih ada di direktori itu.
+>
+> Membersihkan sisa baris lama (opsional): `UPDATE ftp_config SET host = '' WHERE id = 1;`
 
 ```bash
 # d. uji jalan di foreground dulu (Ctrl+C untuk berhenti)
@@ -160,8 +166,9 @@ Kelola Data GL (ajukan perubahan → approve) → Ajukan Export → Otorisasi Ex
 
 - [ ] Ganti password 4 akun seed (`admin123`/`user123`/`spv123`) lewat menu User.
 - [ ] Password `ausy_user` bukan default, dan `.env` mode `600` milik user `ausy`.
-- [ ] Isi `FTP_*` di `.env` kalau export ke core sudah mau diuji — setelan FTP tidak lagi bisa
-      diubah dari website. Kirim ulang transfer yang gagal ada di beranda Admin.
+- [ ] Isi `FTP_*` di `.env` kalau export ke core lewat FTP sudah mau diuji — setelan FTP tidak lagi
+      bisa diubah dari website, dan `FTP_HOST` kosong berarti push FTP mati (file diambil dari
+      `AUSY_EXPORT_DIR`). Kirim ulang transfer yang gagal ada di beranda Admin.
 - [ ] Tentukan siapa yang boleh akses port 8080 (reverse proxy/HTTPS kalau keluar jaringan dev).
 - [ ] Backup: `pg_dump ausy` terjadwal di server DB.
 
