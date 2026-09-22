@@ -34,9 +34,53 @@ public class GlExportService {
     private final GlChangeService changes;
     private final DataScopeService scope;
 
-    @Value("${ausy.txt-dir:data/txt}") private String txtDir;
+    @Value("${ausy.txt-dir:}") private String txtDir;
     /** Tujuan file ACCTXT — di produksi diarahkan ke C:/inetpub/ftproot (BUG_AUSY_00146). */
-    @Value("${ausy.export-dir:${ausy.txt-dir:data/txt}}") private String exportDir;
+    @Value("${ausy.export-dir:}") private String exportDir;
+
+    private static final String DEFAULT_EXPORT_DIR = "data/txt";
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(GlExportService.class);
+
+    /**
+     * Direktori tujuan ACCTXT, selalu absolut.
+     *
+     * Nilai KOSONG diperlakukan seperti tidak diisi (BUG_AUSY_00151). Default placeholder Spring
+     * hanya berlaku kalau variabelnya tidak ada sama sekali, sedangkan {@code .env.example} justru
+     * mengirim {@code AUSY_EXPORT_DIR=} kosong: hasilnya {@code Paths.get("")}, yaitu direktori
+     * kerja proses — file ACCTXT nyangkut di situ, bukan di folder yang dituju, tanpa error apa pun.
+     *
+     * Absolut supaya path yang dicatat & ditampilkan bisa langsung dibuka, bukan "data/txt" yang
+     * artinya tergantung dari mana aplikasi dijalankan.
+     */
+    Path exportDir() {
+        String v = exportDir == null ? "" : exportDir.trim();
+        if (v.isEmpty()) v = txtDir == null ? "" : txtDir.trim();
+        if (v.isEmpty()) v = DEFAULT_EXPORT_DIR;
+        return Paths.get(v).toAbsolutePath().normalize();
+    }
+
+    /**
+     * Sebutkan direktorinya saat start, sekalian pastikan bisa ditulis.
+     *
+     * Kegagalan menulis ACCTXT dulu baru ketahuan saat checker menekan approve, dan yang dicari
+     * orang ("kenapa tidak muncul di inetpub/ftproot") justru tidak pernah disebut di mana pun
+     * (BUG_AUSY_00151). Sekarang salah setelan atau folder tanpa izin tulis kelihatan sejak boot.
+     */
+    @jakarta.annotation.PostConstruct
+    void logExportDir() {
+        Path d = exportDir();
+        try {
+            Files.createDirectories(d);
+            if (!Files.isWritable(d))
+                LOG.warn("Direktori export {} TIDAK BISA DITULIS — file ACCTXT akan gagal dibuat."
+                        + " Cek izin folder / AUSY_EXPORT_DIR.", d);
+            else
+                LOG.info("File ACCTXT ditulis ke {}", d);
+        } catch (Exception e) {
+            LOG.warn("Direktori export {} tidak bisa disiapkan: {}. Cek AUSY_EXPORT_DIR & izin folder.",
+                    d, e.getMessage());
+        }
+    }
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
                            ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes,
@@ -242,7 +286,7 @@ public class GlExportService {
 
         String ftpNote;
         try {
-            Path dir = Paths.get(exportDir);
+            Path dir = exportDir();
             Files.createDirectories(dir);
             // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
             // Export berikutnya di hari yang sama menimpa file hari itu, baik di disk maupun di FTP
@@ -262,23 +306,28 @@ public class GlExportService {
             ExportTransfer t = new ExportTransfer();
             t.setFileName(fileName); t.setPaket("EXPORT#" + reqId); t.setInputer(req.getRequestedBy());
             t.setChecker(checker); t.setRowsCount(rows.size()); t.setCreatedAt(LocalDateTime.now());
+            // Lokasi file selalu disebut, apa pun hasil FTP-nya (BUG_AUSY_00151): kalau orang mencari
+            // hasil export di folder yang salah — atau AUSY_EXPORT_DIR memang belum diarahkan ke
+            // root FTP — jawabannya ada di pesan ini, bukan harus ditebak.
+            String where = " File ACCTXT ada di " + out + ".";
             if (ftp.enabled()) {
                 try {
                     String remote = ftp.push(out);
                     t.setStatus("SENT"); t.setRemotePath(remote); t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
                     audit.transaction(checker, "FTP_SENT", "Export CR#" + reqId + " -> FTP: " + remote);
-                    ftpNote = " Terkirim ke FTP: " + remote + ".";
+                    ftpNote = where + " Terkirim ke FTP: " + remote + ".";
                 } catch (Exception fe) {
                     t.setStatus("FAILED"); t.setError(fe.getMessage()); t.setAttempts(1);
                     audit.transaction(checker, "FTP_FAILED", "Export CR#" + reqId + " gagal kirim FTP: " + fe.getMessage());
-                    ftpNote = " (Gagal kirim ke FTP — masuk antrian; Admin dapat kirim ulang dari beranda Admin.)";
+                    ftpNote = where + " Gagal kirim ke FTP: " + fe.getMessage()
+                            + " — masuk antrian, Admin dapat kirim ulang dari beranda Admin.";
                 }
             } else {
                 // Tanpa setelan FTP, file ACCTXT cukup ditulis ke direktori tujuan (root FTP lokal)
                 // dan core mengambilnya dari sana — tidak ada lagi antrian kirim (BUG_AUSY_00146).
-                t.setStatus("SENT"); t.setRemotePath(out.toAbsolutePath().toString());
+                t.setStatus("SENT"); t.setRemotePath(out.toString());
                 t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
-                ftpNote = " File tersimpan di " + out.toAbsolutePath() + ".";
+                ftpNote = where;
             }
             transfers.save(t);
 
@@ -315,7 +364,7 @@ public class GlExportService {
     /** Resolve a generated text file inside the txt dir (basename only — no path traversal). */
     public Path txtFile(String name) {
         String safe = Paths.get(name == null ? "" : name).getFileName().toString();
-        return Paths.get(exportDir).resolve(safe);   // file ditulis di direktori export
+        return exportDir().resolve(safe);   // file ditulis di direktori export
     }
 
     @Transactional

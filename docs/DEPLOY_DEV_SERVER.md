@@ -75,9 +75,11 @@ DB_PORT=5432
 DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
-# Kalau FTP server-nya ada di mesin yang sama, JANGAN pakai FTP_* — arahkan AUSY_EXPORT_DIR
-# ke root FTP-nya (BUG_AUSY_00146). File ACCTXT langsung ditulis di sana dan push FTP mati sendiri
-# karena FTP_HOST kosong; FTP_ENABLED tidak perlu diisi.
+# AUSY_EXPORT_DIR = folder tempat file ACCTXT DIBUAT, di mesin tempat aplikasi ini jalan.
+# Isi PATH ABSOLUT; kosong = data/txt di folder aplikasi (BUG_AUSY_00151).
+# Kalau FTP server-nya ada di mesin yang SAMA, arahkan ke root FTP-nya — file langsung terbit di
+# sana dan FTP_* tidak perlu diisi (BUG_AUSY_00146). Kalau FTP-nya di mesin LAIN, folder ini
+# bukan tujuan akhir: isi FTP_HOST/FTP_USER/FTP_PASS di bawah.
 AUSY_EXPORT_DIR=C:/inetpub/ftproot
 FTP_ENABLED=
 
@@ -108,6 +110,28 @@ FTP_DIR=
 > masih ada di direktori itu.
 >
 > Membersihkan sisa baris lama (opsional): `UPDATE ftp_config SET host = '' WHERE id = 1;`
+
+### "Hasil export tidak muncul di inetpub/ftproot" (BUG_AUSY_00151)
+
+Satu file ACCTXT hanya bisa sampai ke root FTP lewat salah satu dari dua jalan — pastikan dulu
+yang mana yang berlaku di lingkungan ini:
+
+| Aplikasi jalan di… | Yang mengantarkan file | Yang harus diisi |
+|---|---|---|
+| mesin yang sama dengan server FTP | penulisan file itu sendiri | `AUSY_EXPORT_DIR` = root FTP (mis. `C:/inetpub/ftproot`), `FTP_*` kosong |
+| mesin lain | push FTP | `FTP_HOST`/`FTP_USER`/`FTP_PASS` (+ `FTP_DIR`) ke server FTP-nya |
+
+Mengisi `AUSY_EXPORT_DIR` dengan path root FTP **mesin lain** tidak akan berhasil: aplikasi
+menulisnya sebagai folder lokal, dan tidak ada yang memindahkannya.
+
+Cek cepat kalau file tidak ketemu:
+
+1. Log saat start menyebut folder yang sebenarnya dipakai: `File ACCTXT ditulis ke <path>`.
+   Kalau `WARN Direktori export ... TIDAK BISA DITULIS`, izin folder / `AUSY_EXPORT_DIR` yang salah.
+2. Pesan setelah checker approve juga menyebut path file-nya + hasil kiriman FTP-nya.
+3. `AUSY_EXPORT_DIR` yang **ditulis tapi dibiarkan kosong** dianggap tidak diisi → `data/txt`
+   di folder aplikasi. Sebelum BUG_AUSY_00151 nilai kosong bikin file mendarat di folder kerja
+   proses tanpa pesan apa pun.
 
 ```bash
 # d. uji jalan di foreground dulu (Ctrl+C untuk berhenti)

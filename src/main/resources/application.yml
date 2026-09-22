@@ -38,11 +38,14 @@ spring:
           no-cache: true        # always revalidate CSS/JS so UI changes show without a hard refresh
 
 ausy:
-  # Direktori tujuan file ACCTXT. Di server produksi diarahkan ke root FTP lokal
-  # (mis. C:/inetpub/ftproot) supaya core langsung mengambilnya dari sana — tidak perlu
-  # lagi mengonfigurasi kiriman FTP (BUG_AUSY_00146).
-  txt-dir: ${AUSY_TXT_DIR:data/txt}
-  export-dir: ${AUSY_EXPORT_DIR:${AUSY_TXT_DIR:data/txt}}
+  # Direktori tujuan file ACCTXT. Kalau aplikasi jalan DI MESIN yang sama dengan server FTP-nya,
+  # arahkan ke root FTP lokal (mis. C:/inetpub/ftproot) supaya core langsung mengambilnya dari
+  # sana — tidak perlu lagi mengonfigurasi kiriman FTP (BUG_AUSY_00146). Kalau server FTP-nya di
+  # MESIN LAIN, direktori ini cuma tempat file dibuat: yang mengantarkannya adalah FTP_* di .env.
+  # Kosong atau tidak diisi = data/txt (relatif ke folder tempat aplikasi dijalankan).
+  # Path yang berlaku disebut di log saat start: "File ACCTXT ditulis ke ...".
+  txt-dir: ${AUSY_TXT_DIR:}
+  export-dir: ${AUSY_EXPORT_DIR:}
   ftp:
     # false = push FTP dimatikan, apa pun isi FTP_HOST maupun baris tabel ftp_config.
     # true  = hidup, dan boleh memakai baris ftp_config kalau FTP_HOST kosong.
