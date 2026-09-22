@@ -5,7 +5,7 @@
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
       <h1 class="ausy-page-title">Direktori Hasil Export</h1>
-      <p class="text-muted mb-0">Folder tujuan file ACCTXT di server tempat aplikasi ini berjalan, beserta isinya.</p>
+      <p class="text-muted mb-0">Tempat file hasil export dibuat di server, beserta isinya.</p>
     </div>
     <a class="btn btn-outline-secondary" th:href="@{/export-dir}"><i class="fa-solid fa-rotate-right"></i> Muat ulang</a>
   </div>
@@ -18,14 +18,14 @@
         <i class="fa-regular fa-copy"></i> Copy path</button>
       <span class="badge bg-success-subtle text-success" th:if="${dir.writable}">bisa ditulis</span>
       <span class="badge bg-danger-subtle text-danger" th:unless="${dir.exists}">folder belum ada</span>
-      <span class="badge bg-danger-subtle text-danger" th:if="${dir.exists and !dir.writable}">tidak bisa ditulis</span>
+      <span class="badge bg-danger-subtle text-danger" th:if="${dir.exists and !dir.writable}">tidak bisa ditulis — hubungi Administrator</span>
     </div>
     <p class="text-muted small mb-0 mt-2">
       <i class="fa-solid fa-circle-info"></i>
-      Diatur lewat <code>AUSY_EXPORT_DIR</code> di konfigurasi server, bukan dari website.
-      <span th:if="${ftpActive}">Setelah file dibuat, file juga dikirim ke FTP (setelan dibaca dari <b th:text="${ftpSource}"></b>).</span>
-      <span th:unless="${ftpActive}">Push FTP tidak aktif (<b th:text="${ftpSource}"></b>) — file di folder ini yang diambil core.</span>
-      File ACCTXT tidak bisa diunduh dari website; hanya diambil core dari folder/FTP.
+      <span th:if="${ftpActive}">Setiap hasil export dibuat di folder ini, lalu dikirim ke server FTP.</span>
+      <span th:unless="${ftpActive}">Setiap hasil export dibuat di folder ini, dan core banking mengambilnya dari sini.</span>
+      Folder maupun setelan pengirimannya diatur Administrator di server, tidak dari website.
+      File hasil export tidak bisa diunduh lewat website.
     </p>
   </div>
 
@@ -39,13 +39,13 @@
       <tbody>
       <tr th:each="f : ${dir.files}">
         <td class="ps-3 font-monospace small" th:text="${f.name}"></td>
-        <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(f.size,1,'POINT')} + ' B'"></td>
+        <td class="text-end text-nowrap" th:text="${f.sizeText}"></td>
         <td class="pe-3 text-muted small text-nowrap" th:text="${#temporals.format(f.modified,'dd-MM-yyyy HH:mm:ss')}"></td>
       </tr>
       <tr th:if="${#lists.isEmpty(dir.files)}">
         <td colspan="3" class="text-center text-muted py-4">
           <span th:if="${dir.exists}">Folder ini masih kosong — belum ada hasil export yang ditulis ke sini.</span>
-          <span th:unless="${dir.exists}">Folder belum ada. Cek <code>AUSY_EXPORT_DIR</code> di konfigurasi server.</span>
+          <span th:unless="${dir.exists}">Folder ini belum ada di server — hubungi Administrator.</span>
         </td>
       </tr>
       </tbody>

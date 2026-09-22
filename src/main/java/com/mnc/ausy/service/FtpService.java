@@ -89,11 +89,13 @@ public class FtpService {
         return new Settings("", pPort, pUser, pPass, pDir, pSecure, pPassive, false, SRC_NONE);
     }
 
-    private static final String SRC_ENV  = "FTP_* di .env";
-    private static final String SRC_DB   = "tabel ftp_config (baris id=1)";
-    private static final String SRC_NONE = "tidak dikonfigurasi";
-    private static final String SRC_OFF  = "dimatikan lewat FTP_ENABLED=false";
-    private static final String SRC_DB_IGNORED = "tidak dikonfigurasi di .env — baris ftp_config lama diabaikan";
+    // Ditulis dengan bahasa biasa: label ini tampil di halaman yang dibuka petugas bank, bukan
+    // hanya di log. Petunjuk teknis cara mengubahnya ada di log saat start & dokumen deploy.
+    private static final String SRC_ENV  = "konfigurasi server";
+    private static final String SRC_DB   = "database (tabel ftp_config)";
+    private static final String SRC_NONE = "belum diatur — pengiriman FTP tidak aktif";
+    private static final String SRC_OFF  = "dimatikan di konfigurasi server";
+    private static final String SRC_DB_IGNORED = "belum diatur di konfigurasi server — pengiriman FTP tidak aktif";
 
     /** {@code FTP_ENABLED} diisi tegas "false"/"0"/"no"/"off". Kosong = tidak memaksa. */
     private boolean forcedOff() { return is(pEnabled, "false", "0", "no", "off"); }
@@ -156,7 +158,7 @@ public class FtpService {
 
     /** Sumber setelan, ditempel ke pesan gagal supaya jelas nilai itu datang dari mana. */
     private static String from(Settings s) {
-        return " (setelan dibaca dari " + s.source() + ", host=" + s.host() + ")";
+        return " (setelan dari " + s.source() + ", host " + s.host() + ")";
     }
 
     /** Upload one file using the current settings; returns the remote path. Throws on any failure. */

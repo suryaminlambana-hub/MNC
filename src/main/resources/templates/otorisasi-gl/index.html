@@ -10,7 +10,7 @@
          dari halaman http diblokir browser, jadi yang dipencet adalah halaman daftar isi folder. */-->
   <p class="small mb-3" th:if="${exportDirPath != null}">
     <i class="fa-solid fa-folder-open text-muted"></i>
-    Direktori hasil export: <code th:text="${exportDirPath}"></code>
+    Folder hasil export: <code th:text="${exportDirPath}"></code>
     <a class="ms-1" th:href="@{/export-dir}" th:if="${canSeeExportDir}">Lihat isinya →</a>
   </p>
 

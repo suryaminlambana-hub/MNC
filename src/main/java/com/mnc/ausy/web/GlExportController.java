@@ -17,11 +17,8 @@ public class GlExportController {
 
     @PostMapping("/gl-export/approve")
     public String approve(@RequestParam Long reqId, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.approveExport(reqId, me);
-        // Dicocokkan tanpa peduli huruf besar/kecil: sebelumnya satu perubahan kata di pesan layanan
-        // sudah cukup membuat kegagalan FTP tampil sebagai notifikasi hijau.
-        boolean ok = msg.startsWith("Otorisasi export berhasil") && !msg.toLowerCase().contains("gagal kirim ke ftp");
-        ra.addFlashAttribute(ok ? "ok" : "warn", msg);
+        GlExportService.ApproveResult r = glExport.approveExport(reqId, me);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/otorisasi-gl";
     }
 

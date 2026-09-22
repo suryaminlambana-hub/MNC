@@ -6,6 +6,12 @@
     <h1 class="ausy-page-title">Beranda Admin</h1>
     <p class="text-muted">Konfigurasi user &amp; group.</p>
 
+    <!--/* Hasil aksi yang kembali ke beranda (mis. Kirim Ulang transfer FTP) ditampilkan di sini.
+           Sebelumnya tidak ada satu pun beranda yang menampilkannya, jadi tombol Kirim Ulang
+           terasa tidak melakukan apa-apa: halaman hanya ter-reload tanpa keterangan. */-->
+    <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+    <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
     <div class="dash-grid">
         <div th:if="${cards.contains('cfg-stats')}" class="dash-card">
             <div class="dash-ico c-accent"><i class="fa-solid fa-users"></i></div>
@@ -68,9 +74,9 @@
         <!--/* BUG_AUSY_00141: halaman Konfigurasi FTP dihapus — setelan FTP hanya dari database/deploy.
                Kirim ulang bukan konfigurasi, jadi tombolnya pindah ke sini, satu per baris. */-->
         <p class="text-muted small px-3 mb-2"><i class="fa-solid fa-circle-info"></i>
-            Setelan FTP (host &amp; kredensial) dibaca dari konfigurasi server dan tidak diatur dari website.
-            Sumber yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.
-            <span th:if="${canSeeExportDir}">File ACCTXT dibuat di <code th:text="${exportDirPath}"></code> —
+            Setelan FTP (host &amp; kredensial) diatur di server, tidak dari website.
+            Setelan yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.
+            <span th:if="${canSeeExportDir}">File hasil export dibuat di <code th:text="${exportDirPath}"></code> —
             <a th:href="@{/export-dir}">lihat isinya</a>.</span></p>
         <table class="table table-sm table-hover align-middle mb-0">
             <thead><tr>
