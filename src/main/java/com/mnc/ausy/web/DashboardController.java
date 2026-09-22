@@ -6,7 +6,6 @@ import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.DataScopeService;
-import com.mnc.ausy.service.FtpAdminService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
 import org.springframework.data.domain.Page;
@@ -33,17 +32,16 @@ public class DashboardController {
     private final GlChangeService glChange;
     private final ConfigChangeService configChange;
     private final GlExportService glExport;
-    private final FtpAdminService ftpAdmin;
     private final AccessService access;
     private final AuditScopeService auditScope;
     private final DataScopeService scope;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
-                               ConfigChangeService configChange, GlExportService glExport, FtpAdminService ftpAdmin,
+                               ConfigChangeService configChange, GlExportService glExport,
                                AccessService access, AuditScopeService auditScope, DataScopeService scope) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
-        this.glChange = glChange; this.configChange = configChange; this.glExport = glExport; this.ftpAdmin = ftpAdmin;
+        this.glChange = glChange; this.configChange = configChange; this.glExport = glExport;
         this.access = access; this.auditScope = auditScope; this.scope = scope;
     }
 
@@ -62,13 +60,6 @@ public class DashboardController {
             model.addAttribute("pendingUsers", mine.size());
             model.addAttribute("pendingUserList", mine);
             model.addAttribute("userHistory", tx.byActivityPrefix("CONFIG_CHANGE%", PageRequest.of(0, 50)));
-            // FTP transfers stuck as PENDING/FAILED — Admin needs to resend from Konfigurasi FTP.
-            List<com.mnc.ausy.domain.ExportTransfer> ftpResendList = ftpAdmin.needsResend();
-            model.addAttribute("ftpResendList", ftpResendList);
-            model.addAttribute("ftpResendCount", ftpResendList.size());
-            model.addAttribute("ftpSource", ftpAdmin.configSource());   // BUG_AUSY_00141 follow-up
-            model.addAttribute("exportDirPath", glExport.exportDirPath()); // BUG_AUSY_00151
-            model.addAttribute("canSeeExportDir", access.allowedUser(auth.getName(), "/export-dir"));
             return "dashboard-admin";
         }
 
@@ -103,10 +94,6 @@ public class DashboardController {
             model.addAttribute("pendingChanges", pendingList.size());
             String me = auth.getName();
             model.addAttribute("glHistory", tx.glHistoryForMaker(me, "%maker=" + me + "%", PageRequest.of(0, 50)));
-            // Export yang sudah di-approve checker tapi gagal terkirim ke FTP — maker perlu tahu & minta Admin kirim ulang.
-            List<com.mnc.ausy.domain.ExportTransfer> ftpFailedList = ftpAdmin.failedFor(me);
-            model.addAttribute("ftpFailedList", ftpFailedList);
-            model.addAttribute("ftpFailedCount", ftpFailedList.size());
             return "dashboard-maker";
         }
 

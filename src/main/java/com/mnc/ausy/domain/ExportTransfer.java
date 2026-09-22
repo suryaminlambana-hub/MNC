@@ -3,7 +3,7 @@ package com.mnc.ausy.domain;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-/** One record per generated GL export file and its transfer-out status to the FTP server. */
+/** One record per generated GL export file — bukti dual-control yang dipakai "Riwayat Export". */
 @Entity
 @Table(name = "export_transfer")
 public class ExportTransfer {

@@ -18,8 +18,9 @@ import java.util.*;
 
 /**
  * Export flow (separated from otorisasi upload):
- *   Maker "Ajukan Export" (List GL Aktif) → checker "Otorisasi Export GL" approve → ACCTXT ke FTP.
- * File ACCTXT tidak pernah diunduh ke komputer; hanya dikirim ke FTP untuk diproses core.
+ *   Maker "Ajukan Export" (List GL Aktif) → checker "Otorisasi Export GL" approve → file ACCTXT
+ *   ditulis ke folder hasil export di server, dan core banking mengambilnya dari sana.
+ * File ACCTXT tidak pernah diunduh ke komputer.
  */
 @Service
 public class GlExportService {
@@ -28,7 +29,6 @@ public class GlExportService {
     private final ExportTransferRepository transfers;
     private final ApprovalService approval;
     private final AuditService audit;
-    private final FtpService ftp;
     private final GlChangeService changes;
     private final DataScopeService scope;
 
@@ -37,10 +37,10 @@ public class GlExportService {
     private final ExportFileStore files;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
-                           ApprovalService approval, AuditService audit, FtpService ftp, GlChangeService changes,
+                           ApprovalService approval, AuditService audit, GlChangeService changes,
                            DataScopeService scope, ExportFileStore files) {
         this.gl = gl; this.requests = requests; this.transfers = transfers;
-        this.approval = approval; this.audit = audit; this.ftp = ftp; this.changes = changes; this.scope = scope;
+        this.approval = approval; this.audit = audit; this.changes = changes; this.scope = scope;
         this.files = files;
     }
 
@@ -73,10 +73,10 @@ public class GlExportService {
         return requests.findByRequestedByAndStatusOrderByCreatedAtDesc(username, "PENDING");
     }
 
-    /** One export request + its FTP delivery outcome (if it got that far) — for the maker's "Riwayat Export". */
+    /** One export request + the file it produced (if it got that far) — for the maker's "Riwayat Export". */
     public record ExportHistoryItem(GlExportRequest req, ExportTransfer transfer) {}
 
-    /** Maker's full export history — pending, approved, and rejected — with FTP send status where applicable. */
+    /** Maker's full export history — pending, approved, and rejected — with the file produced where applicable. */
     public List<ExportHistoryItem> myHistory(String username) {
         List<ExportHistoryItem> out = new ArrayList<>();
         for (GlExportRequest r : requests.findByRequestedByOrderByCreatedAtDesc(username)) {
@@ -223,8 +223,8 @@ public class GlExportService {
     /**
      * Hasil otorisasi export: pesan untuk ditampilkan + apakah semuanya benar-benar beres.
      *
-     * Dulu pemanggilnya menebak lewat isi pesan ("Gagal kirim ke FTP"), jadi satu perubahan kata
-     * saja sudah cukup membuat kegagalan pengiriman tampil sebagai notifikasi hijau.
+     * Dulu pemanggilnya menebak berhasil/gagal dari isi pesan, jadi satu perubahan kata saja
+     * sudah cukup membuat kegagalan tampil sebagai notifikasi hijau.
      */
     public record ApproveResult(boolean ok, String message) {}
 
@@ -247,11 +247,10 @@ public class GlExportService {
         }
         if (d.compareTo(c) != 0) return new ApproveResult(false, "Total tidak balance (Debit != Credit). Otorisasi export dibatalkan.");
 
-        String ftpNote;
         try {
             // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
-            // Export berikutnya di hari yang sama menimpa file hari itu, baik di disk maupun di FTP
-            // (nama remote-nya sama), sehingga core hanya pernah menemukan hasil export terakhir.
+            // Export berikutnya di hari yang sama menimpa file hari itu, sehingga core hanya
+            // pernah menemukan hasil export terakhir untuk tanggal tersebut.
             // Sebelumnya file kedua dibuat dengan akhiran "_<reqId>" sehingga menumpuk beberapa
             // file untuk satu tanggal dan tidak jelas mana yang berlaku.
             String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
@@ -264,34 +263,12 @@ public class GlExportService {
                 audit.transaction(checker, "EXPORT_REPLACE",
                         "File " + fileName + " ditimpa oleh export CR#" + reqId + " (satu file per hari).");
 
+            // Catatan file yang dihasilkan — bukti dual-control, dipakai "Riwayat Export" maker.
             ExportTransfer t = new ExportTransfer();
             t.setFileName(fileName); t.setPaket("EXPORT#" + reqId); t.setInputer(req.getRequestedBy());
             t.setChecker(checker); t.setRowsCount(rows.size()); t.setCreatedAt(LocalDateTime.now());
-            // Nama file selalu disebut, apa pun hasil FTP-nya (BUG_AUSY_00151). Path lengkap &
-            // isi foldernya ada di halaman "Direktori Hasil Export" yang ditautkan di bawah pesan
-            // ini — pesan untuk checker ditulis apa adanya, tanpa istilah teknis dan tanpa
-            // pesan mentah dari library; detail sebabnya ada di beranda Admin & audit trail.
-            boolean delivered = true;
-            if (ftp.enabled()) {
-                try {
-                    String remote = ftp.push(out);
-                    t.setStatus("SENT"); t.setRemotePath(remote); t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
-                    audit.transaction(checker, "FTP_SENT", "Export CR#" + reqId + " -> FTP: " + remote);
-                    ftpNote = " File " + fileName + " sudah dibuat dan dikirim ke server FTP.";
-                } catch (Exception fe) {
-                    t.setStatus("FAILED"); t.setError(fe.getMessage()); t.setAttempts(1);
-                    audit.transaction(checker, "FTP_FAILED", "Export CR#" + reqId + " gagal kirim FTP: " + fe.getMessage());
-                    delivered = false;
-                    ftpNote = " File " + fileName + " sudah dibuat di folder hasil export, tetapi gagal"
-                            + " dikirim ke server FTP. Admin dapat mengirimnya ulang dari beranda Admin.";
-                }
-            } else {
-                // Tanpa setelan FTP, file ACCTXT cukup ditulis ke direktori tujuan (root FTP lokal)
-                // dan core mengambilnya dari sana — tidak ada lagi antrian kirim (BUG_AUSY_00146).
-                t.setStatus("SENT"); t.setRemotePath(out.toString());
-                t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
-                ftpNote = " File " + fileName + " sudah dibuat di folder hasil export.";
-            }
+            t.setStatus("SENT"); t.setRemotePath(out.toString());
+            t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
             transfers.save(t);
 
             gl.markExported(reqId);
@@ -300,8 +277,8 @@ public class GlExportService {
             requests.save(req);
             audit.transaction(checker, "EXPORT_APPROVE",
                     "Export CR#" + reqId + " (maker=" + req.getRequestedBy() + ") di-approve, " + rows.size() + " baris -> " + fileName);
-            return new ApproveResult(delivered,
-                    "Otorisasi export berhasil — " + rows.size() + " baris diproses." + ftpNote);
+            return new ApproveResult(true, "Otorisasi export berhasil — " + rows.size()
+                    + " baris diproses. File " + fileName + " sudah dibuat di folder hasil export.");
         } catch (Exception e) {
             return new ApproveResult(false, "Gagal menulis file ACCTXT: " + e.getMessage());
         }
@@ -324,65 +301,6 @@ public class GlExportService {
         return "Permintaan export ditolak. GL dikembalikan agar bisa diajukan lagi; alasan tercatat di audit trail.";
     }
 
-    // ---------- Admin: resend a queued/failed transfer ----------
-    /** Keterangan folder hasil export + isinya — dipakai halaman /export-dir. */
-    public record ExportDirView(String path, boolean exists, boolean writable,
-                                List<ExportFileStore.StoredFile> files) {}
-
-    /**
-     * Isi direktori export, terbaru dulu.
-     *
-     * Ada supaya pertanyaan "hasil export-nya ke mana?" bisa dijawab dari dalam aplikasi
-     * (BUG_AUSY_00151): link file:// dari halaman http diblokir browser, jadi menunjukkan
-     * daftarnya sendiri adalah satu-satunya cara yang benar-benar bisa dipencet.
-     * File-nya tidak diunduh — ACCTXT memang tidak untuk turun ke komputer siapa pun.
-     */
-    public ExportDirView exportDirView() {
-        return new ExportDirView(files.dir().toString(), files.exists(), files.writable(), files.list());
-    }
-
-    /** Path folder hasil export apa adanya — ditempel di halaman otorisasi & beranda Admin. */
-    public String exportDirPath() { return files.dir().toString(); }
-
     /** Lokasi satu file hasil export (nama saja — tidak bisa menunjuk ke luar folder). */
     public Path txtFile(String name) { return files.resolve(name); }
-
-    @Transactional
-    public String resend(Long transferId, String admin) {
-        ExportTransfer t = transfers.findById(transferId).orElse(null);
-        if (t == null) return "Data transfer tidak ditemukan.";
-        if ("SENT".equals(t.getStatus())) return "File sudah terkirim sebelumnya.";
-        Path f = txtFile(t.getFileName());
-        t.setAttempts((t.getAttempts()==null?0:t.getAttempts()) + 1);
-        if (!Files.exists(f)) {
-            t.setStatus("FAILED"); t.setError("File lokal tidak ditemukan: " + t.getFileName());
-            transfers.save(t);
-            return "Gagal: file lokal '" + t.getFileName() + "' tidak ditemukan.";
-        }
-        // Push FTP mati: file di direktori export ITU pengirimannya (BUG_AUSY_00146) — persis seperti
-        // export baru yang langsung ditandai SENT. Sebelumnya tombol Kirim Ulang hanya menolak, jadi
-        // transfer yang gagal sewaktu FTP masih menyala tidak pernah bisa diselesaikan: barisnya
-        // menetap FAILED di card beranda Admin (dan di peringatan maker) tanpa satu pun jalan keluar.
-        if (!ftp.enabled()) {
-            String at = f.toAbsolutePath().toString();
-            t.setStatus("SENT"); t.setRemotePath(at); t.setSentAt(LocalDateTime.now()); t.setError(null);
-            transfers.save(t);
-            audit.transaction(admin, "FTP_SENT", "Resend " + t.getFileName() + ": pengiriman FTP tidak aktif ("
-                    + ftp.sourceLabel() + "), file diserahkan lewat folder hasil export " + at);
-            return "Berhasil: pengiriman ke server FTP tidak aktif, jadi file " + t.getFileName()
-                    + " diambil core langsung dari folder hasil export. Transfer ditandai selesai.";
-        }
-        try {
-            String remote = ftp.push(f);
-            t.setStatus("SENT"); t.setRemotePath(remote); t.setSentAt(LocalDateTime.now()); t.setError(null);
-            transfers.save(t);
-            audit.transaction(admin, "FTP_SENT", "Resend " + t.getFileName() + " -> FTP: " + remote);
-            return "Berhasil dikirim ke server FTP: " + remote + ".";
-        } catch (Exception fe) {
-            t.setStatus("FAILED"); t.setError(fe.getMessage());
-            transfers.save(t);
-            audit.transaction(admin, "FTP_FAILED", "Resend " + t.getFileName() + " gagal: " + fe.getMessage());
-            return "Gagal dikirim ke server FTP: " + fe.getMessage();
-        }
-    }
 }

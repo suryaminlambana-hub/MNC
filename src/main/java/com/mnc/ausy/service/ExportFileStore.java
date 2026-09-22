@@ -30,6 +30,9 @@ import java.util.List;
 public class ExportFileStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExportFileStore.class);
+    /** Bawaan di Windows: root FTP lokal IIS, tempat core banking mengambil file. */
+    private static final String WINDOWS_DEFAULT_DIR = "C:/inetpub/ftproot";
+    /** Bawaan di OS lain (mesin dev): di bawah folder aplikasi. */
     private static final String DEFAULT_DIR = "data/txt";
     /** Akhiran berkas sementara saat menulis; tidak pernah ikut ditampilkan sebagai hasil export. */
     private static final String PART = ".part";
@@ -54,12 +57,38 @@ public class ExportFileStore {
      * hanya berlaku kalau variabelnya tidak ada sama sekali, sedangkan {@code .env.example} justru
      * mengirim {@code AUSY_EXPORT_DIR=} kosong — hasilnya {@code Paths.get("")}, yaitu direktori
      * kerja proses, dan file mendarat di sana tanpa error apa pun.
+     *
+     * Setelan yang TIDAK BISA DIPAKAI juga diabaikan: kalau foldernya belum ada dan folder
+     * induknya pun tidak ada, itu praktis selalu salah tulis (mis. {@code C:\inethub\ftproot}).
+     * Dulu folder salah itu dibuat begitu saja dan hasil export terbit di tempat yang tidak
+     * dipantau siapa pun; sekarang dipakai bawaannya, dan sumber yang berlaku disebut di log
+     * saat start.
      */
     public Path dir() {
+        Path configured = configuredDir();
+        if (configured == null) return defaultDir();
+        return usable(configured) ? configured : defaultDir();
+    }
+
+    /** Isi {@code AUSY_EXPORT_DIR} (atau {@code AUSY_TXT_DIR}) apa adanya; null kalau tidak diisi. */
+    Path configuredDir() {
         String v = exportDir == null ? "" : exportDir.trim();
         if (v.isEmpty()) v = txtDir == null ? "" : txtDir.trim();
-        if (v.isEmpty()) v = DEFAULT_DIR;
+        return v.isEmpty() ? null : Paths.get(v).toAbsolutePath().normalize();
+    }
+
+    /** Folder bawaan: root FTP lokal di Windows, folder aplikasi di OS lain. */
+    Path defaultDir() {
+        String os = System.getProperty("os.name", "");
+        String v = os.toLowerCase().contains("win") ? WINDOWS_DEFAULT_DIR : DEFAULT_DIR;
         return Paths.get(v).toAbsolutePath().normalize();
+    }
+
+    /** Folder sudah ada, atau setidaknya folder induknya ada sehingga wajar untuk dibuat. */
+    private boolean usable(Path p) {
+        if (Files.isDirectory(p)) return true;
+        Path parent = p.getParent();
+        return parent != null && Files.isDirectory(parent);
     }
 
     /** Nama file di dalam folder export — nama saja, supaya tidak bisa menunjuk ke luar folder. */
@@ -144,19 +173,18 @@ public class ExportFileStore {
      */
     @jakarta.annotation.PostConstruct
     void logDir() {
+        Path configured = configuredDir();
         Path d = dir();
+        if (configured != null && !configured.equals(d))
+            LOG.warn("AUSY_EXPORT_DIR menunjuk {} yang tidak bisa dipakai (folder itu dan folder"
+                    + " induknya tidak ada — biasanya salah tulis). Dipakai folder bawaan {}."
+                    + " Perbaiki AUSY_EXPORT_DIR kalau maksudnya folder lain.", configured, d);
         boolean isNew = !Files.isDirectory(d);
-        Path parent = d.getParent();
-        boolean orphan = isNew && parent != null && !Files.isDirectory(parent);
         try {
             Files.createDirectories(d);
             if (!Files.isWritable(d))
                 LOG.warn("Folder hasil export {} TIDAK BISA DITULIS — file export akan gagal dibuat."
                         + " Cek izin folder / setelan AUSY_EXPORT_DIR.", d);
-            else if (orphan)
-                LOG.warn("Folder hasil export {} DIBUAT BARU, dan folder induknya ({}) juga belum ada."
-                        + " Periksa ejaan AUSY_EXPORT_DIR — hasil export akan terbit di folder ini,"
-                        + " bukan di folder yang mungkin Anda maksud.", d, parent);
             else if (isNew)
                 LOG.info("File hasil export ditulis ke {} (folder baru dibuat)", d);
             else

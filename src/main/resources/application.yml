@@ -38,27 +38,12 @@ spring:
           no-cache: true        # always revalidate CSS/JS so UI changes show without a hard refresh
 
 ausy:
-  # Direktori tujuan file ACCTXT. Kalau aplikasi jalan DI MESIN yang sama dengan server FTP-nya,
-  # arahkan ke root FTP lokal (mis. C:/inetpub/ftproot) supaya core langsung mengambilnya dari
-  # sana — tidak perlu lagi mengonfigurasi kiriman FTP (BUG_AUSY_00146). Kalau server FTP-nya di
-  # MESIN LAIN, direktori ini cuma tempat file dibuat: yang mengantarkannya adalah FTP_* di .env.
-  # Kosong atau tidak diisi = data/txt (relatif ke folder tempat aplikasi dijalankan).
-  # Path yang berlaku disebut di log saat start: "File ACCTXT ditulis ke ...".
+  # Folder tempat file ACCTXT hasil export ditulis; core banking mengambilnya dari sana.
+  # Arahkan ke root FTP lokal mesin ini (mis. C:/inetpub/ftproot). Kosong / tidak bisa dipakai
+  # = bawaan: C:/inetpub/ftproot di Windows, data/txt di OS lain. Folder yang berlaku disebut
+  # di log saat start: "File hasil export ditulis ke ...".
   txt-dir: ${AUSY_TXT_DIR:}
   export-dir: ${AUSY_EXPORT_DIR:}
-  ftp:
-    # false = push FTP dimatikan, apa pun isi FTP_HOST maupun baris tabel ftp_config.
-    # true  = hidup, dan boleh memakai baris ftp_config kalau FTP_HOST kosong.
-    # kosong = pakai FTP_HOST kalau diisi; kalau tidak, push FTP MATI dan baris ftp_config
-    #          peninggalan layar Konfigurasi FTP yang lama diabaikan (BUG_AUSY_00141).
-    enabled: ${FTP_ENABLED:}
-    host: ${FTP_HOST:}          # kosong -> push FTP mati (file ACCTXT diambil dari direktori export)
-    port: ${FTP_PORT:21}
-    user: ${FTP_USER:}
-    pass: ${FTP_PASS:}
-    dir: ${FTP_DIR:}            # folder tujuan di server FTP (opsional)
-    secure: ${FTP_SECURE:false} # true = FTPS (FTP over TLS)
-    passive: ${FTP_PASSIVE:true}
 
 logging:
   level:

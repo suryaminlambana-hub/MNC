@@ -20,7 +20,7 @@ import java.util.Map;
  * jadi setelan seperti {@code AUSY_EXPORT_DIR} sampai ke aplikasi. Di Windows tidak ada padanannya:
  * aplikasi dijalankan langsung ({@code mvnw.cmd spring-boot:run}) dengan beberapa {@code set ...}
  * yang diingat orang saat itu — dan yang paling mudah terlupa justru {@code AUSY_EXPORT_DIR},
- * sehingga file ACCTXT diam-diam mendarat di {@code data/txt} bukan di root FTP (BUG_AUSY_00151).
+ * sehingga file ACCTXT diam-diam mendarat di {@code data/txt} bukan di folder tujuan (BUG_AUSY_00151).
  * Dengan ini satu file {@code .env} berlaku sama di semua cara menjalankan.
  *
  * Diparse sendiri, bukan sebagai {@code .properties}, supaya path Windows tidak rusak:

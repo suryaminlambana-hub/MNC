@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-/** Checker (④) authorizes maker-initiated GL export → ACCTXT sent to FTP. Part of Manajemen Otorisasi GL. */
+/** Checker (④) authorizes maker-initiated GL export → ACCTXT written to the export folder. Part of Manajemen Otorisasi GL. */
 @Controller
 public class GlExportController {
     private final GlExportService glExport;

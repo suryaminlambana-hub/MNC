@@ -64,13 +64,13 @@ Prinsip: yang meng-**approve tidak boleh** add/edit/delete; **CONFIG tidak** mem
 - Maker **hanya melihat data GL miliknya sendiri**; antar-maker tertutup.
 - Checker melihat & mengotorisasi data maker yang dipasangkan padanya di menu
   *Pasangan Checker–Maker*. Checker tanpa pasangan tidak melihat pengajuan siapa pun.
-- Setelan **FTP** hanya dari `.env`/database, tidak ada layar konfigurasinya.
+- Hasil export = file ACCTXT yang ditulis ke folder `AUSY_EXPORT_DIR` di server; tidak ada pengiriman FTP.
 
 **Catatan:**
 - **Wajib** set `DB_NAME/DB_USER/DB_PASS` di depan perintah — default di `application.yml` menunjuk DB dev penulis, jadi tanpa override akan gagal konek.
 - Ganti port: tambah `SERVER_PORT=9090`. Ganti context path: `CONTEXT_PATH=` (root) atau biarkan `/ausy` (default).
 - **Windows:** `set DB_NAME=ausy` (dst) dulu, lalu `mvnw.cmd spring-boot:run`.
-- **FTP** (`FTP_*`) & **email** default mati — tidak memengaruhi run lokal.
+- **Email** default mati — tidak memengaruhi run lokal.
 - Reset total: jalankan ulang `packaging/setup-db.sql` (selalu fresh).
 
 ### Windows (step-by-step)
@@ -108,13 +108,12 @@ psql -U postgres -f packaging\setup-db.sql
    $env:AUSY_EXPORT_DIR="C:/inetpub/ftproot"
    .\mvnw.cmd spring-boot:run
    ```
-   > `AUSY_EXPORT_DIR` = folder tempat file ACCTXT hasil export dibuat. Kalau server FTP-nya di
-   > mesin ini juga, arahkan ke root FTP-nya (mis. `C:/inetpub/ftproot`) — file langsung terbit di
-   > sana. **Tanpa ini** file jatuh ke `data\txt` di folder repo dan tidak akan muncul di ftproot
-   > (BUG_AUSY_00151). Pakai garis miring `/` walau di Windows, dan pastikan user yang menjalankan
-   > aplikasi punya izin tulis ke folder itu. Folder yang berlaku dicetak saat start:
-   > `File ACCTXT ditulis ke ...`. Kalau FTP-nya di mesin LAIN, folder ini bukan tujuan akhir —
-   > isi `FTP_HOST`/`FTP_USER`/`FTP_PASS` (lihat `packaging/.env.example`).
+   > `AUSY_EXPORT_DIR` = folder tempat file ACCTXT hasil export dibuat; core banking mengambilnya
+   > dari sana, jadi arahkan ke root FTP lokal mesin ini. Pakai garis miring `/` walau di Windows,
+   > dan pastikan user yang menjalankan aplikasi punya izin tulis ke folder itu (`inetpub` default
+   > terkunci — jalankan sebagai Administrator kalau perlu). Kosong / tidak bisa dipakai = bawaan
+   > `C:/inetpub/ftproot` di Windows, `data/txt` di OS lain. Folder yang berlaku dicetak saat start:
+   > `File hasil export ditulis ke ...`.
 3. Buka **http://localhost:8080/ausy** — login sesuai role — `admin`(config), `adminapv`(config-approver), `user`(maker), `spv`(approver). Lihat tabel Role di atas.
 
 > Ganti port: tambah `set SERVER_PORT=9090` (cmd) atau `$env:SERVER_PORT="9090"` (PowerShell) sebelum menjalankan.

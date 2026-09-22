@@ -75,63 +75,33 @@ DB_PORT=5432
 DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
-# AUSY_EXPORT_DIR = folder tempat file ACCTXT DIBUAT, di mesin tempat aplikasi ini jalan.
-# Isi PATH ABSOLUT; kosong = data/txt di folder aplikasi (BUG_AUSY_00151).
-# Kalau FTP server-nya ada di mesin yang SAMA, arahkan ke root FTP-nya — file langsung terbit di
-# sana dan FTP_* tidak perlu diisi (BUG_AUSY_00146). Kalau FTP-nya di mesin LAIN, folder ini
-# bukan tujuan akhir: isi FTP_HOST/FTP_USER/FTP_PASS di bawah.
+# AUSY_EXPORT_DIR = folder tempat file ACCTXT hasil export DIBUAT, di mesin tempat aplikasi ini
+# jalan. Core banking mengambil file dari folder itu, jadi arahkan ke root FTP lokalnya.
+# Isi PATH ABSOLUT, pakai garis miring / walau di Windows. Kosong / tidak bisa dipakai = bawaan
+# C:/inetpub/ftproot (Windows) atau data/txt (OS lain).
 AUSY_EXPORT_DIR=C:/inetpub/ftproot
-FTP_ENABLED=
-
-# FTP_* hanya untuk kirim ke server FTP LAIN. Diisi DI SINI, bukan lewat website: menu
-# "Konfigurasi FTP" sudah dihapus (BUG_AUSY_00141) supaya host & kredensial tidak bisa
-# dilihat/diubah dari antarmuka. FTP_DIR = folder DI SERVER FTP (mis. /gl), bukan path lokal.
-FTP_HOST=
-FTP_PORT=21
-FTP_USER=
-FTP_PASS=
-FTP_DIR=
 ```
 
-> **Push FTP mati kalau `FTP_HOST` kosong.** Urutan sumbernya:
->
-> 1. `FTP_ENABLED=false` → mati, apa pun isi yang lain.
-> 2. `FTP_HOST` diisi di `.env` → itu yang dipakai.
-> 3. `FTP_HOST` kosong → **mati**. Baris tabel `ftp_config` peninggalan layar Konfigurasi FTP yang
->    lama sengaja diabaikan: tidak ada satu pun layar untuk melihat/mengubahnya, jadi kalau dipakai
->    diam-diam setiap otorisasi export gagal dengan kredensial yang tidak bisa diperbaiki dari
->    website. Log start menyebutkannya sebagai `WARN Push FTP MATI: ...`.
-> 4. Masih mau memakai baris `ftp_config` itu → `FTP_ENABLED=true`.
->
-> Sumber yang berlaku disebut di log saat start dan di card **Export FTP Gagal / Tertunda** pada
-> beranda Admin. Kalau card itu masih memuat baris `FAILED` dari sebelum FTP dimatikan, tombol
-> **Kirim Ulang** akan menyelesaikannya: dengan push FTP mati, file ACCTXT di `AUSY_EXPORT_DIR`
-> itulah pengirimannya, jadi barisnya ditandai `SENT` (tercatat di audit trail) selama file-nya
-> masih ada di direktori itu.
->
-> Membersihkan sisa baris lama (opsional): `UPDATE ftp_config SET host = '' WHERE id = 1;`
+> **Pengiriman FTP sudah tidak ada di aplikasi.** Hasil export hanya berupa file yang ditulis ke
+> `AUSY_EXPORT_DIR`; tidak ada push FTP, antrian kirim, tombol kirim ulang, maupun setelan
+> host/kredensial FTP. Karena itu **folder ini harus folder di mesin ini** (root FTP lokal / share
+> yang dipantau core) — mengarahkannya ke root FTP mesin lain tidak akan berhasil, aplikasi
+> menulisnya sebagai folder lokal dan tidak ada yang memindahkannya.
 
 ### "Hasil export tidak muncul di inetpub/ftproot" (BUG_AUSY_00151)
 
-Satu file ACCTXT hanya bisa sampai ke root FTP lewat salah satu dari dua jalan — pastikan dulu
-yang mana yang berlaku di lingkungan ini:
+Urutannya begini:
 
-| Aplikasi jalan di… | Yang mengantarkan file | Yang harus diisi |
-|---|---|---|
-| mesin yang sama dengan server FTP | penulisan file itu sendiri | `AUSY_EXPORT_DIR` = root FTP (mis. `C:/inetpub/ftproot`), `FTP_*` kosong |
-| mesin lain | push FTP | `FTP_HOST`/`FTP_USER`/`FTP_PASS` (+ `FTP_DIR`) ke server FTP-nya |
-
-Mengisi `AUSY_EXPORT_DIR` dengan path root FTP **mesin lain** tidak akan berhasil: aplikasi
-menulisnya sebagai folder lokal, dan tidak ada yang memindahkannya.
-
-Cek cepat kalau file tidak ketemu:
-
-1. Log saat start menyebut folder yang sebenarnya dipakai: `File ACCTXT ditulis ke <path>`.
-   Kalau `WARN Direktori export ... TIDAK BISA DITULIS`, izin folder / `AUSY_EXPORT_DIR` yang salah.
-2. Pesan setelah checker approve juga menyebut path file-nya + hasil kiriman FTP-nya.
-3. `AUSY_EXPORT_DIR` yang **ditulis tapi dibiarkan kosong** dianggap tidak diisi → `data/txt`
-   di folder aplikasi. Sebelum BUG_AUSY_00151 nilai kosong bikin file mendarat di folder kerja
-   proses tanpa pesan apa pun.
+1. Log saat start menyebut folder yang **sebenarnya** dipakai: `File hasil export ditulis ke <path>`.
+   Itu sumber kebenarannya — kalau isinya bukan folder yang Anda pantau, `AUSY_EXPORT_DIR`-nya yang salah.
+2. `WARN ... TIDAK BISA DITULIS` → izin folder. Di Windows `inetpub` default terkunci: jalankan
+   `run.bat` sebagai Administrator atau beri izin Modify ke user yang menjalankan aplikasi.
+3. `WARN AUSY_EXPORT_DIR menunjuk ... yang tidak bisa dipakai` → setelan itu diabaikan dan dipakai
+   folder bawaan. Ini muncul kalau foldernya **dan** folder induknya tidak ada, yang praktis selalu
+   berarti salah tulis (mis. `C:\inethub\ftproot`). Dulu folder salah itu dibuat begitu saja dan
+   hasil export terbit di tempat yang tidak dipantau siapa pun.
+4. `AUSY_EXPORT_DIR` yang ditulis tapi dibiarkan **kosong** dianggap tidak diisi → folder bawaan.
+5. Pesan setelah checker approve menyebut nama file yang dibuat.
 
 ```bash
 # d. uji jalan di foreground dulu (Ctrl+C untuk berhenti)
@@ -190,9 +160,9 @@ Kelola Data GL (ajukan perubahan → approve) → Ajukan Export → Otorisasi Ex
 
 - [ ] Ganti password 4 akun seed (`admin123`/`user123`/`spv123`) lewat menu User.
 - [ ] Password `ausy_user` bukan default, dan `.env` mode `600` milik user `ausy`.
-- [ ] Isi `FTP_*` di `.env` kalau export ke core lewat FTP sudah mau diuji — setelan FTP tidak lagi
-      bisa diubah dari website, dan `FTP_HOST` kosong berarti push FTP mati (file diambil dari
-      `AUSY_EXPORT_DIR`). Kirim ulang transfer yang gagal ada di beranda Admin.
+- [ ] `AUSY_EXPORT_DIR` menunjuk folder yang benar-benar dipantau core (root FTP lokal), dan user
+      yang menjalankan aplikasi punya izin tulis ke folder itu. Cek baris `File hasil export
+      ditulis ke ...` di log saat start.
 - [ ] Tentukan siapa yang boleh akses port 8080 (reverse proxy/HTTPS kalau keluar jaringan dev).
 - [ ] Backup: `pg_dump ausy` terjadwal di server DB.
 

@@ -6,9 +6,8 @@
     <h1 class="ausy-page-title">Beranda Admin</h1>
     <p class="text-muted">Konfigurasi user &amp; group.</p>
 
-    <!--/* Hasil aksi yang kembali ke beranda (mis. Kirim Ulang transfer FTP) ditampilkan di sini.
-           Sebelumnya tidak ada satu pun beranda yang menampilkannya, jadi tombol Kirim Ulang
-           terasa tidak melakukan apa-apa: halaman hanya ter-reload tanpa keterangan. */-->
+    <!--/* Hasil aksi yang kembali ke beranda ditampilkan di sini; sebelumnya tidak ada satu pun
+           beranda yang menampilkan flash message, jadi aksinya terasa tidak melakukan apa-apa. */-->
     <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
     <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
@@ -25,11 +24,6 @@
             <span class="dash-pill" th:if="${pendingUsers > 0}">MENUNGGU APPROVAL</span>
             <div class="dash-ico c-purple"><i class="fa-solid fa-user-clock"></i></div>
             <div><div class="dash-num" th:text="${pendingUsers}">0</div><div class="dash-label">Perubahan Config Pending</div></div>
-        </div>
-        <div th:if="${cards.contains('ftp-resend')}" class="dash-card" th:classappend="${ftpResendCount > 0} ? 'attn'">
-            <span class="dash-pill" th:if="${ftpResendCount > 0}">PERLU KIRIM ULANG</span>
-            <div class="dash-ico c-warn"><i class="fa-solid fa-server"></i></div>
-            <div><div class="dash-num" th:text="${ftpResendCount}">0</div><div class="dash-label">Export FTP Gagal / Tertunda</div></div>
         </div>
     </div>
 
@@ -64,43 +58,6 @@
                 </tbody>
             </table>
         </div>
-    </div>
-
-        <!-- Export FTP gagal/tertunda -- perlu kirim ulang dari Admin -->
-    <div th:if="${cards.contains('ftp-resend')}" class="ausy-card">
-        <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
-            <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="fa-solid fa-server text-muted"></i> Export FTP Gagal / Tertunda</h2>
-        </div>
-        <!--/* BUG_AUSY_00141: halaman Konfigurasi FTP dihapus — setelan FTP hanya dari database/deploy.
-               Kirim ulang bukan konfigurasi, jadi tombolnya pindah ke sini, satu per baris. */-->
-        <p class="text-muted small px-3 mb-2"><i class="fa-solid fa-circle-info"></i>
-            Setelan FTP (host &amp; kredensial) diatur di server, tidak dari website.
-            Setelan yang berlaku sekarang: <b th:text="${ftpSource}">—</b>.
-            <span th:if="${canSeeExportDir}">File hasil export dibuat di <code th:text="${exportDirPath}"></code> —
-            <a th:href="@{/export-dir}">lihat isinya</a>.</span></p>
-        <table class="table table-sm table-hover align-middle mb-0">
-            <thead><tr>
-                <th class="ps-3">Waktu</th><th>File</th><th>Batch</th><th>Maker</th>
-                <th class="text-end">Baris</th><th>Status</th><th>Error</th><th class="pe-3">Aksi</th>
-            </tr></thead>
-            <tbody>
-            <tr th:each="t : ${ftpResendList}">
-                <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.createdAt,'dd-MM-yyyy HH:mm')}"></td>
-                <td class="font-monospace small" th:text="${t.fileName}"></td>
-                <td th:text="${t.paket}"></td>
-                <td th:text="${t.inputer}"></td>
-                <td class="text-end" th:text="${t.rowsCount}"></td>
-                <td><span class="badge" th:classappend="${t.status == 'FAILED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning'" th:text="${t.status}"></span></td>
-                <td class="small text-muted" th:text="${t.error}"></td>
-                <td class="pe-3">
-                    <form method="post" th:action="@{'/admin/ftp-resend/' + ${t.id}}" class="d-inline">
-                        <button class="btn btn-sm btn-primary"><i class="fa-solid fa-rotate-right"></i> Kirim Ulang</button>
-                    </form>
-                </td>
-            </tr>
-            <tr th:if="${ftpResendList.isEmpty()}"><td colspan="8" class="text-center text-muted py-4">Tidak ada export FTP yang perlu dikirim ulang.</td></tr>
-            </tbody>
-        </table>
     </div>
 
 <!-- Riwayat User: add/edit/delete + approve/reject -->

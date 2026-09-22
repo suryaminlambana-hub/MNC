@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Maker-initiated export of active GL to ACCTXT; approved by checker (Otorisasi Export GL) → FTP. */
+/** Maker-initiated export of active GL to ACCTXT; approved by checker (Otorisasi Export GL). */
 @Entity
 @Table(name = "gl_export_request")
 public class GlExportRequest {

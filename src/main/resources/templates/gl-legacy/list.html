@@ -30,7 +30,7 @@
         <div class="modal-header"><h5 class="modal-title">Ajukan Export GL ke Checker</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-          <p class="text-muted small">Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
+          <p class="text-muted small">Export membuat file ACCTXT di server (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
 
           <label class="form-label">Pilih batch hasil upload <span class="text-danger">*</span></label>
           <div class="ausy-card mb-3" style="padding:0">
@@ -152,7 +152,7 @@
     })();
   </script>
   <p th:if="${canExport}" class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
-     Export mengirim ACCTXT ke FTP (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
+     Export membuat file ACCTXT di server (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
      Hanya GL aktif yang belum di-export yang disertakan.</p>
 
   <!--/* Dipaginasi di server: 10 baris per halaman. Dulu seluruh baris (belasan ribu) dirender
@@ -206,7 +206,7 @@
       <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="0" data-order-dir="desc">
         <thead><tr>
           <th>Tanggal</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th>
-          <th>Alasan</th><th>Status</th><th>Checker</th><th>Catatan Checker</th><th>Status FTP</th>
+          <th>Alasan</th><th>Status</th><th>Checker</th><th>Catatan Checker</th><th>File</th>
         </tr></thead>
         <tbody>
         <tr th:each="h : ${exportHistory}">
@@ -222,11 +222,10 @@
                     th:text="${h.req.status == 'PENDING'} ? 'MENUNGGU CHECKER' : ${h.req.status}"></span></td>
           <td th:text="${h.req.checker}"></td>
           <td class="small text-muted" th:text="${h.req.noteChecker}"></td>
-          <td>
-            <span th:if="${h.transfer != null}" class="badge"
-                  th:classappend="${h.transfer.status == 'SENT'} ? 'bg-success-subtle text-success' : (${h.transfer.status == 'FAILED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
-                  th:text="${h.transfer.status}"></span>
-            <span th:if="${h.transfer != null and h.transfer.error != null}" class="small text-muted d-block" th:text="${h.transfer.error}"></span>
+          <!--/* Kolom ini dulu "Status FTP". Pengiriman FTP sudah tidak ada: hasil export adalah
+                 file yang dibuat di server, jadi yang berguna diketahui maker adalah nama file-nya. */-->
+          <td class="font-monospace small">
+            <span th:if="${h.transfer != null}" th:text="${h.transfer.fileName}"></span>
             <span th:if="${h.transfer == null}">—</span>
           </td>
         </tr>

@@ -110,7 +110,7 @@ public class GlDataController {
 
     /**
      * Maker "Ajukan Export": ajukan paket GL aktif pilihan maker ke checker (Otorisasi Export GL).
-     * File ACCTXT tidak diunduh ke komputer — dikirim ke FTP setelah checker approve.
+     * File ACCTXT tidak diunduh ke komputer — dibuat di folder hasil export setelah checker approve.
      */
     @PostMapping("/gl-legacy/export-request")
     public String exportRequest(@RequestParam String note, @RequestParam(required = false) List<String> pakets,

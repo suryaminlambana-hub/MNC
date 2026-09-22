@@ -12,7 +12,7 @@ import java.util.*;
 
 /**
  * Otorisasi UPLOAD GL: checker approves an uploaded paket → GL becomes active.
- * NOTE: approving an upload NO LONGER generates ACCTXT / sends to FTP — that now lives in the
+ * NOTE: approving an upload NO LONGER generates ACCTXT — that now lives in the
  * separate maker-initiated export flow (GlExportService), authorized in "Otorisasi Export GL".
  */
 @Service
@@ -58,7 +58,7 @@ public class OtorisasiService {
 
     public record ExportResult(boolean ok, String message, int rows, String file) {}
 
-    /** Otorisasi UPLOAD: approve a pending paket → mark active (status_dual=APPROVED). No export/FTP here. */
+    /** Otorisasi UPLOAD: approve a pending paket → mark active (status_dual=APPROVED). No export here. */
     @Transactional
     public ExportResult export(String paket, String inputer, AusyUserDetails me) {
         String checker = me.getUsername();
@@ -77,7 +77,7 @@ public class OtorisasiService {
             return new ExportResult(false, "Batch tidak balance (Debit != Credit). Otorisasi dibatalkan.", 0, null);
 
         // Tandai lolos otorisasi upload → jadi GL Aktif. status_print tetap 'BELUM UPLOAD'
-        // (artinya: belum di-export ke core). Export ke FTP dilakukan lewat flow export maker.
+        // (artinya: belum di-export ke core). Pembuatan file export dilakukan lewat flow export maker.
         for (GlTabel g : rows) {
             g.setStatusDual("APPROVED");
             g.setStatusPrint("BELUM UPLOAD");
