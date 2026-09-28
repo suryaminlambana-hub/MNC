@@ -50,6 +50,22 @@ public class UploadService {
         try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
     }
 
+    /**
+     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT — {index kolom, index label}.
+     * Kolom angka (nominal) dan tanggal tidak ikut: keduanya sudah punya validasinya sendiri.
+     */
+    private static final int[][] TEXT_COLUMNS = {
+            {2, 0}, {4, 1}, {5, 2}, {6, 3}, {7, 4}, {8, 5},
+            {9, 6}, {10, 7}, {11, 8}, {12, 9}, {14, 10}, {15, 11}
+    };
+
+    private static final String[] COLUMN_LABEL = {
+            "Kolom C [Product]", "Kolom E [Tr. Account]", "Kolom F [GL Name]",
+            "Kolom G [Description]", "Kolom H [Branch]", "Kolom I [Branch Name]",
+            "Kolom J [Cost Centre]", "Kolom K [Cost Centre Name]", "Kolom L [Currency]",
+            "Kolom M [Tr. Year]", "Kolom O [Flag]", "Kolom P [Resp]"
+    };
+
     @Transactional
     public UploadResult process(InputStream in, String fileName, String username) throws Exception {
         UploadResult res = new UploadResult();
@@ -74,6 +90,23 @@ public class UploadService {
             }
             if (!res.errors.isEmpty()) {
                 res.message = "Upload gagal: tanggal posting tidak sesuai hari ini.";
+                return res;
+            }
+
+            // Pass 2: karakter yang tidak bisa ditulis ke ACCTXT (BUG_AUSY_00162).
+            // Diperiksa sebelum satu baris pun disimpan, supaya file yang bermasalah ditolak
+            // utuh — bukan separuh masuk lalu ketahuan waktu checker sudah meng-approve.
+            for (int r = 1; r <= last; r++) {
+                Row row = sh.getRow(r);
+                if (cell(row, 0).isBlank()) continue;
+                for (int[] col : TEXT_COLUMNS) {
+                    String problem = GlTextRule.problem(COLUMN_LABEL[col[1]], cell(row, col[0]));
+                    if (problem != null)
+                        res.errors.add(new String[]{ String.valueOf(r + 1), problem });
+                }
+            }
+            if (!res.errors.isEmpty()) {
+                res.message = "Upload gagal: ada karakter yang tidak diizinkan. Perbaiki di file Excel lalu unggah ulang.";
                 return res;
             }
 
