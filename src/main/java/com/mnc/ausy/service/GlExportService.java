@@ -247,41 +247,58 @@ public class GlExportService {
         }
         if (d.compareTo(c) != 0) return new ApproveResult(false, "Total tidak balance (Debit != Credit). Otorisasi export dibatalkan.");
 
-        try {
-            // Nama file AS400: ACCTXT.<YYMMDD> — SATU file per hari (BUG_AUSY_00142).
-            // Export berikutnya di hari yang sama menimpa file hari itu, sehingga core hanya
-            // pernah menemukan hasil export terakhir untuk tanggal tersebut.
-            // Sebelumnya file kedua dibuat dengan akhiran "_<reqId>" sehingga menumpuk beberapa
-            // file untuk satu tanggal dan tidak jelas mana yang berlaku.
-            String yymmdd = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
-            String fileName = "ACCTXT." + yymmdd;
-            boolean replaced = Files.exists(files.resolve(fileName));
-            // Ditulis lewat ExportFileStore: berkas sementara lalu dipindah atomik, supaya core
-            // tidak pernah membaca ACCTXT yang masih separuh ditulis.
-            Path out = files.write(fileName, content.toString());
-            if (replaced)
-                audit.transaction(checker, "EXPORT_REPLACE",
-                        "File " + fileName + " ditimpa oleh export CR#" + reqId + " (satu file per hari).");
+        // BUG_AUSY_00156: otorisasi berhenti di sini — approve hanya menandai data sebagai
+        // disetujui, TIDAK lagi membuat file ACCTXT. Pembuatan filenya satu pintu lewat menu
+        // admin "Generate File ACCTXT" (BUG_AUSY_00155/00158), yang menggabungkan seluruh
+        // export approved dalam rentang tanggal jadi SATU file. Dulu tiap approve menulis
+        // filenya sendiri, sehingga approve kedua di hari yang sama menimpa hasil approve
+        // pertama dan isinya tinggal sebagian.
+        //
+        // Barisnya sengaja dibiarkan PROSES EXPORT dengan export_req_id tetap terpasang: sudah
+        // keluar dari kumpulan "boleh diajukan", tapi belum SUDAH UPLOAD karena memang belum
+        // ada file yang terbit. markExported() dipanggil saat generate.
+        req.setStatus("APPROVED"); req.setChecker(checker); req.setDecidedAt(LocalDateTime.now());
+        requests.save(req);
+        audit.transaction(checker, "EXPORT_APPROVE",
+                "Export CR#" + reqId + " (maker=" + req.getRequestedBy() + ") di-approve, "
+                + rows.size() + " baris — menunggu generate file ACCTXT oleh admin.");
+        return new ApproveResult(true, "Otorisasi export berhasil — " + rows.size()
+                + " baris disetujui. File ACCTXT dibuat lewat menu Generate File ACCTXT (admin).");
+    }
 
-            // Catatan file yang dihasilkan — bukti dual-control, dipakai "Riwayat Export" maker.
-            ExportTransfer t = new ExportTransfer();
-            t.setFileName(fileName); t.setPaket("EXPORT#" + reqId); t.setInputer(req.getRequestedBy());
-            t.setChecker(checker); t.setRowsCount(rows.size()); t.setCreatedAt(LocalDateTime.now());
-            t.setStatus("SENT"); t.setRemotePath(out.toString());
-            t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
-            transfers.save(t);
+    /**
+     * Tarik kembali export yang sudah di-approve (BUG_AUSY_00157).
+     *
+     * Hanya selama file ACCTXT-nya belum terbit. Begitu digenerate, berkasnya sudah berada di
+     * folder yang dibaca core banking dan mungkin sudah diambil — menarik kembali di layar
+     * setelah itu cuma membuat catatan aplikasi berbeda dari apa yang diterima core. Untuk
+     * kasus itu jalurnya koreksi jurnal, bukan return.
+     */
+    /** Export approved yang filenya belum terbit — satu-satunya yang masih bisa ditarik. */
+    public List<GlExportRequest> returnable() { return requests.findApprovedNotGenerated(); }
 
-            gl.markExported(reqId);
-            req.setStatus("APPROVED"); req.setChecker(checker); req.setDecidedAt(LocalDateTime.now());
-            req.setFileName(fileName); req.setTransferId(t.getId());
-            requests.save(req);
-            audit.transaction(checker, "EXPORT_APPROVE",
-                    "Export CR#" + reqId + " (maker=" + req.getRequestedBy() + ") di-approve, " + rows.size() + " baris -> " + fileName);
-            return new ApproveResult(true, "Otorisasi export berhasil — " + rows.size()
-                    + " baris diproses. File " + fileName + " sudah dibuat di folder hasil export.");
-        } catch (Exception e) {
-            return new ApproveResult(false, "Gagal menulis file ACCTXT: " + e.getMessage());
-        }
+    @Transactional
+    public String returnExport(Long reqId, AusyUserDetails me, String note) {
+        String checker = me.getUsername();
+        GlExportRequest req = requests.findById(reqId).orElse(null);
+        if (req == null || !"APPROVED".equals(req.getStatus()))
+            return "Permintaan export tidak ditemukan / statusnya bukan approved.";
+        if (req.getFileName() != null)
+            return "Export ini sudah masuk file " + req.getFileName()
+                    + " dan tidak bisa ditarik kembali. Perbaikan lewat jurnal koreksi.";
+        if (!approval.canApproveGroup(me.getIdGroup(), groupOf(req)))
+            return "Group Anda tidak berwenang menarik kembali export dari group tersebut.";
+        if (!scope.canSee(me, req.getRequestedBy())) return DataScopeService.NOT_MY_MAKER;
+        if (note == null || note.isBlank()) return "Alasan penarikan wajib diisi.";
+
+        gl.revertExport(reqId);
+        req.setStatus("RETURNED"); req.setChecker(checker);
+        req.setDecidedAt(LocalDateTime.now()); req.setNoteChecker(note);
+        requests.save(req);
+        audit.transaction(checker, "EXPORT_RETURN",
+                "Export CR#" + reqId + " (maker=" + req.getRequestedBy()
+                + ") DITARIK KEMBALI sebelum file dibuat. Alasan: " + note);
+        return "Export ditarik kembali. GL dikembalikan agar bisa diajukan lagi; alasan tercatat di audit trail.";
     }
 
     @Transactional
