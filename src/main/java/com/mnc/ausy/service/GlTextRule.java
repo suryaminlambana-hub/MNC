@@ -13,23 +13,28 @@ import java.util.Set;
  * Karena itu penyaringannya di depan, saat maker mengunggah / mengisi, bukan saat file
  * dibuat: kalau ketahuan waktu generate, datanya sudah lewat otorisasi checker.
  *
- * <p><b>Bukan hanya huruf dan angka.</b> Permintaan aslinya berbunyi "hanya alfanumerik
- * serta pemisah yang diizinkan (misal spasi)", tapi data MNC yang sesungguhnya memakai
- * titik, strip dan koma — di contoh jurnal resminya ada {@code BBN GEDUNG-PERAWATAN} dan
- * {@code SRV FIN 6 7 8 3.111.}. Aturan huruf+angka+spasi saja akan menolak data MNC
- * sendiri, jadi tanda baca yang memang dipakai ikut diizinkan. Daftarnya ada di
- * {@link #ALLOWED_PUNCT} — satu tempat, gampang diketatkan kalau memang diminta.
+ * <p><b>Hanya huruf, angka dan spasi.</b> Tanda baca apa pun ikut ditolak — titik, koma,
+ * strip, garis miring, kurung. Aturan ini diminta tegas oleh pengguna (BUG_AUSY_00162)
+ * sesudah alternatif yang lebih longgar ditawarkan, jadi jangan dilonggarkan lagi tanpa
+ * permintaan baru.
+ *
+ * <p>Konsekuensinya disadari: jurnal contoh MNC sendiri memuat {@code BBN GEDUNG-PERAWATAN},
+ * {@code CAB.KPNO MENARA ICB} dan {@code SRV FIN 6 7 8 3.111.}, dan data demo memakai
+ * {@code BIAYA #1} — semuanya ditolak aturan ini dan harus ditulis ulang tanpa tanda baca.
+ * Kalau nanti diputuskan sebagian tanda baca boleh, {@link #ALLOWED_PUNCT} tempatnya.
  */
 public final class GlTextRule {
 
     private GlTextRule() {}
 
-    /** Tanda baca yang ikut diizinkan selain huruf, angka dan spasi. */
-    public static final String ALLOWED_PUNCT = ".,-/()_:'";
+    /**
+     * Tanda baca yang ikut diizinkan selain huruf, angka dan spasi.
+     * Sengaja KOSONG: permintaannya hanya alfanumerik dan spasi.
+     */
+    public static final String ALLOWED_PUNCT = "";
 
     /** Ditampilkan ke user supaya jelas apa yang boleh, bukan cuma "ada karakter salah". */
-    public static final String ALLOWED_TEXT =
-            "huruf, angka, spasi, dan tanda baca " + ALLOWED_PUNCT;
+    public static final String ALLOWED_TEXT = "huruf, angka, dan spasi";
 
     private static boolean ok(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')

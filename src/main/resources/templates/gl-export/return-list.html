@@ -11,23 +11,23 @@
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
-  <div class="ausy-card" style="padding:0">
+  <div class="ausy-card">
     <table class="table align-middle mb-0">
       <thead><tr>
-        <th class="ps-3">Export</th><th>Maker</th><th>Checker</th><th>Disetujui</th>
+        <th>Export</th><th>Maker</th><th>Checker</th><th>Disetujui</th>
         <th class="text-end">Jml Baris</th><th class="text-end">Debit</th>
-        <th class="text-end">Credit</th><th class="pe-3">Aksi</th>
+        <th class="text-end">Credit</th><th>Aksi</th>
       </tr></thead>
       <tbody>
       <tr th:each="r : ${items}">
-        <td class="ps-3"><span class="badge bg-primary-subtle text-primary">CR#<span th:text="${r.id}"></span></span></td>
+        <td><span class="badge bg-primary-subtle text-primary">CR#<span th:text="${r.id}"></span></span></td>
         <td th:text="${r.requestedBy}"></td>
         <td th:text="${r.checker}"></td>
         <td th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt,'dd-MM-yyyy HH:mm') : ''}"></td>
         <td class="text-end" th:text="${r.rowsCount}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA')}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.credit,1,'POINT',2,'COMMA')}"></td>
-        <td class="pe-3">
+        <td>
           <button type="button" class="btn btn-sm btn-outline-danger"
                   data-bs-toggle="modal" th:attr="data-bs-target='#ret' + ${r.id}">
             <i class="fa-solid fa-rotate-left"></i> Return
