@@ -35,11 +35,19 @@ import java.util.List;
  *
  * Dari situ dua hal mengikuti sendirinya:
  * <ul>
- *   <li>berapa kali pun tombol ditekan dalam satu hari, hasilnya satu berkas yang memuat
- *       seluruh penghuninya — isinya selalu disusun ulang dari nol, tidak ditambal;</li>
+ *   <li>berapa kali pun tombol ditekan dalam satu hari, hasilnya satu berkas — isinya selalu
+ *       disusun ulang dari nol, tidak ditambal;</li>
  *   <li>menerbitkan ulang berkas lama berarti memindahkan isinya ke berkas hari ini, karena
  *       berkas bertanggal lampau tidak akan diambil core lagi.</li>
  * </ul>
+ *
+ * <h2>Rentang tanggal menentukan isi, bukan tambahan</h2>
+ *
+ * Isi berkas hari ini adalah export yang <b>disetujui checker dalam rentang yang dipilih
+ * admin</b> — tidak lebih. Yang sempat masuk berkas ini dari penekanan sebelumnya tapi jatuh di
+ * luar rentang baru akan dikeluarkan dan dikembalikan ke daftar tunggu, lengkap sampai penanda
+ * statusnya, supaya tidak ada data yang hilang diam-diam: tidak ada di berkas tapi tercatat
+ * sudah terkirim.
  */
 @Service
 public class AcctxtGenerateService {
@@ -106,22 +114,42 @@ public class AcctxtGenerateService {
             return Result.fail("Tanggal hanya boleh dalam " + MAX_DAYS_BACK + " hari terakhir ("
                     + fmt(min) + " s/d " + fmt(max) + "). Pilihan di luar itu tidak diproses.");
 
-        List<GlExportRequest> baru = pending(from, to);
-        if (baru.isEmpty())
+        LocalDateTime awal = from.atStartOfDay(), akhir = to.plusDays(1).atStartOfDay();
+        List<GlExportRequest> terpilih = requests.findForFileInRange(todayFile(), awal, akhir);
+        if (terpilih.isEmpty())
             return Result.fail("Tidak ada export berstatus approved pada " + rangeText(from, to)
-                    + " yang belum dibuatkan file.");
+                    + " yang bisa dibuatkan file.");
 
-        for (GlExportRequest req : baru) {
+        // Rentang tanggal menentukan ISI berkas, bukan sekadar apa yang ditambahkan. Penghuni
+        // berkas hari ini yang jatuh di luar rentang baru harus keluar — dan keluarnya sampai ke
+        // penanda statusnya, supaya mereka muncul lagi di daftar tunggu. Tanpa ini datanya
+        // menghilang diam-diam: tidak ada di berkas, tapi tercatat sudah terkirim.
+        List<GlExportRequest> dilepas = requests.findInFileOutsideRange(todayFile(), awal, akhir);
+        for (GlExportRequest req : dilepas) {
+            gl.unmarkExported(req.getId());
+            req.setFileName(null);
+            req.setTransferId(null);
+            requests.save(req);
+        }
+
+        for (GlExportRequest req : terpilih) {
             gl.markExported(req.getId());
             req.setFileName(todayFile());
             requests.save(req);
         }
-        return publish(me, "ACCTXT_GENERATE",
-                "Generate untuk " + rangeText(from, to) + ", " + baru.size() + " export baru");
+
+        Result r = publish(terpilih, me, "ACCTXT_GENERATE",
+                "Generate untuk " + rangeText(from, to) + (dilepas.isEmpty() ? ""
+                        : ", " + dilepas.size() + " export di luar rentang dilepas kembali"));
+        if (r.ok() && !dilepas.isEmpty())
+            return new Result(true, r.message() + " " + dilepas.size() + " export di luar rentang itu"
+                    + " dikeluarkan dari file dan kembali menunggu digenerate.",
+                    r.fileName(), r.rows(), r.exportCount());
+        return r;
     }
 
     /**
-     * Tulis berkas ACCTXT hari ini dari SELURUH export yang menghuninya, lalu perbarui catatannya.
+     * Tulis berkas ACCTXT hari ini dari daftar export yang diberikan, lalu perbarui catatannya.
      *
      * Inilah satu-satunya jalan berkas ACCTXT ditulis, dan sengaja begitu (BUG_AUSY_00169).
      * Sebelumnya tiap penekanan tombol menulis berkas berisi hanya export yang ikut penekanan
@@ -130,13 +158,14 @@ public class AcctxtGenerateService {
      * dibuatkan file" sehingga tidak ikut disusun lagi, dan isinya lenyap dari berkas tanpa
      * satu pun pesan galat. Persis keluhan "file yang keluar hanya memuat salah satu tanggal".
      *
-     * Dengan menyusun ulang dari seluruh penghuni berkas, berapa kali pun tombolnya ditekan
-     * hasilnya satu berkas yang memuat semuanya.
+     * Berkasnya selalu disusun ulang dari nol, tidak pernah ditambal. Daftarnya DITENTUKAN
+     * PEMANGGIL, bukan dibaca ulang dari "semua penghuni berkas": versi yang membaca ulang ikut
+     * menyeret export dari penekanan sebelumnya, sehingga memilih 27-29 tetap menghasilkan
+     * berkas yang memuat tanggal 30.
      */
-    private Result publish(AusyUserDetails me, String auditAction, String alasan) {
+    private Result publish(List<GlExportRequest> isi, AusyUserDetails me, String auditAction, String alasan) {
         String fileName = todayFile();
-        List<GlExportRequest> isi = requests.findByFileNameOrderById(fileName);
-        if (isi.isEmpty()) return Result.fail("Tidak ada export yang menghuni " + fileName + ".");
+        if (isi.isEmpty()) return Result.fail("Tidak ada export yang bisa mengisi " + fileName + ".");
 
         String content = contentOf(isi);
         int rowCount = lineCount(content);
@@ -260,7 +289,10 @@ public class AcctxtGenerateService {
             transfers.save(t);
         }
 
-        Result r = publish(me, "ACCTXT_REGENERATE",
+        // Berbeda dari generate, di sini tidak ada rentang tanggal: admin menunjuk satu berkas
+        // dan minta isinya terbit lagi. Jadi yang ditulis seluruh penghuni berkas hari ini —
+        // yang baru dipindah ditambah yang memang sudah ada di situ.
+        Result r = publish(requests.findByFileNameOrderById(todayFile()), me, "ACCTXT_REGENERATE",
                 "Populate ulang " + asal + (pindah ? " (isinya dipindah ke berkas hari ini)" : ""));
         if (r.ok() && pindah)
             return new Result(true, "Isi " + asal + " diterbitkan ulang sebagai " + r.fileName()

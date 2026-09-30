@@ -42,4 +42,33 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
      * terakhir. Urut id supaya susunan barisnya tidak berubah-ubah antar penulisan.
      */
     List<GlExportRequest> findByFileNameOrderById(String fileName);
+
+    /**
+     * Export yang BOLEH mengisi berkas hari ini untuk rentang tanggal terpilih: yang belum punya
+     * berkas, ditambah yang sudah menghuni berkas hari ini — supaya menekan tombol dua kali untuk
+     * rentang yang sama tidak mengubah isinya.
+     *
+     * Yang sudah menghuni berkas HARI LAIN sengaja tidak ikut: memindahkannya adalah tindakan
+     * tersendiri (tombol Populate Ulang), bukan efek samping memilih rentang tanggal.
+     */
+    @Query("select r from GlExportRequest r where r.status = 'APPROVED'"
+         + " and (r.fileName is null or r.fileName = :file)"
+         + " and r.decidedAt >= :from and r.decidedAt < :until order by r.id asc")
+    List<GlExportRequest> findForFileInRange(@Param("file") String file,
+                                             @Param("from") LocalDateTime from,
+                                             @Param("until") LocalDateTime until);
+
+    /**
+     * Penghuni berkas hari ini yang jatuh DI LUAR rentang yang baru dipilih (BUG_AUSY_00169).
+     *
+     * Mereka harus dilepas kembali ke daftar tunggu, bukan dibiarkan: berkasnya disusun ulang
+     * hanya dari rentang terpilih, jadi kalau penandanya tidak dilepas, catatan akan mengaku
+     * mereka ada di dalam berkas padahal isinya sudah tidak memuat mereka.
+     */
+    @Query("select r from GlExportRequest r where r.fileName = :file"
+         + " and (r.decidedAt is null or r.decidedAt < :from or r.decidedAt >= :until)"
+         + " order by r.id asc")
+    List<GlExportRequest> findInFileOutsideRange(@Param("file") String file,
+                                                 @Param("from") LocalDateTime from,
+                                                 @Param("until") LocalDateTime until);
 }
