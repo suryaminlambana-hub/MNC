@@ -19,7 +19,25 @@ import java.util.Locale;
 public class UploadService {
     private static final DateTimeFormatter IN  = DateTimeFormatter.ofPattern("d-MMM-yy", Locale.ENGLISH);
     private static final DateTimeFormatter DDMMYY = DateTimeFormatter.ofPattern("ddMMyy");
-    private static final int DATA_SHEET = 4;   // 5th sheet (0-based), matches the template
+
+    /**
+     * Sheet data dicari menurut NAMA (BUG_AUSY_00154). Dulu dipatok indeks ke-4 — "sheet ke-5" —
+     * yang hanya benar untuk template buatan sendiri; di AUSY.xls milik MNC sheet ke-5 adalah
+     * Branch_Closed_List, sehingga berkas asli MNC terbaca daftar cabang tutup sebagai data GL.
+     * "Sheet1" nama MNC, "DATA" nama template lama; keduanya dilayani supaya berkas yang sudah
+     * beredar tidak mendadak ditolak.
+     */
+    private static final String[] DATA_SHEET_NAMES = { UploadTemplateService.DATA_SHEET, "DATA" };
+
+    /**
+     * Kolom E [Transaction_Account] menentukan sebuah baris berisi data atau tidak.
+     *
+     * Dulu yang dipakai kolom A [Posting Date], dan itu tidak bisa dipertahankan: di template MNC
+     * kolom A berisi rumus {@code =NOW()} pada seluruh 167 baris isian, jadi baris kosong pun
+     * bertanggal. Tanpa nomor akun sebuah baris GL tidak punya arti apa-apa, sehingga kolom inilah
+     * penanda yang jujur.
+     */
+    private static final int KEY_COLUMN = 4;
 
     private final GlTabelRepository gl;
     private final TUploadRepository tUploads;
@@ -34,15 +52,46 @@ public class UploadService {
         if (r == null) return "";
         Cell c = r.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (c == null) return "";
-        return switch (c.getCellType()) {
+        // Sel rumus dibaca dari nilai yang Excel simpan saat berkas terakhir dihitung. Template
+        // MNC penuh rumus (=NOW(), VLOOKUP nama GL/cabang/cost centre) dan dulu semuanya terbaca
+        // kosong, sehingga berkas MNC yang sah tidak menghasilkan satu baris pun (BUG_AUSY_00154).
+        CellType type = c.getCellType() == CellType.FORMULA ? c.getCachedFormulaResultType() : c.getCellType();
+        return switch (type) {
             case STRING -> c.getStringCellValue().trim();
             case NUMERIC -> {
+                // Tanggal ditulis dengan ejaan yang sama seperti yang diketik tangan di template
+                // lama (d-MMM-yy), supaya pemeriksaan & penguraian tanggal di bawah tidak peduli
+                // sel itu berisi teks atau tanggal sungguhan.
+                if (DateUtil.isCellDateFormatted(c))
+                    yield c.getLocalDateTimeCellValue().toLocalDate().format(IN);
                 double d = c.getNumericCellValue();
                 yield (d == Math.floor(d)) ? String.valueOf((long) d) : String.valueOf(d);
             }
             case BOOLEAN -> String.valueOf(c.getBooleanCellValue());
             default -> "";
         };
+    }
+
+    /**
+     * Ada isinya atau tidak. Template MNC datang dengan 167 baris berumus yang semuanya kosong,
+     * jadi "sheetnya panjang" bukan tanda berkas itu berisi data — pesan "tidak ada baris data"
+     * harus tetap muncul kalau maker lupa mengisi.
+     */
+    private static boolean hasDataRow(Sheet sh, int last) {
+        for (int r = 1; r <= last; r++)
+            if (!cell(sh.getRow(r), KEY_COLUMN).isBlank()) return true;
+        return false;
+    }
+
+    /**
+     * Sheet tempat data GL diisi, dicari menurut nama. Null kalau berkasnya bukan template kami.
+     */
+    private static Sheet dataSheet(Workbook wb) {
+        for (String name : DATA_SHEET_NAMES) {
+            Sheet sh = wb.getSheet(name);
+            if (sh != null) return sh;
+        }
+        return null;
     }
 
     private static BigDecimal amount(String s) {
@@ -72,18 +121,21 @@ public class UploadService {
         String today = LocalDate.now().format(IN).toLowerCase();
 
         try (Workbook wb = WorkbookFactory.create(in)) {
-            if (wb.getNumberOfSheets() <= DATA_SHEET) {
-                res.message = "Format file salah: sheet DATA (ke-5) tidak ditemukan.";
+            Sheet sh = dataSheet(wb);
+            if (sh == null) {
+                res.message = "Format file salah: sheet \"" + UploadTemplateService.DATA_SHEET
+                        + "\" tidak ditemukan. Unduh Template dan isi pada sheet itu.";
                 return res;
             }
-            Sheet sh = wb.getSheetAt(DATA_SHEET);
             int last = sh.getLastRowNum();
 
             // Pass 1: validate posting date (col A) == today
             for (int r = 1; r <= last; r++) {
+                if (cell(sh.getRow(r), KEY_COLUMN).isBlank()) continue;
                 String a = cell(sh.getRow(r), 0);
-                if (a.isBlank()) continue;
-                if (!a.toLowerCase().equals(today)) {
+                if (a.isBlank()) {
+                    res.errors.add(new String[]{ String.valueOf(r + 1), "Kolom A [Posting Date] belum diisi." });
+                } else if (!a.toLowerCase().equals(today)) {
                     res.errors.add(new String[]{ String.valueOf(r + 1),
                         "Kolom A [Posting Date] salah: " + a + " (seharusnya " + today + ")" });
                 }
@@ -92,13 +144,18 @@ public class UploadService {
                 res.message = "Upload gagal: tanggal posting tidak sesuai hari ini.";
                 return res;
             }
+            if (!hasDataRow(sh, last)) {
+                res.message = "Tidak ada baris data: kolom E [Transaction_Account] kosong di seluruh sheet \""
+                        + sh.getSheetName() + "\".";
+                return res;
+            }
 
             // Pass 2: karakter yang tidak bisa ditulis ke ACCTXT (BUG_AUSY_00162).
             // Diperiksa sebelum satu baris pun disimpan, supaya file yang bermasalah ditolak
             // utuh — bukan separuh masuk lalu ketahuan waktu checker sudah meng-approve.
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
-                if (cell(row, 0).isBlank()) continue;
+                if (cell(row, KEY_COLUMN).isBlank()) continue;
                 for (int[] col : TEXT_COLUMNS) {
                     String problem = GlTextRule.problem(COLUMN_LABEL[col[1]], cell(row, col[0]));
                     if (problem != null)
@@ -114,8 +171,8 @@ public class UploadService {
             int n = 0;
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
+                if (cell(row, KEY_COLUMN).isBlank()) continue;
                 String postingDate = cell(row, 0);
-                if (postingDate.isBlank()) continue;
                 String dc = cell(row, 1).toUpperCase();
                 BigDecimal amt = amount(cell(row, 13));
                 String ddmmyy;
