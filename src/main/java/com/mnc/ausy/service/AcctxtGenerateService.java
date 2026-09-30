@@ -65,6 +65,18 @@ public class AcctxtGenerateService {
     public List<GlExportRequest> allPending() { return requests.findApprovedNotGenerated(); }
 
     /**
+     * File ACCTXT yang sudah terbit pada rentang tanggal terpilih (BUG_AUSY_00167).
+     *
+     * Tanpa ini, memilih tanggal lampau selalu berakhir layar kosong: yang ditampilkan hanya
+     * export yang BELUM dibuatkan file, padahal begitu filenya jadi export itu justru hilang
+     * dari daftar. Admin jadi tidak punya cara melihat hasil generate hari-hari sebelumnya.
+     */
+    public List<ExportTransfer> generated(LocalDate from, LocalDate to) {
+        return transfers.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                from.atStartOfDay(), to.plusDays(1).atStartOfDay());
+    }
+
+    /**
      * Gabungkan seluruh export approved pada rentang tanggal jadi satu file ACCTXT.
      *
      * Tanggal yang dipakai adalah tanggal PERSETUJUAN checker, bukan tanggal pengajuan maker:

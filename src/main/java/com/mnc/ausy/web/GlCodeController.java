@@ -30,6 +30,11 @@ import java.util.List;
  *
  * Add/Edit/Delete/Import hanya membuat permintaan perubahan; tabel master baru ditulis saat
  * Checker menyetujui (tab Otorisasi Perubahan GL).
+ *
+ * BUG_AUSY_00165 &amp; BUG_AUSY_00166: import CSV pindah ke halamannya sendiri, "Upload Kode GL"
+ * ({@code /gl-code/upload}). Halaman manajemen tinggal mengurus kode satu per satu; pemuatan
+ * massal saat migrasi data berdiri terpisah dan punya baris menunya sendiri, sehingga haknya
+ * bisa diberikan tanpa ikut membuka tambah/ubah/hapus.
  */
 @Controller
 @RequestMapping("/gl-code")
@@ -113,12 +118,20 @@ public class GlCodeController {
         return "redirect:/gl-code";
     }
 
-    @PostMapping("/import")
+    /** Halaman "Upload Kode GL" — pemuatan massal dari CSV, terpisah dari halaman manajemen. */
+    @GetMapping("/upload")
+    public String uploadPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
+        model.addAttribute("needApproval", needsApproval(me));
+        model.addAttribute("total", service.listWithUsage().size());
+        return "gl-code/upload";
+    }
+
+    @PostMapping("/upload/import")
     public String importCsv(@RequestParam("file") MultipartFile file, @RequestParam(required=false) String note,
                             @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         if (file == null || file.isEmpty()) {
             ra.addFlashAttribute("warn", "File CSV belum dipilih.");
-            return "redirect:/gl-code";
+            return "redirect:/gl-code/upload";
         }
         try {
             GlCodeService.CsvParse p = service.parseCsv(file.getInputStream());
@@ -127,18 +140,18 @@ public class GlCodeController {
             String issue = csvIssue(p);
             if (issue != null) {
                 ra.addFlashAttribute("warn", issue);
-                return "redirect:/gl-code";
+                return "redirect:/gl-code/upload";
             }
             GlChangeService.Res r = changes.submitGlCodeImport(p.rows(), me, note);
             // hitungan duplikat/invalid hanya relevan kalau pengajuannya diterima
             flash(ra, r.ok() ? new GlChangeService.Res(true, r.message()
                     + " (" + p.dup() + " duplikat, " + p.bad() + " tidak valid diabaikan)") : r);
-            return "redirect:/gl-code";
+            return "redirect:/gl-code/upload";
         } catch (Exception e) {
             ra.addFlashAttribute("warn", "Gagal membaca CSV — pastikan file berformat CSV sesuai template"
                     + " (kolom: NoGL, Debit/Credit, Description).");
         }
-        return "redirect:/gl-code";
+        return "redirect:/gl-code/upload";
     }
 
     /**
@@ -159,7 +172,8 @@ public class GlCodeController {
                 + p.dup() + " baris sudah terdaftar.";
     }
 
-    @GetMapping("/template")
+    /** Template CSV, di bawah /gl-code/upload supaya haknya ikut menu Upload Kode GL. */
+    @GetMapping("/upload/template")
     public void template(HttpServletResponse resp) throws Exception {
         resp.setContentType("text/csv; charset=utf-8");
         resp.setHeader("Content-Disposition", "attachment; filename=\"template_gl_code.csv\"");

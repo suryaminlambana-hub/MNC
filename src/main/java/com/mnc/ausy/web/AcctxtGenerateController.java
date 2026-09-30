@@ -45,6 +45,10 @@ public class AcctxtGenerateController {
         model.addAttribute("maxDaysBack", AcctxtGenerateService.MAX_DAYS_BACK);
         model.addAttribute("pending", acctxt.pending(f, t));
         model.addAttribute("allPendingCount", acctxt.allPending().size());
+        // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
+        // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
+        // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.
+        model.addAttribute("generated", acctxt.generated(f, t));
         return "admin/acctxt";
     }
 

@@ -2,27 +2,18 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Manajemen Kode GL — AUSY</title></head>
 <main>
-  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
       <h1 class="ausy-page-title">Manajemen Kode GL</h1>
       <p class="text-muted mb-0">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
     </div>
+    <!--/* BUG_AUSY_00164: unduhan Excel juga dipasang di sini, bukan hanya di List Kode GL —
+           alamatnya /gl-code/export supaya haknya ikut menu ini. */-->
+    <a class="btn btn-outline-secondary" th:href="@{/gl-code/export}">
+      <i class="fa-solid fa-file-excel"></i> Export Kode GL</a>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
-
-  <div class="ausy-card mb-3" style="padding:18px">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <b><i class="fa-solid fa-upload"></i> Import dari CSV</b>
-      <a class="small" th:href="@{/gl-code/template}"><i class="fa-solid fa-download"></i> Unduh Template CSV</a>
-    </div>
-    <form th:action="@{/gl-code/import}" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
-      <div class="col"><input class="form-control" type="file" name="file" accept=".csv" required></div>
-      <div class="col" th:if="${needApproval}">
-        <input class="form-control" name="note" placeholder="Alasan pengajuan (wajib)" required></div>
-      <div class="col-auto"><button class="btn btn-primary" th:text="${needApproval} ? 'Ajukan Import' : 'Import'">Import</button></div>
-    </form>
-  </div>
 
   <div class="ausy-card mb-3" style="padding:18px">
     <b class="d-block mb-2"><i class="fa-solid fa-plus"></i> Tambah Kode GL</b>

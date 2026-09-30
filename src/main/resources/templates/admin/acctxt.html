@@ -41,6 +41,7 @@
     </div>
   </div>
 
+  <h2 class="h6 text-uppercase text-muted mb-2">Menunggu digenerate</h2>
   <div class="ausy-card">
     <table class="table align-middle mb-0">
       <thead><tr>
@@ -78,5 +79,33 @@
       <i class="fa-solid fa-file-export"></i> Generate / Populate File ACCTXT
     </button>
   </form>
+
+  <!--/* BUG_AUSY_00167: begitu sebuah export dibuatkan file, ia keluar dari daftar di atas.
+         Tanpa bagian ini memilih tanggal lampau selalu berakhir layar kosong — padahal justru
+         file yang sudah terbit itu yang dicari admin saat menengok tanggal sebelumnya. */-->
+  <h2 class="h6 text-uppercase text-muted mt-4 mb-2">File ACCTXT yang sudah dibuat</h2>
+  <div class="ausy-card">
+    <table class="table align-middle mb-0">
+      <thead><tr>
+        <th>Nama File</th><th>Cakupan</th><th>Dibuat oleh</th>
+        <th>Waktu dibuat</th><th class="text-end">Jml Baris</th><th>Lokasi</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="t : ${generated}">
+        <td><code th:text="${t.fileName}"></code></td>
+        <td th:text="${t.paket}"></td>
+        <td th:text="${t.inputer}"></td>
+        <td th:text="${t.createdAt != null ? #temporals.format(t.createdAt,'dd-MM-yyyy HH:mm') : ''}"></td>
+        <td class="text-end" th:text="${t.rowsCount}"></td>
+        <td class="small text-muted text-break" th:text="${t.remotePath}"></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(generated)}">
+        <td colspan="6" class="text-center text-muted py-4">
+          Belum ada file ACCTXT yang dibuat pada rentang tanggal ini.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
 </main>
 </html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
+<head><title>Upload Kode GL — AUSY</title></head>
+<main>
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+    <div>
+      <h1 class="ausy-page-title">Upload Kode GL</h1>
+      <p class="text-muted mb-0">
+        Pemuatan massal master kode GL dari berkas CSV — dipakai saat migrasi data.
+        Perawatan kode satu per satu ada di menu Manajemen Kode GL.
+      </p>
+    </div>
+    <a class="btn btn-outline-secondary" th:href="@{/gl-code/list}">
+      <i class="fa-solid fa-list"></i> Lihat List Kode GL</a>
+  </div>
+
+  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+
+  <div class="ausy-card mb-3" style="padding:20px 22px">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <b><i class="fa-solid fa-file-import"></i> Import dari CSV</b>
+      <a class="small" th:href="@{/gl-code/upload/template}">
+        <i class="fa-solid fa-download"></i> Unduh Template CSV</a>
+    </div>
+    <form th:action="@{/gl-code/upload/import}" method="post" enctype="multipart/form-data"
+          class="d-flex flex-wrap align-items-end gap-3">
+      <div style="min-width:240px">
+        <label class="form-label" for="file">Berkas CSV</label>
+        <input class="form-control" type="file" id="file" name="file" accept=".csv" required>
+      </div>
+      <div th:if="${needApproval}" style="flex:1 1 240px">
+        <label class="form-label" for="note">Alasan pengajuan <span class="text-danger">*</span></label>
+        <input class="form-control" id="note" name="note" placeholder="Alasan pengajuan" required>
+      </div>
+      <div>
+        <button class="btn btn-primary" th:text="${needApproval} ? 'Ajukan Import' : 'Import'">Import</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="ausy-card" style="padding:20px 22px">
+    <b class="d-block mb-2">Ketentuan berkas</b>
+    <ul class="text-muted mb-0 small">
+      <li>Kolom: <code>NoGL, Debit/Credit, Description</code> — pakai template di atas.</li>
+      <li>NoGL hanya angka; Debit/Credit diisi <code>D</code> atau <code>C</code>.</li>
+      <li>Baris yang kodenya sudah terdaftar dilewati, tidak menimpa data lama.</li>
+      <li th:if="${needApproval}">Import berjalan lewat otorisasi: kode baru masuk setelah Checker menyetujui.</li>
+    </ul>
+    <p class="text-muted small mb-0 mt-2">
+      Saat ini ada <strong th:text="${total}">0</strong> kode GL terdaftar.
+    </p>
+  </div>
+</main>
+</html>
