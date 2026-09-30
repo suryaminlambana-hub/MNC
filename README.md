@@ -75,13 +75,24 @@ Prinsip: yang meng-**approve tidak boleh** add/edit/delete; **CONFIG tidak** mem
 
 ### Windows (step-by-step)
 
-**Prasyarat** (install via winget, lalu tutup & buka ulang terminal):
-```powershell
-winget install EclipseAdoptium.Temurin.21.JDK
-winget install PostgreSQL.PostgreSQL.16
-```
-> Saat instalasi PostgreSQL, catat password user `postgres` yang kamu set — dipakai di langkah 2.
-> Jika `psql` / `java` tidak dikenali, tambahkan ke PATH: `C:\Program Files\PostgreSQL\16\bin` dan folder `bin` JDK 21.
+> **Baru pertama kali menjalankan di Windows?** Pakai
+> **[docs/JALANKAN_DI_WINDOWS.md](docs/JALANKAN_DI_WINDOWS.md)** — panduan langkah demi
+> langkah tanpa asumsi apa pun, termasuk cara memasang Java tanpa hak administrator.
+
+**Prasyarat:** JDK 21 + PostgreSQL 14+.
+
+- **JDK 21** — <https://adoptium.net/temurin/releases/?version=21&os=windows&arch=x64>.
+  Ambil `.msi` (installer) atau `.zip`. Kalau memakai `.zip`: unzip, ganti nama foldernya
+  jadi `jdk`, taruh di sebelah `run.bat` — tanpa install, tanpa admin. `run.bat` mencari
+  Java sendiri di PATH, `JAVA_HOME`, folder `jdk` itu, dan lokasi install umum, jadi PATH
+  tidak perlu diatur manual.
+- **PostgreSQL** — <https://www.postgresql.org/download/windows/>. Catat password user
+  `postgres` yang di-set saat instalasi; dipakai di langkah 1.
+
+> **`winget` tidak dipakai AUSY.** Instruksi lama di sini menyuruh `winget install ...`,
+> dan di beberapa Windows 10 winget sendiri belum terpasang atau gagal
+> (`0x80073CF9`, `Access is denied`) — orang jadi sibuk memperbaiki winget padahal
+> tidak diperlukan. Abaikan winget, unduh langsung dari dua alamat di atas.
 
 **Langkah** (jalankan di folder repo setelah `git clone` + `cd AUSY-MNC-JAVA`):
 
