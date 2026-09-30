@@ -43,12 +43,16 @@ public class AcctxtGenerateController {
         model.addAttribute("from", f);
         model.addAttribute("to", t);
         model.addAttribute("maxDaysBack", AcctxtGenerateService.MAX_DAYS_BACK);
-        model.addAttribute("pending", acctxt.pending(f, t));
-        model.addAttribute("allPendingCount", acctxt.allPending().size());
+        // Daftar "Menunggu digenerate" sengaja TIDAK tersaring rentang tanggal di atas
+        // (BUG_AUSY_00174): tombol di bawahnya menyusun seluruh export yang menunggu, jadi
+        // daftarnya harus memperlihatkan persis itu — daftar tersaring dengan tombol
+        // tak-tersaring adalah jebakan.
+        model.addAttribute("pending", acctxt.allPending());
+        model.addAttribute("todayPendingCount", acctxt.todayPendingCount());
+        model.addAttribute("stranded", acctxt.strandedPending());
         // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
         // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.
-        model.addAttribute("generated", acctxt.generated(f, t));
         model.addAttribute("todayYymmdd", acctxt.todayYymmdd());
         return "admin/acctxt";
     }
@@ -63,18 +67,14 @@ public class AcctxtGenerateController {
     }
 
     /**
-     * Terbitkan ulang satu file ACCTXT yang sudah pernah dibuat (BUG_AUSY_00168).
-     *
-     * Rentang tanggal ikut dikembalikan supaya admin mendarat di layar yang sama seperti sebelum
-     * menekan tombolnya, lengkap dengan daftar file yang sedang dilihatnya.
+     * Tombol kedua: susun berkas dari export yang disetujui HARI INI (BUG_AUSY_00174).
+     * Satu-satunya jalan bagi persetujuan hari ini, karena hari ini tidak bisa dipilih
+     * pada rentang tanggal (BUG_AUSY_00172).
      */
-    @PostMapping("/admin/acctxt/regenerate")
-    public String regenerate(@RequestParam Long transferId,
-                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                             @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        AcctxtGenerateService.Result r = acctxt.regenerate(transferId, me);
+    @PostMapping("/admin/acctxt/generate-today")
+    public String generateToday(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        AcctxtGenerateService.Result r = acctxt.generateToday(me);
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-        return "redirect:/admin/acctxt?from=" + from + "&to=" + to;
+        return "redirect:/admin/acctxt";
     }
 }

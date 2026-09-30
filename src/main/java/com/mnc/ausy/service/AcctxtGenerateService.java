@@ -76,7 +76,14 @@ public class AcctxtGenerateService {
     public LocalDate earliestSelectable() { return LocalDate.now().minusDays(MAX_DAYS_BACK); }
 
     /** Tanggal paling akhir yang boleh dipilih. */
-    public LocalDate latestSelectable() { return LocalDate.now(); }
+    /**
+     * Tanggal paling akhir yang boleh dipilih: KEMARIN, bukan hari ini (BUG_AUSY_00172).
+     *
+     * "3 hari terakhir" dihitung tidak termasuk hari berjalan — hari ini 30 Sep berarti
+     * pilihannya 27 s/d 29 Sep. Export yang disetujui hari ini tidak lewat sini, melainkan
+     * lewat tombol pada daftar "Menunggu digenerate" (BUG_AUSY_00174).
+     */
+    public LocalDate latestSelectable() { return LocalDate.now().minusDays(1); }
 
     /** Export yang sudah disetujui checker tapi belum pernah ikut file ACCTXT mana pun. */
     public List<GlExportRequest> pending(LocalDate from, LocalDate to) {
@@ -85,18 +92,6 @@ public class AcctxtGenerateService {
 
     /** Semua yang menunggu digenerate, tanpa batas tanggal — untuk angka di layar. */
     public List<GlExportRequest> allPending() { return requests.findApprovedNotGenerated(); }
-
-    /**
-     * File ACCTXT yang sudah terbit pada rentang tanggal terpilih (BUG_AUSY_00167).
-     *
-     * Tanpa ini, memilih tanggal lampau selalu berakhir layar kosong: yang ditampilkan hanya
-     * export yang BELUM dibuatkan file, padahal begitu filenya jadi export itu justru hilang
-     * dari daftar. Admin jadi tidak punya cara melihat hasil generate hari-hari sebelumnya.
-     */
-    public List<ExportTransfer> generated(LocalDate from, LocalDate to) {
-        return transfers.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
-                from.atStartOfDay(), to.plusDays(1).atStartOfDay());
-    }
 
     /**
      * Gabungkan seluruh export approved pada rentang tanggal jadi satu file ACCTXT.
@@ -146,6 +141,58 @@ public class AcctxtGenerateService {
                     + " dikeluarkan dari file dan kembali menunggu digenerate.",
                     r.fileName(), r.rows(), r.exportCount());
         return r;
+    }
+
+    /**
+     * Susun berkas ACCTXT hari ini dari export yang disetujui HARI INI (BUG_AUSY_00174).
+     *
+     * Tombol kedua, pasangan dari {@link #generate}. Bedanya tegas: yang di atas memilih isi
+     * berkas menurut rentang tanggal lampau dan karenanya bisa MELEPAS penghuni yang jatuh di
+     * luar rentang; yang ini tidak pernah melepas apa pun, hanya menarik masuk persetujuan
+     * hari ini. Export yang disetujui hari ini memang hanya bisa lewat sini, karena sejak
+     * BUG_AUSY_00172 hari ini tidak bisa dipilih pada rentang tanggal.
+     *
+     * <p><b>Ada celah yang disengaja.</b> Export yang disetujui lebih dari {@value #MAX_DAYS_BACK}
+     * hari lalu dan belum pernah dibuatkan berkas tidak terjangkau tombol mana pun: terlalu tua
+     * untuk rentang tanggal, bukan hari ini untuk tombol ini. Karena itu daftar di layar sengaja
+     * menampilkan SELURUH yang menunggu, bukan hanya hari ini, dan menandai yang sudah lewat
+     * jangkauan — supaya kelihatan, bukan hilang diam-diam. Lihat {@link #strandedPending()}.
+     */
+    @Transactional
+    public Result generateToday(AusyUserDetails me) {
+        LocalDate today = LocalDate.now();
+        List<GlExportRequest> isi = requests.findForFileOrApprovedBetween(
+                todayFile(), today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        if (isi.isEmpty())
+            return Result.fail("Tidak ada export yang disetujui hari ini dan menunggu digenerate.");
+
+        for (GlExportRequest req : isi) {
+            gl.markExported(req.getId());
+            req.setFileName(todayFile());
+            requests.save(req);
+        }
+        return publish(isi, me, "ACCTXT_GENERATE_TODAY",
+                "Generate export yang disetujui hari ini (" + isi.size() + " export)");
+    }
+
+    /** Berapa yang menunggu dan disetujui hari ini — angka yang dijanjikan tombol Hari Ini. */
+    public long todayPendingCount() {
+        LocalDate today = LocalDate.now();
+        return allPending().stream()
+                .filter(r -> r.getDecidedAt() != null && !r.getDecidedAt().toLocalDate().isBefore(today))
+                .count();
+    }
+
+    /**
+     * Export menunggu yang sudah lewat jangkauan kedua tombol: disetujui sebelum
+     * {@link #earliestSelectable()} sehingga tidak bisa dipilih di rentang tanggal, dan bukan
+     * hari ini sehingga tidak terbawa tombol Hari Ini. Ditampilkan sebagai peringatan.
+     */
+    public List<GlExportRequest> strandedPending() {
+        LocalDate min = earliestSelectable();
+        return allPending().stream()
+                .filter(r -> r.getDecidedAt() != null && r.getDecidedAt().toLocalDate().isBefore(min))
+                .toList();
     }
 
     /**
@@ -239,66 +286,6 @@ public class AcctxtGenerateService {
             if (max == null || d.isAfter(max)) max = d;
         }
         return min == null ? "-" : rangeText(min, max);
-    }
-
-    /**
-     * Terbitkan ulang satu file ACCTXT yang sudah pernah dibuat (BUG_AUSY_00168).
-     *
-     * Dipakai kalau berkasnya hilang dari folder hasil export, terhapus, atau terlanjur diambil
-     * core dalam keadaan tidak lengkap.
-     *
-     * Hasilnya selalu berkas BERTANGGAL HARI INI (BUG_AUSY_00169), bukan nama lama berkas yang
-     * dipilih. Berkas lama sudah lewat harinya dan tidak akan diambil core lagi; supaya isinya
-     * sampai, ia harus terbit sebagai berkas hari berjalan. Jadi export yang dulu menghuni
-     * berkas itu dipindahkan ke berkas hari ini — dipindah, bukan disalin, supaya satu export
-     * tidak pernah berada di dua berkas sekaligus dan core tidak menerima jurnal dobel.
-     *
-     * Kalau berkas hari ini sudah berisi export lain, semuanya bergabung: penyusunannya lewat
-     * {@link #publish} yang selalu membaca seluruh penghuni berkas.
-     */
-    @Transactional
-    public Result regenerate(Long transferId, AusyUserDetails me) {
-        if (transferId == null) return Result.fail("File ACCTXT yang mau diterbitkan ulang belum dipilih.");
-        ExportTransfer t = transfers.findById(transferId).orElse(null);
-        if (t == null) return Result.fail("File ACCTXT tersebut tidak ditemukan.");
-
-        // Batas 3 hari berlaku sama seperti saat membuat: yang boleh diterbitkan ulang hanya
-        // berkas yang masih dalam jendela itu (BUG_AUSY_00158).
-        LocalDate made = t.getCreatedAt() == null ? null : t.getCreatedAt().toLocalDate();
-        LocalDate min = earliestSelectable(), max = latestSelectable();
-        if (made == null || made.isBefore(min) || made.isAfter(max))
-            return Result.fail("File " + t.getFileName() + " dibuat di luar " + MAX_DAYS_BACK
-                    + " hari terakhir (" + fmt(min) + " s/d " + fmt(max) + "), jadi tidak bisa diterbitkan ulang.");
-
-        List<GlExportRequest> isi = requests.findByTransferIdOrderById(transferId);
-        if (isi.isEmpty())
-            return Result.fail("File " + t.getFileName() + " tidak punya catatan export, isinya tidak bisa"
-                    + " disusun ulang.");
-
-        String asal = t.getFileName();
-        boolean pindah = !asal.equals(todayFile());
-        if (pindah) {
-            for (GlExportRequest r : isi) {
-                r.setFileName(todayFile());
-                requests.save(r);
-            }
-            // Catatan berkas lama dibiarkan ada sebagai jejak, tapi ditandai supaya jelas isinya
-            // sudah tidak di situ lagi — daftar di layar tidak boleh menjanjikan isi yang pindah.
-            t.setStatus("MOVED");
-            t.setRowsCount(0);
-            transfers.save(t);
-        }
-
-        // Berbeda dari generate, di sini tidak ada rentang tanggal: admin menunjuk satu berkas
-        // dan minta isinya terbit lagi. Jadi yang ditulis seluruh penghuni berkas hari ini —
-        // yang baru dipindah ditambah yang memang sudah ada di situ.
-        Result r = publish(requests.findByFileNameOrderById(todayFile()), me, "ACCTXT_REGENERATE",
-                "Populate ulang " + asal + (pindah ? " (isinya dipindah ke berkas hari ini)" : ""));
-        if (r.ok() && pindah)
-            return new Result(true, "Isi " + asal + " diterbitkan ulang sebagai " + r.fileName()
-                    + " (" + r.rows() + " baris dari " + r.exportCount() + " export).",
-                    r.fileName(), r.rows(), r.exportCount());
-        return r;
     }
 
     /** Isi berkas ACCTXT untuk sekumpulan export, urut seperti yang diberikan. */

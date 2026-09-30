@@ -71,4 +71,20 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
     List<GlExportRequest> findInFileOutsideRange(@Param("file") String file,
                                                  @Param("from") LocalDateTime from,
                                                  @Param("until") LocalDateTime until);
+
+    /**
+     * Isi berkas untuk tombol "Generate Hari Ini" (BUG_AUSY_00174): export yang disetujui
+     * HARI INI dan masih menunggu, ditambah seluruh penghuni berkas itu sendiri.
+     *
+     * Penghuni berkas wajib ikut. Berkasnya selalu disusun ulang dari nol, jadi export yang
+     * tidak masuk daftar akan lenyap dari isinya — termasuk yang baru saja dimasukkan lewat
+     * tombol rentang tanggal (BUG_AUSY_00169).
+     */
+    @Query("select r from GlExportRequest r where r.status = 'APPROVED'"
+         + " and (r.fileName = :file"
+         + "      or (r.fileName is null and r.decidedAt >= :from and r.decidedAt < :until))"
+         + " order by r.id asc")
+    List<GlExportRequest> findForFileOrApprovedBetween(@Param("file") String file,
+                                                       @Param("from") LocalDateTime from,
+                                                       @Param("until") LocalDateTime until);
 }
