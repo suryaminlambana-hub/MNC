@@ -26,6 +26,20 @@ import java.util.List;
  * Alasan digabung: core banking membaca satu berkas per hari. Waktu tiap approve menulis
  * filenya sendiri, approve kedua di hari yang sama menimpa yang pertama dan core hanya
  * menerima sebagian data.
+ *
+ * <h2>Satu berkas per hari eksekusi (BUG_AUSY_00169)</h2>
+ *
+ * Sebuah berkas ACCTXT dikenali dari TANGGAL EKSEKUSI — kapan admin menekan tombolnya — bukan
+ * dari tanggal data di dalamnya. Rentang tanggal yang dipilih admin menentukan data mana yang
+ * ikut, tidak pernah menentukan nama berkas.
+ *
+ * Dari situ dua hal mengikuti sendirinya:
+ * <ul>
+ *   <li>berapa kali pun tombol ditekan dalam satu hari, hasilnya satu berkas yang memuat
+ *       seluruh penghuninya — isinya selalu disusun ulang dari nol, tidak ditambal;</li>
+ *   <li>menerbitkan ulang berkas lama berarti memindahkan isinya ke berkas hari ini, karena
+ *       berkas bertanggal lampau tidak akan diambil core lagi.</li>
+ * </ul>
  */
 @Service
 public class AcctxtGenerateService {
@@ -92,19 +106,43 @@ public class AcctxtGenerateService {
             return Result.fail("Tanggal hanya boleh dalam " + MAX_DAYS_BACK + " hari terakhir ("
                     + fmt(min) + " s/d " + fmt(max) + "). Pilihan di luar itu tidak diproses.");
 
-        List<GlExportRequest> approved = pending(from, to);
-        if (approved.isEmpty())
+        List<GlExportRequest> baru = pending(from, to);
+        if (baru.isEmpty())
             return Result.fail("Tidak ada export berstatus approved pada " + rangeText(from, to)
                     + " yang belum dibuatkan file.");
 
-        String content = contentOf(approved);
+        for (GlExportRequest req : baru) {
+            gl.markExported(req.getId());
+            req.setFileName(todayFile());
+            requests.save(req);
+        }
+        return publish(me, "ACCTXT_GENERATE",
+                "Generate untuk " + rangeText(from, to) + ", " + baru.size() + " export baru");
+    }
+
+    /**
+     * Tulis berkas ACCTXT hari ini dari SELURUH export yang menghuninya, lalu perbarui catatannya.
+     *
+     * Inilah satu-satunya jalan berkas ACCTXT ditulis, dan sengaja begitu (BUG_AUSY_00169).
+     * Sebelumnya tiap penekanan tombol menulis berkas berisi hanya export yang ikut penekanan
+     * ITU. Karena namanya sama-sama ACCTXT.&lt;hari ini&gt;, penekanan kedua di hari yang sama
+     * menimpa berkas yang pertama — export dari penekanan pertama sudah ditandai "sudah
+     * dibuatkan file" sehingga tidak ikut disusun lagi, dan isinya lenyap dari berkas tanpa
+     * satu pun pesan galat. Persis keluhan "file yang keluar hanya memuat salah satu tanggal".
+     *
+     * Dengan menyusun ulang dari seluruh penghuni berkas, berapa kali pun tombolnya ditekan
+     * hasilnya satu berkas yang memuat semuanya.
+     */
+    private Result publish(AusyUserDetails me, String auditAction, String alasan) {
+        String fileName = todayFile();
+        List<GlExportRequest> isi = requests.findByFileNameOrderById(fileName);
+        if (isi.isEmpty()) return Result.fail("Tidak ada export yang menghuni " + fileName + ".");
+
+        String content = contentOf(isi);
         int rowCount = lineCount(content);
         if (rowCount == 0)
-            return Result.fail("Export approved pada " + rangeText(from, to) + " tidak punya baris GL.");
+            return Result.fail("Export yang menghuni " + fileName + " tidak punya baris GL.");
 
-        // Nama file AS400: ACCTXT.<YYMMDD> — dinamai menurut hari file ini dibuat, karena itu
-        // yang dicari core banking saat mengambil berkas hari berjalan.
-        String fileName = "ACCTXT." + LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         Path out;
         try {
             out = files.write(fileName, content);
@@ -112,45 +150,82 @@ public class AcctxtGenerateService {
             return Result.fail("Gagal menulis file ACCTXT: " + e.getMessage());
         }
 
-        ExportTransfer t = new ExportTransfer();
-        t.setFileName(fileName); t.setPaket("GENERATE " + rangeText(from, to));
-        t.setInputer(me.getUsername()); t.setChecker(me.getUsername());
-        t.setRowsCount(rowCount); t.setCreatedAt(LocalDateTime.now());
-        t.setStatus("SENT"); t.setRemotePath(out.toString());
-        t.setSentAt(LocalDateTime.now()); t.setAttempts(1);
+        // Satu nama berkas = satu baris catatan. Penekanan berikutnya memperbarui baris yang
+        // sama, jadi daftar di layar tidak memuat dua baris untuk berkas yang sebenarnya satu.
+        ExportTransfer t = transfers.findFirstByFileNameOrderByIdAsc(fileName).orElseGet(() -> {
+            ExportTransfer baru = new ExportTransfer();
+            baru.setFileName(fileName);
+            baru.setCreatedAt(LocalDateTime.now());
+            baru.setInputer(me.getUsername());
+            baru.setAttempts(0);
+            return baru;
+        });
+        t.setChecker(me.getUsername());
+        t.setPaket(cakupan(isi));
+        t.setRowsCount(rowCount);
+        t.setStatus("SENT");
+        t.setRemotePath(out.toString());
+        t.setSentAt(LocalDateTime.now());
+        t.setAttempts((t.getAttempts() == null ? 0 : t.getAttempts()) + 1);
         transfers.save(t);
 
         StringBuilder ids = new StringBuilder();
-        for (GlExportRequest req : approved) {
-            gl.markExported(req.getId());
-            req.setFileName(fileName);
+        for (GlExportRequest req : isi) {
             req.setTransferId(t.getId());
             requests.save(req);
             if (!ids.isEmpty()) ids.append(", ");
             ids.append("CR#").append(req.getId());
         }
 
-        audit.transaction(me.getUsername(), "ACCTXT_GENERATE",
-                "Generate " + fileName + " untuk " + rangeText(from, to) + ": "
-                + approved.size() + " export (" + ids + "), " + rowCount + " baris -> " + out);
+        audit.transaction(me.getUsername(), auditAction,
+                alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
+                + rowCount + " baris di " + out);
 
-        return new Result(true, "File " + fileName + " dibuat dari " + approved.size()
-                + " export approved (" + rowCount + " baris) pada " + rangeText(from, to) + ".",
-                fileName, rowCount, approved.size());
+        return new Result(true, "File " + fileName + " berisi " + isi.size()
+                + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ".",
+                fileName, rowCount, isi.size());
+    }
+
+    /**
+     * Nama berkas AS400 menurut TANGGAL EKSEKUSI, bukan tanggal data (BUG_AUSY_00169).
+     *
+     * Rentang tanggal yang dipilih admin menentukan data mana yang ikut, bukan nama berkasnya.
+     * Admin yang menekan tombol pada 4 September untuk data 1–3 September tetap menghasilkan
+     * ACCTXT.260904 — itu nama yang dicari core banking saat mengambil berkas hari berjalan.
+     */
+    private static String todayFile() { return "ACCTXT." + todayYymmdd(); }
+
+    /** Bagian YYMMDD nama berkas hari ini — ditampilkan di layar supaya aturannya tidak ditebak. */
+    public static String todayYymmdd() {
+        return LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+    }
+
+    /** Rentang tanggal persetujuan yang benar-benar ada di dalam berkas — untuk kolom Cakupan. */
+    private static String cakupan(List<GlExportRequest> isi) {
+        LocalDate min = null, max = null;
+        for (GlExportRequest r : isi) {
+            if (r.getDecidedAt() == null) continue;
+            LocalDate d = r.getDecidedAt().toLocalDate();
+            if (min == null || d.isBefore(min)) min = d;
+            if (max == null || d.isAfter(max)) max = d;
+        }
+        return min == null ? "-" : rangeText(min, max);
     }
 
     /**
      * Terbitkan ulang satu file ACCTXT yang sudah pernah dibuat (BUG_AUSY_00168).
      *
      * Dipakai kalau berkasnya hilang dari folder hasil export, terhapus, atau terlanjur diambil
-     * core dalam keadaan tidak lengkap. Yang ditulis ulang isi yang sama persis — export yang
-     * dulu ikut file itu, urut id seperti semula — dengan NAMA FILE YANG SAMA. Namanya tidak
-     * diganti tanggal hari ini: yang diminta menerbitkan kembali berkas tanggal itu, bukan
-     * membuat berkas baru, dan core mencarinya dengan nama itu.
+     * core dalam keadaan tidak lengkap.
      *
-     * Tidak ada export yang berpindah file: {@code file_name} dan {@code transfer_id} pada
-     * permintaan export tidak disentuh, jadi menerbitkan ulang tidak bisa membuat satu export
-     * ikut dua berkas.
+     * Hasilnya selalu berkas BERTANGGAL HARI INI (BUG_AUSY_00169), bukan nama lama berkas yang
+     * dipilih. Berkas lama sudah lewat harinya dan tidak akan diambil core lagi; supaya isinya
+     * sampai, ia harus terbit sebagai berkas hari berjalan. Jadi export yang dulu menghuni
+     * berkas itu dipindahkan ke berkas hari ini — dipindah, bukan disalin, supaya satu export
+     * tidak pernah berada di dua berkas sekaligus dan core tidak menerima jurnal dobel.
+     *
+     * Kalau berkas hari ini sudah berisi export lain, semuanya bergabung: penyusunannya lewat
+     * {@link #publish} yang selalu membaca seluruh penghuni berkas.
      */
     @Transactional
     public Result regenerate(Long transferId, AusyUserDetails me) {
@@ -171,36 +246,27 @@ public class AcctxtGenerateService {
             return Result.fail("File " + t.getFileName() + " tidak punya catatan export, isinya tidak bisa"
                     + " disusun ulang.");
 
-        String content = contentOf(isi);
-        int rowCount = lineCount(content);
-        if (rowCount == 0)
-            return Result.fail("Export yang membentuk " + t.getFileName() + " tidak punya baris GL lagi.");
-
-        Path out;
-        try {
-            out = files.write(t.getFileName(), content);
-        } catch (Exception e) {
-            return Result.fail("Gagal menulis ulang file ACCTXT: " + e.getMessage());
+        String asal = t.getFileName();
+        boolean pindah = !asal.equals(todayFile());
+        if (pindah) {
+            for (GlExportRequest r : isi) {
+                r.setFileName(todayFile());
+                requests.save(r);
+            }
+            // Catatan berkas lama dibiarkan ada sebagai jejak, tapi ditandai supaya jelas isinya
+            // sudah tidak di situ lagi — daftar di layar tidak boleh menjanjikan isi yang pindah.
+            t.setStatus("MOVED");
+            t.setRowsCount(0);
+            transfers.save(t);
         }
 
-        t.setRowsCount(rowCount);
-        t.setRemotePath(out.toString());
-        t.setSentAt(LocalDateTime.now());
-        t.setAttempts(t.getAttempts() == null ? 1 : t.getAttempts() + 1);
-        t.setStatus("SENT");
-        transfers.save(t);
-
-        StringBuilder ids = new StringBuilder();
-        for (GlExportRequest r : isi) {
-            if (!ids.isEmpty()) ids.append(", ");
-            ids.append("CR#").append(r.getId());
-        }
-        audit.transaction(me.getUsername(), "ACCTXT_REGENERATE",
-                "Populate ulang " + t.getFileName() + ": " + isi.size() + " export (" + ids + "), "
-                + rowCount + " baris -> " + out);
-
-        return new Result(true, "File " + t.getFileName() + " diterbitkan ulang dari " + isi.size()
-                + " export (" + rowCount + " baris).", t.getFileName(), rowCount, isi.size());
+        Result r = publish(me, "ACCTXT_REGENERATE",
+                "Populate ulang " + asal + (pindah ? " (isinya dipindah ke berkas hari ini)" : ""));
+        if (r.ok() && pindah)
+            return new Result(true, "Isi " + asal + " diterbitkan ulang sebagai " + r.fileName()
+                    + " (" + r.rows() + " baris dari " + r.exportCount() + " export).",
+                    r.fileName(), r.rows(), r.exportCount());
+        return r;
     }
 
     /** Isi berkas ACCTXT untuk sekumpulan export, urut seperti yang diberikan. */

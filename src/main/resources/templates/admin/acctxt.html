@@ -3,10 +3,18 @@
 <head><title>Generate File ACCTXT — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Generate File ACCTXT</h1>
-  <p class="text-muted">
+  <p class="text-muted mb-1">
     Menggabungkan seluruh export yang sudah disetujui checker pada rentang tanggal terpilih
     menjadi <strong>satu</strong> file ACCTXT di folder hasil export. Otorisasi checker hanya
     menandai data sebagai disetujui — filenya dibuat di sini.
+  </p>
+  <!--/* BUG_AUSY_00169: aturan penamaan sering disalahpahami sebagai "nama mengikuti tanggal
+         data", jadi ditulis di layar, bukan cuma di kode. */-->
+  <p class="text-muted">
+    Nama filenya selalu <code>ACCTXT.<span th:text="${todayYymmdd}">YYMMDD</span></code> —
+    mengikuti <strong>tanggal hari ini</strong> saat tombol ditekan, bukan tanggal data yang
+    dipilih. Menekan tombolnya lagi hari ini tidak membuat file kedua: file yang sama disusun
+    ulang berisi semuanya.
   </p>
 
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
@@ -108,8 +116,12 @@
         <!--/* BUG_AUSY_00168: tombol per baris — yang diterbitkan ulang berkas pada baris itu,
                dengan nama file yang sama, bukan berkas baru bertanggal hari ini. */-->
         <td class="text-end">
-          <form method="post" th:action="@{/admin/acctxt/regenerate}" class="d-inline"
-                th:attr="onsubmit=|return confirm('Terbitkan ulang file ${t.fileName} ke folder hasil export?')|">
+          <span th:if="${t.status == 'MOVED'}" class="badge bg-secondary-subtle text-secondary"
+                title="Isi berkas ini sudah diterbitkan ulang sebagai berkas hari berikutnya">
+            isinya sudah dipindah
+          </span>
+          <form th:unless="${t.status == 'MOVED'}" method="post" th:action="@{/admin/acctxt/regenerate}" class="d-inline"
+                th:attr="onsubmit=|return confirm('Terbitkan ulang isi ${t.fileName} sebagai file ACCTXT hari ini?')|">
             <input type="hidden" name="transferId" th:value="${t.id}">
             <input type="hidden" name="from" th:value="${from}">
             <input type="hidden" name="to" th:value="${to}">

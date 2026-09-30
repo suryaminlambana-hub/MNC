@@ -33,4 +33,13 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
      * (BUG_AUSY_00168). Urut id supaya isi berkasnya sama persis dengan waktu pertama dibuat.
      */
     List<GlExportRequest> findByTransferIdOrderById(Long transferId);
+
+    /**
+     * Seluruh export yang menghuni satu berkas ACCTXT (BUG_AUSY_00169).
+     *
+     * Berkas hari ini bisa terisi lewat beberapa kali penekanan tombol; isinya selalu disusun
+     * ulang dari SEMUA penghuninya, bukan hanya dari yang baru ditambahkan pada penekanan
+     * terakhir. Urut id supaya susunan barisnya tidak berubah-ubah antar penulisan.
+     */
+    List<GlExportRequest> findByFileNameOrderById(String fileName);
 }
