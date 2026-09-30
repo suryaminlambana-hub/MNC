@@ -97,15 +97,8 @@ public class AcctxtGenerateService {
             return Result.fail("Tidak ada export berstatus approved pada " + rangeText(from, to)
                     + " yang belum dibuatkan file.");
 
-        StringBuilder content = new StringBuilder();
-        int rowCount = 0;
-        for (GlExportRequest req : approved) {
-            List<GlTabel> rows = gl.findByExportReqIdOrderById(req.getId());
-            for (GlTabel g : rows) {
-                content.append(GltrrfFormatter.line(g)).append(System.lineSeparator());
-                rowCount++;
-            }
-        }
+        String content = contentOf(approved);
+        int rowCount = lineCount(content);
         if (rowCount == 0)
             return Result.fail("Export approved pada " + rangeText(from, to) + " tidak punya baris GL.");
 
@@ -114,7 +107,7 @@ public class AcctxtGenerateService {
         String fileName = "ACCTXT." + LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         Path out;
         try {
-            out = files.write(fileName, content.toString());
+            out = files.write(fileName, content);
         } catch (Exception e) {
             return Result.fail("Gagal menulis file ACCTXT: " + e.getMessage());
         }
@@ -144,6 +137,86 @@ public class AcctxtGenerateService {
         return new Result(true, "File " + fileName + " dibuat dari " + approved.size()
                 + " export approved (" + rowCount + " baris) pada " + rangeText(from, to) + ".",
                 fileName, rowCount, approved.size());
+    }
+
+    /**
+     * Terbitkan ulang satu file ACCTXT yang sudah pernah dibuat (BUG_AUSY_00168).
+     *
+     * Dipakai kalau berkasnya hilang dari folder hasil export, terhapus, atau terlanjur diambil
+     * core dalam keadaan tidak lengkap. Yang ditulis ulang isi yang sama persis — export yang
+     * dulu ikut file itu, urut id seperti semula — dengan NAMA FILE YANG SAMA. Namanya tidak
+     * diganti tanggal hari ini: yang diminta menerbitkan kembali berkas tanggal itu, bukan
+     * membuat berkas baru, dan core mencarinya dengan nama itu.
+     *
+     * Tidak ada export yang berpindah file: {@code file_name} dan {@code transfer_id} pada
+     * permintaan export tidak disentuh, jadi menerbitkan ulang tidak bisa membuat satu export
+     * ikut dua berkas.
+     */
+    @Transactional
+    public Result regenerate(Long transferId, AusyUserDetails me) {
+        if (transferId == null) return Result.fail("File ACCTXT yang mau diterbitkan ulang belum dipilih.");
+        ExportTransfer t = transfers.findById(transferId).orElse(null);
+        if (t == null) return Result.fail("File ACCTXT tersebut tidak ditemukan.");
+
+        // Batas 3 hari berlaku sama seperti saat membuat: yang boleh diterbitkan ulang hanya
+        // berkas yang masih dalam jendela itu (BUG_AUSY_00158).
+        LocalDate made = t.getCreatedAt() == null ? null : t.getCreatedAt().toLocalDate();
+        LocalDate min = earliestSelectable(), max = latestSelectable();
+        if (made == null || made.isBefore(min) || made.isAfter(max))
+            return Result.fail("File " + t.getFileName() + " dibuat di luar " + MAX_DAYS_BACK
+                    + " hari terakhir (" + fmt(min) + " s/d " + fmt(max) + "), jadi tidak bisa diterbitkan ulang.");
+
+        List<GlExportRequest> isi = requests.findByTransferIdOrderById(transferId);
+        if (isi.isEmpty())
+            return Result.fail("File " + t.getFileName() + " tidak punya catatan export, isinya tidak bisa"
+                    + " disusun ulang.");
+
+        String content = contentOf(isi);
+        int rowCount = lineCount(content);
+        if (rowCount == 0)
+            return Result.fail("Export yang membentuk " + t.getFileName() + " tidak punya baris GL lagi.");
+
+        Path out;
+        try {
+            out = files.write(t.getFileName(), content);
+        } catch (Exception e) {
+            return Result.fail("Gagal menulis ulang file ACCTXT: " + e.getMessage());
+        }
+
+        t.setRowsCount(rowCount);
+        t.setRemotePath(out.toString());
+        t.setSentAt(LocalDateTime.now());
+        t.setAttempts(t.getAttempts() == null ? 1 : t.getAttempts() + 1);
+        t.setStatus("SENT");
+        transfers.save(t);
+
+        StringBuilder ids = new StringBuilder();
+        for (GlExportRequest r : isi) {
+            if (!ids.isEmpty()) ids.append(", ");
+            ids.append("CR#").append(r.getId());
+        }
+        audit.transaction(me.getUsername(), "ACCTXT_REGENERATE",
+                "Populate ulang " + t.getFileName() + ": " + isi.size() + " export (" + ids + "), "
+                + rowCount + " baris -> " + out);
+
+        return new Result(true, "File " + t.getFileName() + " diterbitkan ulang dari " + isi.size()
+                + " export (" + rowCount + " baris).", t.getFileName(), rowCount, isi.size());
+    }
+
+    /** Isi berkas ACCTXT untuk sekumpulan export, urut seperti yang diberikan. */
+    private String contentOf(List<GlExportRequest> reqs) {
+        StringBuilder content = new StringBuilder();
+        for (GlExportRequest req : reqs)
+            for (GlTabel g : gl.findByExportReqIdOrderById(req.getId()))
+                content.append(GltrrfFormatter.line(g)).append(System.lineSeparator());
+        return content.toString();
+    }
+
+    private static int lineCount(String content) {
+        if (content.isEmpty()) return 0;
+        int n = 0, i = 0;
+        while ((i = content.indexOf('\n', i) + 1) > 0) n++;
+        return n;
     }
 
     private static String fmt(LocalDate d) { return d.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")); }

@@ -60,4 +60,20 @@ public class AcctxtGenerateController {
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/admin/acctxt?from=" + from + "&to=" + to;
     }
+
+    /**
+     * Terbitkan ulang satu file ACCTXT yang sudah pernah dibuat (BUG_AUSY_00168).
+     *
+     * Rentang tanggal ikut dikembalikan supaya admin mendarat di layar yang sama seperti sebelum
+     * menekan tombolnya, lengkap dengan daftar file yang sedang dilihatnya.
+     */
+    @PostMapping("/admin/acctxt/regenerate")
+    public String regenerate(@RequestParam Long transferId,
+                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                             @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        AcctxtGenerateService.Result r = acctxt.regenerate(transferId, me);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        return "redirect:/admin/acctxt?from=" + from + "&to=" + to;
+    }
 }

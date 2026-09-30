@@ -88,19 +88,39 @@
     <table class="table align-middle mb-0">
       <thead><tr>
         <th>Nama File</th><th>Cakupan</th><th>Dibuat oleh</th>
-        <th>Waktu dibuat</th><th class="text-end">Jml Baris</th><th>Lokasi</th>
+        <th>Terakhir terbit</th><th class="text-end">Jml Baris</th><th>Lokasi</th>
+        <th class="text-end">Aksi</th>
       </tr></thead>
       <tbody>
       <tr th:each="t : ${generated}">
         <td><code th:text="${t.fileName}"></code></td>
         <td th:text="${t.paket}"></td>
         <td th:text="${t.inputer}"></td>
-        <td th:text="${t.createdAt != null ? #temporals.format(t.createdAt,'dd-MM-yyyy HH:mm') : ''}"></td>
+        <td>
+          <span th:text="${t.sentAt != null ? #temporals.format(t.sentAt,'dd-MM-yyyy HH:mm')
+                                             : (t.createdAt != null ? #temporals.format(t.createdAt,'dd-MM-yyyy HH:mm') : '')}"></span>
+          <span th:if="${t.attempts != null and t.attempts > 1}" class="badge bg-secondary-subtle text-secondary ms-1"
+                th:title="'Sudah diterbitkan ' + ${t.attempts} + ' kali'"
+                th:text="${t.attempts} + 'x'">1x</span>
+        </td>
         <td class="text-end" th:text="${t.rowsCount}"></td>
         <td class="small text-muted text-break" th:text="${t.remotePath}"></td>
+        <!--/* BUG_AUSY_00168: tombol per baris — yang diterbitkan ulang berkas pada baris itu,
+               dengan nama file yang sama, bukan berkas baru bertanggal hari ini. */-->
+        <td class="text-end">
+          <form method="post" th:action="@{/admin/acctxt/regenerate}" class="d-inline"
+                th:attr="onsubmit=|return confirm('Terbitkan ulang file ${t.fileName} ke folder hasil export?')|">
+            <input type="hidden" name="transferId" th:value="${t.id}">
+            <input type="hidden" name="from" th:value="${from}">
+            <input type="hidden" name="to" th:value="${to}">
+            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+              <i class="fa-solid fa-rotate"></i> Populate Ulang
+            </button>
+          </form>
+        </td>
       </tr>
       <tr th:if="${#lists.isEmpty(generated)}">
-        <td colspan="6" class="text-center text-muted py-4">
+        <td colspan="7" class="text-center text-muted py-4">
           Belum ada file ACCTXT yang dibuat pada rentang tanggal ini.
         </td>
       </tr>

@@ -27,4 +27,10 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
     @Query("select r from GlExportRequest r where r.status = 'APPROVED' and r.fileName is null"
          + " order by r.decidedAt asc, r.id asc")
     List<GlExportRequest> findApprovedNotGenerated();
+
+    /**
+     * Export yang ikut satu file ACCTXT tertentu — dipakai menerbitkan ulang file itu apa adanya
+     * (BUG_AUSY_00168). Urut id supaya isi berkasnya sama persis dengan waktu pertama dibuat.
+     */
+    List<GlExportRequest> findByTransferIdOrderById(Long transferId);
 }
