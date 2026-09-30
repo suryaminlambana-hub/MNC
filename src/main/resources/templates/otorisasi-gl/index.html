@@ -118,11 +118,10 @@
             <p class="mb-2"><i class="fa-solid fa-file-csv text-muted"></i>
               Import CSV — <b th:text="${#lists.size(it.rows)}">0</b> Kode GL akan ditambahkan:</p>
             <table class="table table-sm align-middle mb-0 ausy-diff">
-              <thead><tr><th style="width:20%">NoGL</th><th style="width:20%">Debit/Credit</th><th>Description</th></tr></thead>
+              <thead><tr><th style="width:25%">NoGL</th><th>Description</th></tr></thead>
               <tbody>
                 <tr th:each="r : ${it.rows}">
                   <td><code th:text="${r.code}"></code></td>
-                  <td th:text="${r.position == 'C' ? 'Credit' : 'Debit'}"></td>
                   <td th:text="${r.description}"></td>
                 </tr>
               </tbody>

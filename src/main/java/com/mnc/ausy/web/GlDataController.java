@@ -1,5 +1,6 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.domain.GlCode;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
@@ -40,12 +41,17 @@ public class GlDataController {
         this.changes = changes; this.approval = approval; this.scope = scope;
     }
 
-    /** A GL row is "registered" when its NoGL + D/C exists in the GL Code master. */
+    /**
+     * A GL row is "registered" when its NoGL exists in the GL Code master.
+     *
+     * Sisi D/C tidak ikut dicocokkan sejak BUG_AUSY_00170: master Kode GL hanya memuat nomor
+     * akun, jadi satu kode yang terdaftar berlaku untuk baris debit maupun credit.
+     */
     private Set<String> registeredKeys() {
-        return glCode.findAll().stream().map(c -> c.getCode() + "|" + c.getPosition()).collect(Collectors.toSet());
+        return glCode.findAll().stream().map(GlCode::getCode).collect(Collectors.toSet());
     }
     private static boolean isRegistered(Set<String> reg, GlTabel g) {
-        return reg.contains(n(g.getGltrac()) + "|" + n(g.getGltrcd()));
+        return reg.contains(n(g.getGltrac()));
     }
     private static String n(String s) { return s == null ? "" : s; }
 

@@ -12,11 +12,10 @@
   </div>
   <div class="ausy-card">
     <table class="table table-hover align-middle mb-0 dt">
-      <thead><tr><th>No</th><th>NoGL</th><th>Debit/Credit</th><th>Description</th><th>Status</th><th>Pemakaian</th></tr></thead>
+      <thead><tr><th>No</th><th>NoGL</th><th>Description</th><th>Status</th><th>Pemakaian</th></tr></thead>
       <tbody>
       <tr th:each="g,i : ${rows}">
         <td th:text="${i.count}"></td><td><code th:text="${g.code}"></code></td>
-        <td><span th:class="${g.position=='C'}?'badge bg-warning-subtle text-warning':'badge bg-info-subtle text-info'" th:text="${g.position=='C'?'Credit':'Debit'}"></span></td>
         <td th:text="${g.description}"></td>
         <td th:attr="data-search=${g.status==1 ? 'Active' : 'NonAktif'},data-filter=${g.status==1 ? 'Active' : 'NonAktif'}"><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
         <td><span th:if="${g.used}" class="badge bg-warning-subtle text-warning">Terpakai</span><span th:unless="${g.used}" class="text-muted small">Belum dipakai</span></td>

@@ -13,18 +13,21 @@ import java.util.List;
 
 public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     /**
-     * Berapa baris GL yang memakai kode ini pada sisi D/C tersebut — baris yang sudah dihapus
-     * (active=0) TIDAK dihitung, karena datanya sudah tidak ada di sistem dan dulu membuat kode
-     * baru ikut tertulis "Terpakai" padahal tidak ada datanya (BUG_AUSY_00123).
-     * 100-D terpakai tidak berarti 100-C ikut terpakai (BUG_AUSY_00100).
+     * Berapa baris GL yang memakai kode ini — baris yang sudah dihapus (active=0) TIDAK dihitung,
+     * karena datanya sudah tidak ada di sistem dan dulu membuat kode baru ikut tertulis "Terpakai"
+     * padahal tidak ada datanya (BUG_AUSY_00123).
+     *
+     * Sisi D/C tidak lagi ikut disaring (BUG_AUSY_00170): master Kode GL sekarang hanya memuat
+     * nomor akun, jadi 100 terpakai berarti kode 100 terpakai — tidak ada lagi 100-D dan 100-C
+     * yang bisa dipakai atau dihapus sendiri-sendiri.
      */
-    @Query("select count(g) from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos and g.active = 1")
-    long countUsage(@Param("code") String code, @Param("pos") String pos);
+    @Query("select count(g) from GlTabel g where g.gltrac = :code and g.active = 1")
+    long countUsage(@Param("code") String code);
 
     /** Dari pemakaian itu, berapa yang batch-nya masih menunggu otorisasi upload. */
-    @Query("select count(g) from GlTabel g where g.gltrac = :code and upper(g.gltrcd) = :pos"
+    @Query("select count(g) from GlTabel g where g.gltrac = :code"
          + " and g.active = 1 and g.statusDual = 'PENDING'")
-    long countUsagePending(@Param("code") String code, @Param("pos") String pos);
+    long countUsagePending(@Param("code") String code);
 
     // Hanya cast baris yang no_paket-nya angka murni; hindari error "invalid input syntax
     // for type integer" saat ada no_paket kosong/non-numerik (BUG_00069).
@@ -153,15 +156,13 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
 
     /** Ringkasan seluruh GL aktif: jumlah baris, total nominal, dan berapa yang kodenya terdaftar. */
     @Query("select count(g), coalesce(sum(g.gltram),0),"
-         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac"
-         + "   and upper(c.position) = upper(g.gltrcd)) then 1 else 0 end)"
+         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac) then 1 else 0 end)"
          + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')")
     Object[] activeSummary();
 
     /** Idem, dibatasi maker tertentu. */
     @Query("select count(g), coalesce(sum(g.gltram),0),"
-         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac"
-         + "   and upper(c.position) = upper(g.gltrcd)) then 1 else 0 end)"
+         + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac) then 1 else 0 end)"
          + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
          + " and g.gltrus in :makers")
     Object[] activeSummaryByMakers(@Param("makers") Collection<String> makers);

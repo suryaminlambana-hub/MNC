@@ -9,7 +9,11 @@ public class GlCode {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false) private String code;
-    @Column(nullable = false) private String position;   // D / C
+    /**
+     * Tidak dipakai lagi sejak BUG_AUSY_00170 — kolomnya dibiarkan ada sebagai catatan bagaimana
+     * kode itu dulu didaftarkan (lihat V39), tapi tidak pernah diisi maupun dibaca aplikasi.
+     */
+    private String position;
     private String description;
     private Short status = 1;
     @Column(name = "created_by")    private String createdBy;

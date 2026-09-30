@@ -21,7 +21,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Manajemen Kode GL — master NoGL + Debit/Credit, seluruhnya di bawah dual control.
+ * Manajemen Kode GL — master nomor akun GL, seluruhnya di bawah dual control.
+ *
+ * BUG_AUSY_00170 &amp; BUG_AUSY_00171: kolom Debit/Credit dilepas. Sebuah kode dikenali dari
+ * nomornya saja, mengikuti daftar COA milik MNC; sisi D/C ditentukan baris transaksinya.
  *
  * BUG_AUSY_00140 sempat menghapus halaman ini beserta aksi tambah/ubah/hapus/import.
  * BUG_AUSY_00159 mengembalikannya seperti semula: migrasi V35 menyalakan lagi baris menu 21
@@ -79,12 +82,11 @@ public class GlCodeController {
     @GetMapping({"/export", "/list/export"})
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         List<GlCode> codes = service.listWithUsage();
-        List<String> head = List.of("No","NoGL","Debit/Credit","Description","Status","Pemakaian");
+        List<String> head = List.of("No","NoGL","Description","Status","Pemakaian");
         List<List<Object>> data = new ArrayList<>();
         int no = 1;
         for (GlCode g : codes) {
             data.add(Arrays.asList(no++, g.getCode(),
-                    "C".equals(g.getPosition()) ? "Credit" : "Debit",
                     g.getDescription() == null ? "" : g.getDescription(),
                     (g.getStatus() != null && g.getStatus() == 1) ? "Active" : "Non Active",
                     g.isUsed() ? "Terpakai" : "Belum dipakai"));
@@ -94,20 +96,20 @@ public class GlCodeController {
     }
 
     @PostMapping("/add")
-    public String add(@RequestParam String code, @RequestParam String position,
+    public String add(@RequestParam String code,
                       @RequestParam(required=false) String description, @RequestParam(defaultValue="1") Short status,
                       @RequestParam(required=false) String note,
                       @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        flash(ra, changes.submitGlCodeAdd(code, position, description, status, me, note));
+        flash(ra, changes.submitGlCodeAdd(code, description, status, me, note));
         return "redirect:/gl-code";
     }
 
     @PostMapping("/edit")
-    public String edit(@RequestParam Long id, @RequestParam(required=false) String code, @RequestParam(required=false) String position,
+    public String edit(@RequestParam Long id, @RequestParam(required=false) String code,
                        @RequestParam(required=false) String description, @RequestParam(defaultValue="1") Short status,
                        @RequestParam(required=false) String note,
                        @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        flash(ra, changes.submitGlCodeEdit(id, code, position, description, status, me, note));
+        flash(ra, changes.submitGlCodeEdit(id, code, description, status, me, note));
         return "redirect:/gl-code";
     }
 
@@ -149,7 +151,7 @@ public class GlCodeController {
             return "redirect:/gl-code/upload";
         } catch (Exception e) {
             ra.addFlashAttribute("warn", "Gagal membaca CSV — pastikan file berformat CSV sesuai template"
-                    + " (kolom: NoGL, Debit/Credit, Description).");
+                    + " (kolom: NoGL, Description).");
         }
         return "redirect:/gl-code/upload";
     }
@@ -162,10 +164,10 @@ public class GlCodeController {
         if (!p.rows().isEmpty()) return null;
         if (p.bad() == 0 && p.dup() == 0)
             return "File CSV tidak berisi baris data — pastikan memakai template Kode GL"
-                    + " (kolom: NoGL, Debit/Credit, Description).";
+                    + " (kolom: NoGL, Description).";
         if (p.dup() == 0)
-            return "Format CSV tidak sesuai template: " + p.bad() + " baris tidak valid (NoGL harus angka dan"
-                    + " Debit/Credit harus D atau C). Unduh template Kode GL lalu coba lagi.";
+            return "Format CSV tidak sesuai template: " + p.bad() + " baris tidak valid (NoGL harus angka)."
+                    + " Unduh template Kode GL lalu coba lagi.";
         if (p.bad() == 0)
             return "Semua " + p.dup() + " baris pada CSV sudah terdaftar sebagai Kode GL — tidak ada yang diimport.";
         return "Tidak ada baris yang bisa diimport: " + p.bad() + " baris tidak sesuai template dan "
@@ -178,7 +180,9 @@ public class GlCodeController {
         resp.setContentType("text/csv; charset=utf-8");
         resp.setHeader("Content-Disposition", "attachment; filename=\"template_gl_code.csv\"");
         OutputStream o = resp.getOutputStream();
-        o.write(("NoGL,Debit/Credit,Description\n900,D,KANTOR PUSAT OPERASIONAL\n901,C,BIAYA OPERASIONAL\n100,D,KAS KANTOR PUSAT\n100,C,KAS KANTOR PUSAT\n").getBytes(StandardCharsets.UTF_8));
+        // Dua kolom saja sejak BUG_AUSY_00171 — tanpa Debit/Credit.
+        o.write(("NoGL,Description\n900,KANTOR PUSAT OPERASIONAL\n901,BIAYA OPERASIONAL\n100,KAS KANTOR PUSAT\n")
+                .getBytes(StandardCharsets.UTF_8));
         o.flush();
     }
 

@@ -49,7 +49,6 @@ public class GlChangeService {
     public static final LinkedHashMap<String,String> GLCODE_FIELDS = new LinkedHashMap<>();
     static {
         GLCODE_FIELDS.put("code", "NoGL");
-        GLCODE_FIELDS.put("position", "Debit/Credit");
         GLCODE_FIELDS.put("description", "Description");
         GLCODE_FIELDS.put("status", "Status");
     }
@@ -303,44 +302,41 @@ public class GlChangeService {
 
     // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
     @Transactional
-    public Res submitGlCodeAdd(String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+    public Res submitGlCodeAdd(String code, String desc, Short status, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
-        String p = GlCodeService.normPos(pos);
-        Res bad = checkCode(code, p);
+        Res bad = checkCode(code);
         if (bad != null) return bad;
         code = code.trim();
-        if (glCodeService.exists(code, p)) return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
-        if (pendingCombo(code, p)) return new Res(false, "Sudah ada permintaan untuk NoGL tersebut yang menunggu otorisasi Checker.");
+        if (glCodeService.exists(code)) return new Res(false, "NoGL tersebut sudah terdaftar.");
+        if (pendingCombo(code)) return new Res(false, "Sudah ada permintaan untuk NoGL tersebut yang menunggu otorisasi Checker.");
         GlChangeRequest c = base("ADD", T_GL_CODE, null, me, note);
-        c.setAfterJson(toJson(glCodeMap(code, p, desc, status)));
+        c.setAfterJson(toJson(glCodeMap(code, desc, status)));
         cr.save(c);
         audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ",
-                "TAMBAH Kode GL " + code + "-" + p + " diajukan (CR#" + c.getId() + ")");
+                "TAMBAH Kode GL " + code + " diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Permintaan TAMBAH Kode GL diajukan (menunggu otorisasi Checker).");
     }
 
     @Transactional
-    public Res submitGlCodeEdit(Long id, String code, String pos, String desc, Short status, AusyUserDetails me, String note) {
+    public Res submitGlCodeEdit(Long id, String code, String desc, Short status, AusyUserDetails me, String note) {
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlCode g = glCodeService.find(id);
         if (g == null) return new Res(false, "Kode GL tidak ditemukan.");
         if (pendingForGlCode(id)) return new Res(false, "Kode GL tersebut masih menunggu otorisasi Checker.");
 
-        String newCode, newPos;
-        if (glCodeService.used(g)) {                    // used codes: NoGL + D/C stay locked
-            newCode = g.getCode(); newPos = g.getPosition();
+        String newCode;
+        if (glCodeService.used(g)) {                    // used codes: NoGL stays locked
+            newCode = g.getCode();
         } else {
-            newPos = GlCodeService.normPos(pos);
             newCode = code == null ? "" : code.trim();
-            Res bad = checkCode(newCode, newPos);
+            Res bad = checkCode(newCode);
             if (bad != null) return bad;
-            boolean moved = !newCode.equals(g.getCode()) || !newPos.equals(g.getPosition());
-            if (moved && glCodeService.exists(newCode, newPos))
-                return new Res(false, "Kombinasi NoGL + Debit/Credit sudah terdaftar.");
+            if (!newCode.equals(g.getCode()) && glCodeService.exists(newCode))
+                return new Res(false, "NoGL tersebut sudah terdaftar.");
         }
-        Map<String,String> before = glCodeMap(g), after = glCodeMap(newCode, newPos, desc, status);
+        Map<String,String> before = glCodeMap(g), after = glCodeMap(newCode, desc, status);
         if (before.equals(after))
             return new Res(false, "Tidak ada perubahan pada Kode GL — permintaan tidak diajukan.");
 
@@ -354,13 +350,13 @@ public class GlChangeService {
     }
 
     /**
-     * NoGL / D-C validation shared by the add + edit request paths: an empty NoGL is rejected with a
+     * NoGL validation shared by the add + edit request paths: an empty NoGL is rejected with a
      * message that names the field (BUG_AUSY_00105) and a NoGL with anything but digits is rejected
-     * outright (BUG_AUSY_00104). @return the failure, or null when the input is acceptable.
+     * outright (BUG_AUSY_00104). Sisi D/C tidak lagi diminta (BUG_AUSY_00170).
+     * @return the failure, or null when the input is acceptable.
      */
-    private static Res checkCode(String code, String normPos) {
-        if (blank(code))                       return new Res(false, "NoGL wajib diisi.");
-        if (normPos == null || normPos.isEmpty()) return new Res(false, "Debit/Credit wajib dipilih.");
+    private static Res checkCode(String code) {
+        if (blank(code)) return new Res(false, "NoGL wajib diisi.");
         if (!GlCodeService.validCode(code))
             return new Res(false, "NoGL hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
         return null;
@@ -380,7 +376,7 @@ public class GlChangeService {
         c.setBeforeJson(toJson(glCodeMap(g)));
         cr.save(c);
         audit.transaction(me.getUsername(), "GLCODE_CHANGE_REQ",
-                "HAPUS Kode GL #" + id + " (" + g.getCode() + "-" + g.getPosition() + ") diajukan (CR#" + c.getId() + ")");
+                "HAPUS Kode GL #" + id + " (" + g.getCode() + ") diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Permintaan HAPUS Kode GL diajukan (menunggu otorisasi Checker).");
     }
 
@@ -393,7 +389,7 @@ public class GlChangeService {
         List<Map<String,String>> fresh = new ArrayList<>();
         int held = 0;
         for (Map<String,String> m : rows) {
-            if (pendingCombo(m.get("code"), m.get("position"))) { held++; continue; }
+            if (pendingCombo(m.get("code"))) { held++; continue; }
             fresh.add(m);
         }
         if (fresh.isEmpty()) return new Res(false, "Semua baris CSV sudah ada pada permintaan yang menunggu otorisasi.");
@@ -612,29 +608,29 @@ public class GlChangeService {
         return cr.existsByStatusAndTargetAndRefId("PENDING", T_GL_CODE, glCodeId);
     }
 
-    /** Is an ADD/IMPORT for this NoGL + D/C already waiting? */
-    private boolean pendingCombo(String code, String pos) {
-        if (code == null || pos == null) return false;
+    /** Is an ADD/IMPORT for this NoGL already waiting? */
+    private boolean pendingCombo(String code) {
+        if (code == null) return false;
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_CODE)) {
             if ("IMPORT".equals(c.getOp())) {
                 for (Map<String,String> m : parseList(c.getAfterJson()))
-                    if (code.equals(m.get("code")) && pos.equals(m.get("position"))) return true;
+                    if (code.equals(m.get("code"))) return true;
             } else {
                 Map<String,String> a = parse(c.getAfterJson());
-                if (a != null && code.equals(a.get("code")) && pos.equals(a.get("position"))) return true;
+                if (a != null && code.equals(a.get("code"))) return true;
             }
         }
         return false;
     }
 
-    private Map<String,String> glCodeMap(String code, String pos, String desc, Short status) {
+    private Map<String,String> glCodeMap(String code, String desc, Short status) {
         Map<String,String> m = new LinkedHashMap<>();
-        m.put("code", n(code)); m.put("position", n(pos)); m.put("description", n(desc));
+        m.put("code", n(code)); m.put("description", n(desc));
         m.put("status", status == null ? "1" : String.valueOf(status));
         return m;
     }
     private Map<String,String> glCodeMap(GlCode g) {
-        return glCodeMap(g.getCode(), g.getPosition(), g.getDescription(), g.getStatus());
+        return glCodeMap(g.getCode(), g.getDescription(), g.getStatus());
     }
 
     private GlChangeRequest base(String op, String target, Long glId, AusyUserDetails me, String note) {
@@ -725,8 +721,9 @@ public class GlChangeService {
     /** Raw stored value -> what the Checker should read. */
     private static String fmt(String target, String key, String v) {
         if (T_GL_CODE.equals(target)) {
-            if (key.equals("position")) return "C".equals(v) ? "Credit" : ("D".equals(v) ? "Debit" : v);
-            if (key.equals("status"))   return "1".equals(v) ? "Active" : ("0".equals(v) ? "Non Active" : v);
+            // "position" sudah tidak ada di GLCODE_FIELDS sejak BUG_AUSY_00170, jadi tidak ikut
+            // ditampilkan lagi — termasuk pada permintaan lama yang JSON-nya masih memuatnya.
+            if (key.equals("status")) return "1".equals(v) ? "Active" : ("0".equals(v) ? "Non Active" : v);
         }
         return v;
     }
@@ -781,14 +778,14 @@ public class GlChangeService {
             switch (c.getOp()) {
                 case "ADD" -> {
                     if (a == null) return "Data permintaan tidak terbaca.";
-                    String e = glCodeService.add(a.get("code"), a.get("position"), a.get("description"),
+                    String e = glCodeService.add(a.get("code"), a.get("description"),
                                                  shortOf(a.get("status")), c.getMaker());
-                    if ("exists".equals(e)) return "Tidak dapat diterapkan: NoGL + Debit/Credit sudah terdaftar.";
+                    if ("exists".equals(e)) return "Tidak dapat diterapkan: NoGL sudah terdaftar.";
                     if (e != null) return "Tidak dapat diterapkan: data Kode GL tidak valid.";
                 }
                 case "EDIT" -> {
                     if (a == null || c.getRefId() == null) return "Data permintaan tidak terbaca.";
-                    String e = glCodeService.edit(c.getRefId(), a.get("code"), a.get("position"), a.get("description"),
+                    String e = glCodeService.edit(c.getRefId(), a.get("code"), a.get("description"),
                                                   shortOf(a.get("status")), c.getMaker());
                     if (e != null) return "Tidak dapat diterapkan: Kode GL tidak ditemukan / tidak valid.";
                 }
@@ -856,7 +853,7 @@ public class GlChangeService {
         String ddmmyy = LocalDate.now().format(DDMMYY);
         g.setGltrpd(ddmmyy); g.setGltrpd1(ddmmyy);
         g.setGleqam(amount); g.setGlotam(amount);
-        g.setGlName(glCodeService.descriptionOf(code, dc));
+        g.setGlName(glCodeService.descriptionOf(code));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
         g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi

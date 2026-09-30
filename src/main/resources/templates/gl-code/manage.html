@@ -5,7 +5,7 @@
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
       <h1 class="ausy-page-title">Manajemen Kode GL</h1>
-      <p class="text-muted mb-0">Master kode GL (NoGL + Debit/Credit). Kode yang sudah dipakai pada transaksi terkunci.</p>
+      <p class="text-muted mb-0">Master kode GL (NoGL). Kode yang sudah dipakai pada transaksi terkunci.</p>
     </div>
     <!--/* BUG_AUSY_00164: unduhan Excel juga dipasang di sini, bukan hanya di List Kode GL —
            alamatnya /gl-code/export supaya haknya ikut menu ini. */-->
@@ -21,8 +21,6 @@
       <div class="col-auto"><label class="form-label">NoGL</label>
         <input class="form-control" name="code" required inputmode="numeric" pattern="[0-9]{1,50}"
                title="NoGL hanya boleh berisi angka" placeholder="cth. 100"></div>
-      <div class="col-auto"><label class="form-label">Debit/Credit</label>
-        <select class="form-select" name="position"><option value="D">Debit</option><option value="C">Credit</option></select></div>
       <div class="col"><label class="form-label">Description</label><input class="form-control" name="description"></div>
       <div class="col-auto"><label class="form-label">Status</label>
         <select class="form-select" name="status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
@@ -34,7 +32,7 @@
 
   <div class="ausy-card">
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>No</th><th>NoGL</th><th>D/C</th><th>Description</th><th>Status</th><th>Aksi</th></tr></thead>
+      <thead><tr><th>No</th><th>NoGL</th><th>Description</th><th>Status</th><th>Aksi</th></tr></thead>
       <tbody>
       <tr th:each="g,i : ${rows}">
         <td th:text="${i.count}"></td>
@@ -43,7 +41,6 @@
                         + (${g.usagePending} > 0 ? ' (' + ${g.usagePending} + ' masih menunggu otorisasi upload)' : '')">
           <i class="fa-solid fa-lock"></i> Terpakai
           <span th:text="${g.usageCount}">0</span></span></td>
-        <td><span th:class="${g.position=='C'}?'badge bg-warning-subtle text-warning':'badge bg-info-subtle text-info'" th:text="${g.position=='C'?'Credit':'Debit'}"></span></td>
         <td th:text="${g.description}"></td>
         <td><span th:class="${g.status==1}?'badge bg-success-subtle text-success':'badge bg-secondary-subtle text-secondary'" th:text="${g.status==1?'Active':'Non Active'}"></span></td>
         <td>
@@ -52,10 +49,10 @@
           </span>
           <th:block th:unless="${pendingIds != null and pendingIds.contains(g.id)}">
             <button class="btn btn-sm btn-outline-secondary btn-edit"
-              th:attr="data-id=${g.id},data-code=${g.code},data-pos=${g.position},data-desc=${g.description},data-status=${g.status},data-used=${g.used}"
+              th:attr="data-id=${g.id},data-code=${g.code},data-desc=${g.description},data-status=${g.status},data-used=${g.used}"
               data-bs-toggle="modal" data-bs-target="#editGl">Ubah</button>
             <button th:if="${!g.used}" type="button" class="btn btn-sm btn-outline-danger btn-del"
-                    th:attr="data-id=${g.id},data-code=${g.code},data-pos=${g.position}"
+                    th:attr="data-id=${g.id},data-code=${g.code}"
                     th:text="${needApproval} ? 'Ajukan Hapus' : 'Hapus'">Hapus</button>
           </th:block>
         </td>
@@ -72,14 +69,12 @@
         <div class="mb-2"><label class="form-label">NoGL <span class="text-danger">*</span></label>
           <input class="form-control" name="code" id="gl_code" required inputmode="numeric" pattern="[0-9]{1,50}"
                  title="NoGL wajib diisi dan hanya boleh berisi angka"></div>
-        <div class="mb-2"><label class="form-label">Debit/Credit</label>
-          <select class="form-select" name="position" id="gl_pos"><option value="D">Debit</option><option value="C">Credit</option></select></div>
         <div class="mb-2"><label class="form-label">Description</label><input class="form-control" name="description" id="gl_desc"></div>
         <div class="mb-2"><label class="form-label">Status</label>
           <select class="form-select" name="status" id="gl_status"><option value="1">Active</option><option value="0">Non Active</option></select></div>
         <div class="mb-2" th:if="${needApproval}"><label class="form-label">Alasan <span class="text-danger">*</span></label>
           <textarea class="form-control" name="note" rows="2" placeholder="Alasan perubahan" required></textarea></div>
-        <div id="gl_lockmsg" class="small text-warning" style="display:none"><i class="fa-solid fa-lock"></i> NoGL &amp; posisi terkunci (sudah dipakai). Hanya Description &amp; Status yang dapat diubah.</div>
+        <div id="gl_lockmsg" class="small text-warning" style="display:none"><i class="fa-solid fa-lock"></i> NoGL terkunci (sudah dipakai). Hanya Description &amp; Status yang dapat diubah.</div>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" th:text="${needApproval} ? 'Ajukan Perubahan' : 'Simpan'">Simpan</button></div>
     </form>
@@ -102,18 +97,18 @@
 
   <script>
   document.querySelectorAll('.btn-edit').forEach(function(b){b.addEventListener('click',function(){
-    gl_id.value=b.dataset.id; gl_code.value=b.dataset.code||''; gl_pos.value=b.dataset.pos||'D';
+    gl_id.value=b.dataset.id; gl_code.value=b.dataset.code||'';
     gl_desc.value=b.dataset.desc||''; gl_status.value=b.dataset.status||'1';
-    // Kode terpakai: NoGL & D/C dikunci — pakai disabled (abu-abu, tidak bisa diklik)
+    // Kode terpakai: NoGL dikunci — pakai disabled (abu-abu, tidak bisa diklik)
     // supaya jelas tidak dapat diubah. BUG_AUSY_00101.
     var used=b.dataset.used==='true';
-    gl_code.disabled=used; gl_pos.disabled=used; gl_lockmsg.style.display=used?'block':'none';
+    gl_code.disabled=used; gl_lockmsg.style.display=used?'block':'none';
   });});
   (function(){
     var m=new bootstrap.Modal(document.getElementById('delGl'));
     document.querySelectorAll('.btn-del').forEach(function(b){b.addEventListener('click',function(){
       document.getElementById('del_id').value=b.dataset.id;
-      document.getElementById('del_label').textContent=b.dataset.code+' ('+(b.dataset.pos==='C'?'Credit':'Debit')+')';
+      document.getElementById('del_label').textContent=b.dataset.code;
       m.show();
     });});
   })();

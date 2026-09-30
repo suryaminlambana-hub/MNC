@@ -15,6 +15,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Master Kode GL.
+ *
+ * <b>Tanpa sisi D/C sejak BUG_AUSY_00170 &amp; BUG_AUSY_00171.</b> Sebuah kode dikenali dari
+ * nomornya saja, mengikuti daftar COA milik MNC yang juga hanya memuat nomor akun dan namanya.
+ * Sisi debit/credit ditentukan baris transaksinya, bukan masternya — maka 100 yang terdaftar
+ * berlaku untuk dua-duanya, dan tidak ada lagi 100-D serta 100-C yang hidup terpisah.
+ */
 @Service
 public class GlCodeService {
     private final GlCodeRepository glCodes;
@@ -22,14 +30,6 @@ public class GlCodeService {
 
     public GlCodeService(GlCodeRepository glCodes, GlTabelRepository glTabel) {
         this.glCodes = glCodes; this.glTabel = glTabel;
-    }
-
-    public static String normPos(String p) {
-        if (p == null) return "";
-        p = p.trim().toUpperCase();
-        if (p.equals("D") || p.startsWith("DEB")) return "D";
-        if (p.equals("C") || p.startsWith("CRE") || p.startsWith("KRE")) return "C";
-        return "";
     }
 
     /**
@@ -40,82 +40,73 @@ public class GlCodeService {
         return code != null && code.trim().matches("[0-9]{1,50}");
     }
 
-    /**
-     * A GL code counts as used only on the side (D/C) it was actually posted on — BUG_AUSY_00100:
-     * if 100-D appears in a transaction, 100-C is still free to edit or delete.
-     */
-    public boolean used(String code, String position) {
-        return usageCount(code, position) > 0;
+    /** Kode ini dipakai transaksi atau belum. */
+    public boolean used(String code) {
+        return usageCount(code) > 0;
     }
 
     /** Berapa baris GL yang memakai kode ini (baris terhapus tidak dihitung — BUG_AUSY_00123). */
-    public long usageCount(String code, String position) {
-        String p = normPos(position);
-        if (code == null || code.isBlank() || p.isEmpty()) return 0;
-        return glTabel.countUsage(code.trim(), p);
+    public long usageCount(String code) {
+        if (code == null || code.isBlank()) return 0;
+        return glTabel.countUsage(code.trim());
     }
 
     /** Dari pemakaian itu, berapa yang batch-nya masih menunggu otorisasi upload. */
-    public long usagePending(String code, String position) {
-        String p = normPos(position);
-        if (code == null || code.isBlank() || p.isEmpty()) return 0;
-        return glTabel.countUsagePending(code.trim(), p);
+    public long usagePending(String code) {
+        if (code == null || code.isBlank()) return 0;
+        return glTabel.countUsagePending(code.trim());
     }
-    public boolean used(GlCode g) { return g != null && used(g.getCode(), g.getPosition()); }
+
+    public boolean used(GlCode g) { return g != null && used(g.getCode()); }
 
     public GlCode find(Long id) { return glCodes.findById(id).orElse(null); }
 
-    /** Master description for a NoGL + D/C, or "" when the code is not registered. */
-    public String descriptionOf(String code, String position) {
-        String p = normPos(position);
-        if (code == null || code.isBlank() || p.isEmpty()) return "";
-        return glCodes.findByCodeAndPosition(code.trim(), p).map(GlCode::getDescription).orElse("");
+    /** Master description for a NoGL, or "" when the code is not registered. */
+    public String descriptionOf(String code) {
+        if (code == null || code.isBlank()) return "";
+        return glCodes.findByCode(code.trim()).map(GlCode::getDescription).orElse("");
     }
 
-    public boolean exists(String code, String pos) { return glCodes.existsByCodeAndPosition(code, pos); }
+    public boolean exists(String code) { return code != null && glCodes.existsByCode(code.trim()); }
 
     public List<GlCode> listWithUsage() {
-        List<GlCode> rows = glCodes.findAllByOrderByCodeAscPositionAsc();
+        List<GlCode> rows = glCodes.findAllByOrderByCodeAsc();
         for (GlCode g : rows) {
-            long n = usageCount(g.getCode(), g.getPosition());
+            long n = usageCount(g.getCode());
             g.setUsageCount(n);
-            g.setUsagePending(n > 0 ? usagePending(g.getCode(), g.getPosition()) : 0);
+            g.setUsagePending(n > 0 ? usagePending(g.getCode()) : 0);
             g.setUsed(n > 0);
         }
         return rows;
     }
 
     /** @return null on success, or an error key (exists/error). */
-    public String add(String code, String pos, String desc, Short status, String by) {
-        pos = normPos(pos);
+    public String add(String code, String desc, Short status, String by) {
         if (code == null || code.isBlank()) return "nocode";
-        if (pos.isEmpty()) return "nopos";
         if (!validCode(code)) return "badcode";
         code = code.trim();
-        if (glCodes.existsByCodeAndPosition(code, pos)) return "exists";
+        if (glCodes.existsByCode(code)) return "exists";
         GlCode g = new GlCode();
-        g.setCode(code); g.setPosition(pos); g.setDescription(desc);
+        g.setCode(code); g.setDescription(desc);
         g.setStatus(status == null ? 1 : status); g.setCreatedBy(by); g.setCreatedDate(LocalDateTime.now());
         glCodes.save(g);
         return null;
     }
 
-    public String edit(Long id, String code, String pos, String desc, Short status, String by) {
+    public String edit(Long id, String code, String desc, Short status, String by) {
         GlCode g = glCodes.findById(id).orElse(null);
         if (g == null) return "error";
-        pos = normPos(pos);
         if (used(g)) {
             // locked: only description + status
             g.setDescription(desc); g.setStatus(status);
         } else {
             if (code == null || code.isBlank()) return "nocode";
-            if (pos.isEmpty()) return "nopos";
             if (!validCode(code)) return "badcode";
             code = code.trim();
-            glCodes.findByCodeAndPosition(code, pos)
+            glCodes.findByCode(code)
                    .filter(other -> !other.getId().equals(id))
                    .ifPresent(o -> { throw new DuplicateGl(); });
-            g.setCode(code); g.setPosition(pos); g.setDescription(desc); g.setStatus(status);
+            g.setCode(code); g.setDescription(desc); g.setStatus(status);
         }
         g.setModifiedBy(by); g.setModifiedDate(LocalDateTime.now());
         glCodes.save(g);
@@ -133,7 +124,14 @@ public class GlCodeService {
     /** Rows a CSV would add, plus how many were duplicates / invalid. Nothing is written. */
     public record CsvParse(List<Map<String,String>> rows, int dup, int bad) {}
 
-    /** Parse only — shared by the direct path and by the maker→checker request path. */
+    /**
+     * Parse only — shared by the direct path and by the maker→checker request path.
+     *
+     * Template CSV-nya dua kolom: NoGL, Description (BUG_AUSY_00171). Berkas lama yang masih
+     * bertiga kolom tetap terbaca: kolom kedua diperiksa, kalau isinya cuma D atau C ia dianggap
+     * sisa kolom Debit/Credit dan dilewati, sehingga deskripsi diambil dari kolom ketiga. Tanpa
+     * itu, CSV lama akan masuk dengan deskripsi berbunyi "D".
+     */
     public CsvParse parseCsv(InputStream in) throws Exception {
         List<Map<String,String>> rows = new ArrayList<>();
         int dup = 0, bad = 0, line = 0;
@@ -145,20 +143,27 @@ public class GlCodeService {
                 if (line == 1 && row.toLowerCase().contains("nogl")) continue;   // header
                 String[] c = row.split(",", -1);
                 String code = c.length > 0 ? c[0].trim() : "";
-                String pos  = normPos(c.length > 1 ? c[1] : "");
-                String desc = c.length > 2 ? c[2].trim() : "";
-                if (code.isEmpty() || pos.isEmpty() || !validCode(code)) { bad++; continue; }
-                if (glCodes.existsByCodeAndPosition(code, pos) || listed(rows, code, pos)) { dup++; continue; }
+                String desc = c.length > 1 ? c[1].trim() : "";
+                if (isSisaKolomDc(desc)) desc = c.length > 2 ? c[2].trim() : "";
+                if (code.isEmpty() || !validCode(code)) { bad++; continue; }
+                if (glCodes.existsByCode(code) || listed(rows, code)) { dup++; continue; }
                 Map<String,String> m = new LinkedHashMap<>();
-                m.put("code", code); m.put("position", pos); m.put("description", desc);
+                m.put("code", code); m.put("description", desc);
                 rows.add(m);
             }
         }
         return new CsvParse(rows, dup, bad);
     }
 
-    private static boolean listed(List<Map<String,String>> rows, String code, String pos) {
-        return rows.stream().anyMatch(m -> code.equals(m.get("code")) && pos.equals(m.get("position")));
+    /** Kolom kedua berisi bekas penanda Debit/Credit, bukan deskripsi. */
+    private static boolean isSisaKolomDc(String v) {
+        if (v == null) return false;
+        String s = v.trim().toUpperCase();
+        return s.equals("D") || s.equals("C") || s.equals("DEBIT") || s.equals("CREDIT") || s.equals("KREDIT");
+    }
+
+    private static boolean listed(List<Map<String,String>> rows, String code) {
+        return rows.stream().anyMatch(m -> code.equals(m.get("code")));
     }
 
     /** Insert parsed rows, skipping any that became duplicates meanwhile. @return rows added. */
@@ -166,11 +171,11 @@ public class GlCodeService {
         int added = 0;
         if (rows == null) return 0;
         for (Map<String,String> m : rows) {
-            String code = m.get("code"), pos = normPos(m.get("position"));
-            if (!validCode(code) || pos.isEmpty()) continue;
-            if (glCodes.existsByCodeAndPosition(code, pos)) continue;
+            String code = m.get("code");
+            if (!validCode(code)) continue;
+            if (glCodes.existsByCode(code)) continue;
             GlCode g = new GlCode();
-            g.setCode(code); g.setPosition(pos); g.setDescription(m.get("description"));
+            g.setCode(code); g.setDescription(m.get("description"));
             g.setStatus((short)1); g.setCreatedBy(by); g.setCreatedDate(LocalDateTime.now());
             glCodes.save(g); added++;
         }
