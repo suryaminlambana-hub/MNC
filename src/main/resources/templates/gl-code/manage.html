@@ -2,15 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Manajemen Kode GL — AUSY</title></head>
 <main>
-  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-    <div>
-      <h1 class="ausy-page-title">Manajemen Kode GL</h1>
-      <p class="text-muted mb-0">Master kode GL (NoGL). Kode yang sudah dipakai pada transaksi terkunci.</p>
-    </div>
-    <!--/* BUG_AUSY_00164: unduhan Excel juga dipasang di sini, bukan hanya di List Kode GL —
-           alamatnya /gl-code/export supaya haknya ikut menu ini. */-->
-    <a class="btn btn-outline-secondary" th:href="@{/gl-code/export}">
-      <i class="fa-solid fa-file-excel"></i> Export Kode GL</a>
+  <!--/* BUG_AUSY_00177: tombol Export Kode GL dilepas dari sini. Sempat dipasang di dua halaman
+         (BUG_AUSY_00164); diputuskan cukup satu, di List Kode GL — isinya sama persis, dan dua
+         tombol unduhan yang menghasilkan berkas identik hanya menimbulkan pertanyaan apa
+         bedanya. */-->
+  <div class="mb-2">
+    <h1 class="ausy-page-title">Manajemen Kode GL</h1>
+    <p class="text-muted mb-0">
+      Master kode GL (NoGL). Kode yang sudah dipakai pada transaksi terkunci.
+      Unduhan Excel-nya ada di <a th:href="@{/gl-code/list}">List Kode GL</a>.
+    </p>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>

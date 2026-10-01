@@ -74,12 +74,14 @@ public class GlCodeController {
     }
 
     /**
-     * Export master Kode GL ke Excel, sengaja punya dua alamat: {@code /gl-code/export} ikut hak
-     * akses menu Manajemen Kode GL, {@code /gl-code/list/export} ikut menu List Kode GL. Pemilik
-     * URL terpanjang yang menang (AccessService), jadi user yang hanya dikasih salah satu menu
-     * tetap bisa mengunduh dari halaman yang memang boleh ia buka.
+     * Export master Kode GL ke Excel — satu alamat saja, di bawah {@code /gl-code/list} supaya
+     * hak aksesnya ikut menu List Kode GL.
+     *
+     * Alamat kedua {@code /gl-code/export} dilepas bersama tombolnya (BUG_AUSY_00177): unduhannya
+     * kini hanya ada di List Kode GL, dan endpoint yang tidak dipakai tombol mana pun tidak perlu
+     * ditinggalkan menganggur.
      */
-    @GetMapping({"/export", "/list/export"})
+    @GetMapping("/list/export")
     public void export(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         List<GlCode> codes = service.listWithUsage();
         List<String> head = List.of("No","NoGL","Description","Status","Pemakaian");
