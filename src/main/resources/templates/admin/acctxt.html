@@ -119,6 +119,11 @@
         Hanya <span th:text="${maxDaysBack}">3</span> hari terakhir yang bisa dipilih:
         <strong th:text="${min}"></strong> s/d <strong th:text="${max}"></strong>.
         <strong>Hari ini tidak termasuk</strong> — untuk persetujuan hari ini pakai tombol di atas.
+        <!--/* BUG_AUSY_00178: dasar penyaringannya sering disalahpahami sebagai tanggal batch
+               atau tanggal upload, sehingga hasilnya tampak seperti "semua yang pernah
+               diexport". Ditulis tegas di layar. */-->
+        Yang dicocokkan <strong>tanggal persetujuan Checker</strong> (kolom Disetujui pada daftar
+        di atas) — bukan tanggal upload batch dan bukan tanggal data GL-nya.
         Rentang ini menentukan <strong>isi</strong> file: export yang sekarang ada di file hari ini
         tapi jatuh di luar rentang akan dikeluarkan dan kembali menunggu.
       </small>

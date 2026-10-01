@@ -320,8 +320,30 @@ public class AcctxtGenerateService {
         // lain yang memperlihatkan berkasnya mendarat di mana — "tersimpan atau tidak" jadi tidak
         // bisa dipastikan dari aplikasi, dan penguji melaporkannya sebagai gagal tersimpan.
         return new Result(true, "File " + out + " berisi " + isi.size()
-                + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ".",
+                + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ". "
+                + rincian(isi),
                 fileName, rowCount, isi.size());
+    }
+
+    /**
+     * Export mana saja yang masuk, beserta tanggal persetujuannya (BUG_AUSY_00178).
+     *
+     * Hasilnya sempat dibaca sebagai "seluruh data yang pernah diexport" karena yang terlihat
+     * hanya jumlahnya. Dengan disebut satu per satu, admin bisa langsung mencocokkan apa yang
+     * masuk dengan daftar di layar — dan terlihat bahwa yang dipakai memang tanggal persetujuan
+     * Checker. Dipotong supaya pesannya tetap terbaca kalau exportnya banyak.
+     */
+    private static String rincian(List<GlExportRequest> isi) {
+        int tampil = Math.min(isi.size(), 8);
+        StringBuilder sb = new StringBuilder("Yang masuk: ");
+        for (int i = 0; i < tampil; i++) {
+            GlExportRequest r = isi.get(i);
+            if (i > 0) sb.append(", ");
+            sb.append("CR#").append(r.getId());
+            if (r.getDecidedAt() != null) sb.append(" (disetujui ").append(fmt(r.getDecidedAt().toLocalDate())).append(')');
+        }
+        if (isi.size() > tampil) sb.append(", dan ").append(isi.size() - tampil).append(" lainnya");
+        return sb.append('.').toString();
     }
 
     /**
