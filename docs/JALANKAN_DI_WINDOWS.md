@@ -159,8 +159,12 @@ cari `postgresql-x64-16`, klik kanan → **Start**.
 
 ### Aplikasi jalan tapi browser bilang tidak bisa dibuka
 
-Alamatnya harus lengkap dengan `/ausy` di belakang:
-<http://localhost:8080/ausy> — bukan `http://localhost:8080`.
+Alamat lengkapnya <http://localhost:8080/ausy>. Mengetik `http://localhost:8080` saja juga
+bisa — otomatis dialihkan ke sana.
+
+Kalau yang muncul halaman abu-abu **"HTTP Status 404 — Apache Tomcat"**, berarti aplikasinya
+jalan tapi versinya lama (pengalihan ini baru ada sejak 01-10-2026). Pakai alamat lengkapnya,
+lalu periksa penanda `build` di pojok kanan bawah halaman.
 
 ### Port 8080 sudah dipakai program lain
 
