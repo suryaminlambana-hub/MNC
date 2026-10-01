@@ -44,6 +44,9 @@ ausy:
   # di log saat start: "File hasil export ditulis ke ...".
   txt-dir: ${AUSY_TXT_DIR:}
   export-dir: ${AUSY_EXPORT_DIR:}
+  # Diisi Maven saat build (lihat <resources> di pom.xml), bukan diketik tangan. Ditampilkan di
+  # layar supaya "aplikasi yang jalan ini build kapan" bisa dibaca, bukan ditebak.
+  build-time: '@maven.build.timestamp@'
 
 logging:
   level:

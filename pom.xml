@@ -135,6 +135,25 @@
     </dependencies>
 
     <build>
+        <!--
+          application.yml disaring Maven supaya @maven.build.timestamp@ terisi waktu build
+          (BUG_AUSY_00178 lanjutan). Alasannya praktis: berkali-kali laporan "sudah di-pull tapi
+          tidak berubah" ternyata aplikasi yang jalan memang build lama — JAR lama di folder,
+          target\classes basi, atau belum restart. Tanpa penanda di layar, hal itu hanya bisa
+          ditebak. Delimiternya @ saja; ${...} dibiarkan utuh karena itu milik Spring.
+        -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes><include>application.yml</include></includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes><exclude>application.yml</exclude></excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

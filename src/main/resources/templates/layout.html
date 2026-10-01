@@ -61,6 +61,14 @@
             </div>
         </div>
         <main class="ausy-content" th:replace="${content}">content here</main>
+        <!--/* Penanda build (BUG_AUSY_00178 lanjutan). Berkali-kali laporan "sudah di-pull tapi
+               tidak berubah" ternyata aplikasi yang jalan memang build lama — JAR lama di folder,
+               target\classes basi, atau belum restart. Dengan waktu build tertulis di layar, hal
+               itu bisa dibaca sekilas dan tidak perlu ditebak lagi dari gejala. Sengaja di layout
+               supaya ada di semua halaman, dan kecil supaya tidak mengganggu. */-->
+        <div class="text-muted small text-end px-3 pb-2" style="opacity:.6">
+            build <span th:text="${@environment.getProperty('ausy.build-time')}">-</span>
+        </div>
     </div>
     <div class="ausy-overlay" id="navOverlay"></div>
 </div>
