@@ -270,10 +270,17 @@ public class AcctxtGenerateService {
         t.setAttempts(keBerapa);
         transfers.save(t);
 
+        // transfer_id hanya diperbarui untuk export yang memang MENGHUNI berkas ini. Export yang
+        // ikut karena disalin dari berkas tanggal lain (tombol Susun Ulang) tidak boleh dialihkan:
+        // penandanya itulah yang menyimpan "penulisan terakhir berkas tanggal tersebut". Kalau
+        // dialihkan ke penulisan hari ini, rentang yang sama tidak bisa disusun ulang untuk kedua
+        // kalinya — pencariannya berakhir kosong.
         StringBuilder ids = new StringBuilder();
         for (GlExportRequest req : isi) {
-            req.setTransferId(t.getId());
-            requests.save(req);
+            if (fileName.equals(req.getFileName())) {
+                req.setTransferId(t.getId());
+                requests.save(req);
+            }
             if (!ids.isEmpty()) ids.append(", ");
             ids.append("CR#").append(req.getId());
         }
