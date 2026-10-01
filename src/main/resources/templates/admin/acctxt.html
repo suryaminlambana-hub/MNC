@@ -80,9 +80,20 @@
 
   <h2 class="h6 text-uppercase text-muted mb-2">Susun ulang dari tanggal lampau</h2>
   <div class="ausy-card mb-3" style="padding:20px 22px">
-    <form method="post" th:action="@{/admin/acctxt/generate}" id="rentang"
-          class="d-flex flex-wrap align-items-end gap-3"
-          onsubmit="return confirm('Susun ulang file ACCTXT hari ini memakai export pada rentang tanggal ini? Isi file yang sekarang di luar rentang akan dikeluarkan.');">
+    <!--/* BUG_AUSY_00176: penolakan tanggal tidak boleh diam.
+           Kolom tanggalnya punya min/max, jadi tanggal di luar jendela ditolak browser sebelum
+           form terkirim — tidak ada POST, tidak ada alert, layar diam sama sekali. Yang muncul
+           cuma gelembung bawaan browser yang lewat sekejap. Penguji memilih hari ini (wajar,
+           "3 hari terakhir" terdengar termasuk hari ini, padahal sejak BUG_AUSY_00172 tidak)
+           lalu melapor "tombolnya tidak jalan, tidak ada alert apa-apa".
+           Sekarang penolakannya ditulis di layar dengan alasannya. */-->
+    <div id="rentangSalah" class="alert alert-warning py-2" style="display:none"></div>
+    <!--/* novalidate WAJIB di sini: dengan validasi bawaan menyala, browser membatalkan
+           pengiriman tanpa pernah melepas event submit, sehingga pemeriksaan di bawah tidak
+           kebagian jalan dan layar tetap diam. min/max dibiarkan karena masih berguna
+           membatasi date picker. Tanggalnya tetap diperiksa ulang di server. */-->
+    <form method="post" th:action="@{/admin/acctxt/generate}" id="rentang" novalidate
+          class="d-flex flex-wrap align-items-end gap-3">
       <div>
         <label class="form-label" for="from">Tanggal awal</label>
         <input type="date" class="form-control" id="from" name="from"
@@ -113,5 +124,45 @@
       </small>
     </div>
   </div>
+
+  <script th:inline="javascript">
+  (function () {
+    var form = document.getElementById('rentang');
+    var kotak = document.getElementById('rentangSalah');
+    var min = /*[[${min}]]*/ '', max = /*[[${max}]]*/ '';
+
+    function tanggalId(iso) {                       // 2026-09-30 -> 30-09-2026
+      var p = String(iso).split('-');
+      return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : iso;
+    }
+    function keluhan() {
+      var f = document.getElementById('from').value, t = document.getElementById('to').value;
+      if (!f || !t) return 'Tanggal awal dan tanggal akhir wajib diisi.';
+      if (f > t) return 'Tanggal akhir tidak boleh lebih awal dari tanggal awal.';
+      if (f < min || t > max)
+        return 'Tanggal yang dipilih di luar jangkauan tombol ini. Yang bisa dipilih hanya '
+             + tanggalId(min) + ' s/d ' + tanggalId(max) + ' — hari ini tidak termasuk. '
+             + 'Untuk export yang disetujui hari ini, pakai tombol "Generate File ACCTXT Hari Ini" di atas.';
+      return null;
+    }
+
+    form.addEventListener('submit', function (e) {
+      var pesan = keluhan();
+      if (pesan) {
+        // Tanpa ini penolakannya tidak terlihat sama sekali: browser membatalkan pengiriman
+        // diam-diam dan halaman tampak tidak bereaksi.
+        e.preventDefault();
+        kotak.textContent = pesan;
+        kotak.style.display = '';
+        kotak.scrollIntoView({ block: 'nearest' });
+        form.reportValidity();
+        return;
+      }
+      kotak.style.display = 'none';
+      if (!confirm('Susun ulang file ACCTXT hari ini memakai export pada rentang tanggal ini?'
+                 + ' Isi file yang sekarang di luar rentang akan dikeluarkan.')) e.preventDefault();
+    });
+  })();
+  </script>
 </main>
 </html>
