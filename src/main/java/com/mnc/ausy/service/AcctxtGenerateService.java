@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Pembuatan file ACCTXT oleh admin (BUG_AUSY_00155 & BUG_AUSY_00158).
@@ -110,7 +112,13 @@ public class AcctxtGenerateService {
                     + fmt(min) + " s/d " + fmt(max) + "). Pilihan di luar itu tidak diproses.");
 
         LocalDateTime awal = from.atStartOfDay(), akhir = to.plusDays(1).atStartOfDay();
-        List<GlExportRequest> terpilih = requests.findForFileInRange(todayFile(), awal, akhir);
+        // SELURUH export yang disetujui pada rentang itu, termasuk yang sudah pernah masuk berkas
+        // hari lain (BUG_AUSY_00176). Menyusun ulang berarti menyusun ulang: export tanggal 29
+        // yang kemarin sudah dibuatkan berkas tetap ikut kalau tanggal 29 yang dipilih. Syarat
+        // lama — file_name kosong atau sama dengan berkas hari ini — membuat export semacam itu
+        // tidak pernah terjangkau, dan admin yang memilih tanggal 29 justru dijawab "tidak ada
+        // export pada tanggal itu" padahal exportnya jelas ada.
+        List<GlExportRequest> terpilih = requests.findApprovedBetween(awal, akhir);
         if (terpilih.isEmpty())
             // Dibedakan tegas dari kegagalan menulis (BUG_AUSY_00176): tidak ada yang cocok bukan
             // berarti penyimpanannya bermasalah, dan berkas yang sudah ada tidak ikut disentuh.
@@ -131,20 +139,57 @@ public class AcctxtGenerateService {
             requests.save(req);
         }
 
+        // Berkas lama yang ditinggalkan export-exportnya dicatat dulu, sebelum penandanya ditimpa.
+        Set<String> berkasLama = new LinkedHashSet<>();
+        for (GlExportRequest req : terpilih) {
+            String f = req.getFileName();
+            if (f != null && !f.equals(todayFile())) berkasLama.add(f);
+        }
+
         for (GlExportRequest req : terpilih) {
             gl.markExported(req.getId());
             req.setFileName(todayFile());
             requests.save(req);
         }
+        rapikanBerkasLama(berkasLama);
 
         Result r = publish(terpilih, me, "ACCTXT_GENERATE",
-                "Generate untuk " + rangeText(from, to) + (dilepas.isEmpty() ? ""
-                        : ", " + dilepas.size() + " export di luar rentang dilepas kembali"));
-        if (r.ok() && !dilepas.isEmpty())
-            return new Result(true, r.message() + " " + dilepas.size() + " export di luar rentang itu"
-                    + " dikeluarkan dari file dan kembali menunggu digenerate.",
-                    r.fileName(), r.rows(), r.exportCount());
-        return r;
+                "Generate untuk " + rangeText(from, to)
+                + (berkasLama.isEmpty() ? "" : ", isi " + String.join(", ", berkasLama) + " ditarik ke berkas hari ini")
+                + (dilepas.isEmpty() ? "" : ", " + dilepas.size() + " export di luar rentang dilepas kembali"));
+        if (!r.ok()) return r;
+
+        StringBuilder tambahan = new StringBuilder();
+        if (!berkasLama.isEmpty())
+            tambahan.append(" Isi ").append(String.join(", ", berkasLama))
+                    .append(" ikut ditarik ke file hari ini, jadi satu file.");
+        if (!dilepas.isEmpty())
+            tambahan.append(' ').append(dilepas.size())
+                    .append(" export di luar rentang itu dikeluarkan dari file dan kembali menunggu digenerate.");
+        return tambahan.isEmpty() ? r
+                : new Result(true, r.message() + tambahan, r.fileName(), r.rows(), r.exportCount());
+    }
+
+    /**
+     * Catatan berkas yang penghuninya pindah ke berkas hari ini (BUG_AUSY_00176).
+     *
+     * Kalau tidak dirapikan, catatannya tetap mengaku memuat sekian baris padahal isinya sudah
+     * pindah — dan berkas lamanya sendiri memang tidak ditulis ulang. Yang kosong ditandai MOVED;
+     * yang masih bersisa cukup disesuaikan jumlah exportnya.
+     */
+    private void rapikanBerkasLama(Set<String> namaBerkas) {
+        for (String nama : namaBerkas) {
+            ExportTransfer t = transfers.findFirstByFileNameOrderByIdAsc(nama).orElse(null);
+            if (t == null) continue;
+            List<GlExportRequest> sisa = requests.findByFileNameOrderById(nama);
+            if (sisa.isEmpty()) {
+                t.setStatus("MOVED");
+                t.setRowsCount(0);
+            } else {
+                t.setRowsCount(lineCount(contentOf(sisa)));
+            }
+            transfers.save(t);
+        }
     }
 
     /**

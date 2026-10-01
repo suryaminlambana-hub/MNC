@@ -60,6 +60,21 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
                                              @Param("until") LocalDateTime until);
 
     /**
+     * SELURUH export yang disetujui pada rentang tanggal, termasuk yang sudah masuk berkas hari
+     * lain (BUG_AUSY_00176).
+     *
+     * Tombol "Susun Ulang" memang untuk itu: menyusun ulang isi berkas menurut tanggal
+     * persetujuan, apa pun yang pernah terjadi pada export itu sebelumnya. Versi sebelumnya
+     * mensyaratkan {@code file_name} kosong atau sama dengan berkas hari ini, sehingga export
+     * yang kemarin sudah dibuatkan berkas tidak pernah ikut — admin memilih tanggal 29, di sana
+     * jelas ada export, dan yang keluar justru "tidak ada export pada tanggal itu".
+     */
+    @Query("select r from GlExportRequest r where r.status = 'APPROVED'"
+         + " and r.decidedAt >= :from and r.decidedAt < :until order by r.id asc")
+    List<GlExportRequest> findApprovedBetween(@Param("from") LocalDateTime from,
+                                              @Param("until") LocalDateTime until);
+
+    /**
      * Penghuni berkas hari ini yang jatuh DI LUAR rentang yang baru dipilih (BUG_AUSY_00169).
      *
      * Mereka harus dilepas kembali ke daftar tunggu, bukan dibiarkan: berkasnya disusun ulang
