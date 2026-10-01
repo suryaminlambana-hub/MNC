@@ -49,7 +49,8 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
      * rentang yang sama tidak mengubah isinya.
      *
      * Yang sudah menghuni berkas HARI LAIN sengaja tidak ikut: memindahkannya adalah tindakan
-     * tersendiri (tombol Populate Ulang), bukan efek samping memilih rentang tanggal.
+     * tersendiri, bukan efek samping memilih rentang tanggal. (Tombol Populate Ulang yang dulu
+     * mengerjakannya sudah dibatalkan — BUG_AUSY_00173.)
      */
     @Query("select r from GlExportRequest r where r.status = 'APPROVED'"
          + " and (r.fileName is null or r.fileName = :file)"

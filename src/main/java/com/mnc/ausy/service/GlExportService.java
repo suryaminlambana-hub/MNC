@@ -277,6 +277,25 @@ public class GlExportService {
     /** Export approved yang filenya belum terbit — satu-satunya yang masih bisa ditarik. */
     public List<GlExportRequest> returnable() { return requests.findApprovedNotGenerated(); }
 
+    /**
+     * Idem, dibatasi yang benar-benar boleh ditarik checker ini (BUG_AUSY_00176).
+     *
+     * Daftarnya dulu tidak disaring sama sekali, padahal {@link #returnExport} menolak export
+     * dari maker yang bukan pasangan otorisasi si checker. Akibatnya layar memperlihatkan
+     * pengajuan maker group lain lengkap dengan tombol Return yang tidak akan pernah berhasil —
+     * sekaligus membocorkan data maker yang bukan wewenangnya.
+     *
+     * Saringannya memakai dua syarat yang sama persis dengan aksinya: group pengaju harus boleh
+     * disetujui group ini, dan makernya harus pasangan otorisasi checker ini. Satu aturan di
+     * dua tempat selalu berakhir beda; di sini sengaja dipanggil pemeriksaan yang sama.
+     */
+    public List<GlExportRequest> returnable(AusyUserDetails me) {
+        List<GlExportRequest> sesuaiGroup = new ArrayList<>();
+        for (GlExportRequest r : returnable())
+            if (approval.canApproveGroup(me.getIdGroup(), groupOf(r))) sesuaiGroup.add(r);
+        return scope.filterBy(me, sesuaiGroup, GlExportRequest::getRequestedBy);
+    }
+
     @Transactional
     public String returnExport(Long reqId, AusyUserDetails me, String note) {
         String checker = me.getUsername();

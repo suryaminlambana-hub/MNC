@@ -38,8 +38,10 @@ public class GlExportController {
      * audit trail tetap murni catatan, tidak dipakai mengubah data.
      */
     @GetMapping("/gl-export/return-list")
-    public String returnList(Model model) {
-        model.addAttribute("items", glExport.returnable());
+    public String returnList(@AuthenticationPrincipal AusyUserDetails me, Model model) {
+        // Disaring sesuai wewenang checker ini (BUG_AUSY_00176) — daftarnya harus memperlihatkan
+        // persis apa yang tombolnya sanggup kerjakan.
+        model.addAttribute("items", glExport.returnable(me));
         return "gl-export/return-list";
     }
 

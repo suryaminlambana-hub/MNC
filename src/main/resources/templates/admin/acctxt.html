@@ -17,6 +17,10 @@
     mengikuti <strong>tanggal hari ini</strong> saat tombol ditekan, bukan tanggal data yang
     dipilih. Menekan tombolnya lagi hari ini tidak membuat file kedua: file yang sama disusun
     ulang berisi semuanya.
+    <!--/* BUG_AUSY_00176: folder tujuannya ikut ditulis. Tanpa ini admin tidak punya cara
+           memastikan hasilnya mendarat di mana — dan folder yang berlaku belum tentu sama
+           dengan isi setelan, karena setelan yang tidak bisa dipakai diabaikan. */-->
+    Filenya terbit di <code th:text="${exportDir}">C:\inetpub\ftproot</code>.
   </p>
 
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
@@ -89,11 +93,10 @@
         <input type="date" class="form-control" id="to" name="to"
                th:value="${to}" th:min="${min}" th:max="${max}" required>
       </div>
-      <div>
-        <!--/* Tombol lihat memakai kolom yang sama, cuma dibelokkan ke GET halaman ini. */-->
-        <button type="submit" class="btn btn-secondary" formmethod="get" th:formaction="@{/admin/acctxt}"
-                formnovalidate>Tampilkan</button>
-      </div>
+      <!--/* BUG_AUSY_00175: tombol "Tampilkan" dilepas. Sejak daftar "Menunggu digenerate" tidak
+             lagi disaring rentang tanggal (BUG_AUSY_00174), menekannya tidak mengubah apa pun di
+             layar — tombol yang tidak mengerjakan apa-apa hanya membuat orang ragu mana yang
+             harus ditekan. Kolom tanggalnya kini hanya melayani tombol di sebelahnya. */-->
       <div>
         <button type="submit" class="btn btn-outline-primary">
           <i class="fa-solid fa-rotate"></i> Susun Ulang File Tanggal Terpilih

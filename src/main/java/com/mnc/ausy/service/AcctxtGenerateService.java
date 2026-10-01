@@ -112,8 +112,12 @@ public class AcctxtGenerateService {
         LocalDateTime awal = from.atStartOfDay(), akhir = to.plusDays(1).atStartOfDay();
         List<GlExportRequest> terpilih = requests.findForFileInRange(todayFile(), awal, akhir);
         if (terpilih.isEmpty())
+            // Dibedakan tegas dari kegagalan menulis (BUG_AUSY_00176): tidak ada yang cocok bukan
+            // berarti penyimpanannya bermasalah, dan berkas yang sudah ada tidak ikut disentuh.
             return Result.fail("Tidak ada export berstatus approved pada " + rangeText(from, to)
-                    + " yang bisa dibuatkan file.");
+                    + ". Tidak ada file yang ditulis, dan isi file hari ini tidak berubah."
+                    + " Export yang disetujui hari ini tidak termasuk di sini — pakai tombol"
+                    + " \"Generate File ACCTXT Hari Ini\".");
 
         // Rentang tanggal menentukan ISI berkas, bukan sekadar apa yang ditambahkan. Penghuni
         // berkas hari ini yang jatuh di luar rentang baru harus keluar — dan keluarnya sampai ke
@@ -174,6 +178,15 @@ public class AcctxtGenerateService {
         return publish(isi, me, "ACCTXT_GENERATE_TODAY",
                 "Generate export yang disetujui hari ini (" + isi.size() + " export)");
     }
+
+    /**
+     * Folder tempat berkas ACCTXT terbit, untuk ditampilkan di layar (BUG_AUSY_00176).
+     *
+     * Admin perlu tahu ke mana hasilnya pergi tanpa membuka Explorer — apalagi folder yang
+     * berlaku belum tentu sama dengan yang tertulis di setelan: ExportFileStore mengabaikan
+     * setelan yang tidak bisa dipakai dan memperbaiki salah tulis sendiri.
+     */
+    public String exportDirText() { return files.dir().toString(); }
 
     /** Berapa yang menunggu dan disetujui hari ini — angka yang dijanjikan tombol Hari Ini. */
     public long todayPendingCount() {
@@ -257,7 +270,11 @@ public class AcctxtGenerateService {
                 alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
                 + rowCount + " baris di " + out);
 
-        return new Result(true, "File " + fileName + " berisi " + isi.size()
+        // Lokasinya disebutkan, bukan hanya nama berkasnya (BUG_AUSY_00176). Sejak bagian "File
+        // ACCTXT yang sudah dibuat" di-take out (BUG_AUSY_00173), layar tidak lagi punya tempat
+        // lain yang memperlihatkan berkasnya mendarat di mana — "tersimpan atau tidak" jadi tidak
+        // bisa dipastikan dari aplikasi, dan penguji melaporkannya sebagai gagal tersimpan.
+        return new Result(true, "File " + out + " berisi " + isi.size()
                 + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ".",
                 fileName, rowCount, isi.size());
     }

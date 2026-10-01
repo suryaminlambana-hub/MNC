@@ -54,6 +54,7 @@ public class AcctxtGenerateController {
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
         // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.
         model.addAttribute("todayYymmdd", acctxt.todayYymmdd());
+        model.addAttribute("exportDir", acctxt.exportDirText());
         return "admin/acctxt";
     }
 
