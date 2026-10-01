@@ -1,5 +1,6 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.domain.GlExportRequest;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AcctxtGenerateService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Menu admin "Generate File ACCTXT" (BUG_AUSY_00155 & BUG_AUSY_00158).
@@ -43,12 +45,12 @@ public class AcctxtGenerateController {
         model.addAttribute("from", f);
         model.addAttribute("to", t);
         model.addAttribute("maxDaysBack", AcctxtGenerateService.MAX_DAYS_BACK);
-        // Daftar "Menunggu digenerate" sengaja TIDAK tersaring rentang tanggal di atas
-        // (BUG_AUSY_00174): tombol di bawahnya menyusun seluruh export yang menunggu, jadi
-        // daftarnya harus memperlihatkan persis itu — daftar tersaring dengan tombol
-        // tak-tersaring adalah jebakan.
-        model.addAttribute("pending", acctxt.allPending());
-        model.addAttribute("todayPendingCount", acctxt.todayPendingCount());
+        // Daftar "Menunggu digenerate" berisi persis yang akan diambil tombol di bawahnya:
+        // disetujui hari ini dan belum pernah dibuatkan berkas. Daftar dan tombol harus
+        // menjanjikan hal yang sama — daftar yang lebih luas dari tombolnya adalah jebakan.
+        List<GlExportRequest> pending = acctxt.todayPending();
+        model.addAttribute("pending", pending);
+        model.addAttribute("todayPendingCount", pending.size());
         model.addAttribute("stranded", acctxt.strandedPending());
         // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari

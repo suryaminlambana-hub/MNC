@@ -200,23 +200,34 @@ public class AcctxtGenerateService {
      */
     public String exportDirText() { return files.dir().toString(); }
 
-    /** Berapa yang menunggu dan disetujui hari ini — angka yang dijanjikan tombol Hari Ini. */
-    public long todayPendingCount() {
+    /**
+     * Isi daftar "Menunggu digenerate": export yang disetujui HARI INI dan belum pernah
+     * dibuatkan berkas — persis yang akan diambil tombol Hari Ini, tidak lebih.
+     *
+     * Sebelumnya daftar ini memuat seluruh yang menunggu tanpa melihat tanggal, supaya export
+     * lama yang belum tergenerate tidak hilang dari pandangan. Aturan yang ditetapkan pengguna
+     * lebih tegas: daftar hanya untuk hari berjalan. Yang lama tidak dibiarkan lenyap begitu
+     * saja, melainkan dimunculkan sebagai peringatan tersendiri — lihat {@link #strandedPending()}.
+     */
+    public List<GlExportRequest> todayPending() {
         LocalDate today = LocalDate.now();
-        return allPending().stream()
-                .filter(r -> r.getDecidedAt() != null && !r.getDecidedAt().toLocalDate().isBefore(today))
-                .count();
+        return requests.findApprovedNotGeneratedBetween(
+                today.atStartOfDay(), today.plusDays(1).atStartOfDay());
     }
 
     /**
-     * Export menunggu yang sudah lewat jangkauan kedua tombol: disetujui sebelum
-     * {@link #earliestSelectable()} sehingga tidak bisa dipilih di rentang tanggal, dan bukan
-     * hari ini sehingga tidak terbawa tombol Hari Ini. Ditampilkan sebagai peringatan.
+     * Export menunggu yang tidak terjangkau tombol mana pun di halaman ini.
+     *
+     * Tombol Hari Ini hanya mengambil persetujuan hari ini. Susun Ulang bekerja atas BERKAS
+     * harian, sehingga export yang belum pernah masuk berkas mana pun tidak punya wujud di
+     * sana sama sekali. Akibatnya setiap export menunggu yang disetujui sebelum hari ini tidak
+     * punya jalan keluar lewat layar ini — karena itu dimunculkan sebagai peringatan, bukan
+     * dibiarkan hilang dari pandangan.
      */
     public List<GlExportRequest> strandedPending() {
-        LocalDate min = earliestSelectable();
+        LocalDate today = LocalDate.now();
         return allPending().stream()
-                .filter(r -> r.getDecidedAt() != null && r.getDecidedAt().toLocalDate().isBefore(min))
+                .filter(r -> r.getDecidedAt() == null || r.getDecidedAt().toLocalDate().isBefore(today))
                 .toList();
     }
 

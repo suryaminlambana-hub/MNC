@@ -32,10 +32,11 @@
   <h2 class="h6 text-uppercase text-muted mb-2">Menunggu digenerate</h2>
 
   <div th:if="${not #lists.isEmpty(stranded)}" class="alert alert-warning py-2">
-    <strong th:text="${#lists.size(stranded)}">0</strong> export sudah disetujui lebih dari
-    <span th:text="${maxDaysBack}">3</span> hari lalu dan belum dibuatkan file. Export itu
-    <strong>tidak terjangkau kedua tombol di halaman ini</strong> — terlalu lama untuk rentang
-    tanggal, dan bukan persetujuan hari ini. Perlu ditangani terpisah.
+    <strong th:text="${#lists.size(stranded)}">0</strong> export disetujui pada hari sebelumnya
+    dan belum pernah dibuatkan file. Export itu <strong>tidak terjangkau kedua tombol di halaman
+    ini</strong>: tombol Hari Ini hanya mengambil persetujuan hari ini, sedangkan Susun Ulang
+    bekerja atas file harian — export yang belum pernah masuk file mana pun tidak ada di sana.
+    Perlu ditangani terpisah.
   </div>
 
   <div class="ausy-card">
@@ -57,7 +58,7 @@
       </tr>
       <tr th:if="${#lists.isEmpty(pending)}">
         <td colspan="7" class="text-center text-muted py-4">
-          Tidak ada export approved yang menunggu digenerate.
+          Tidak ada export yang disetujui hari ini dan menunggu digenerate.
         </td>
       </tr>
       </tbody>
@@ -119,13 +120,17 @@
         Hanya <span th:text="${maxDaysBack}">3</span> hari terakhir yang bisa dipilih:
         <strong th:text="${min}"></strong> s/d <strong th:text="${max}"></strong>.
         <strong>Hari ini tidak termasuk</strong> — untuk persetujuan hari ini pakai tombol di atas.
-        <!--/* BUG_AUSY_00178: dasar penyaringannya sering disalahpahami sebagai tanggal batch
-               atau tanggal upload, sehingga hasilnya tampak seperti "semua yang pernah
-               diexport". Ditulis tegas di layar. */-->
-        Yang dicocokkan <strong>tanggal persetujuan Checker</strong> (kolom Disetujui pada daftar
-        di atas) — bukan tanggal upload batch dan bukan tanggal data GL-nya.
-        Rentang ini menentukan <strong>isi</strong> file: export yang sekarang ada di file hari ini
-        tapi jatuh di luar rentang akan dikeluarkan dan kembali menunggu.
+        <!--/* BUG_AUSY_00178: yang disaring adalah FILE HARIAN, bukan export satu per satu.
+               Kalimat lama di sini masih menyebut "tanggal persetujuan Checker" — sisa aturan
+               sebelum 00178 mengubah satuannya — dan itu menyesatkan: export yang disetujui
+               hari ini pun ikut terbawa kalau ia penghuni file tanggal yang dipilih. */-->
+        Yang diambil adalah <strong>file ACCTXT tanggal tersebut</strong>, bukan export satu per
+        satu. Kalau satu tanggal pernah digenerate lebih dari sekali, yang dipakai
+        <strong>versi terakhirnya</strong> — yang sudah tertimpa tidak ikut. File-file itu
+        digabung jadi satu file bertanggal hari ini.
+        Tombol ini <strong>tidak mengeluarkan apa pun</strong> dari daftar di atas: export tetap
+        tercatat sebagai penghuni file tanggal asalnya, sehingga rentang yang sama bisa disusun
+        ulang berkali-kali.
       </small>
     </div>
   </div>
