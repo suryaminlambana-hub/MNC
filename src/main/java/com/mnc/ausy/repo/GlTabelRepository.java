@@ -223,19 +223,6 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query("update GlTabel g set g.statusPrint='SUDAH UPLOAD' where g.exportReqId=:rid")
     int markExported(@Param("rid") Long reqId);
 
-    /**
-     * Lepas baris dari berkas ACCTXT tanpa membatalkan permintaan exportnya (BUG_AUSY_00169).
-     *
-     * Dipakai ketika admin menyusun ulang berkas hari ini untuk rentang tanggal yang lebih
-     * sempit: export yang jatuh di luar rentang keluar dari berkas dan kembali menunggu, jadi
-     * statusnya tidak boleh tetap "SUDAH UPLOAD". Bedanya dengan {@link #revertExport} —
-     * {@code export_req_id} dibiarkan, karena permintaan exportnya sendiri tetap sah dan sudah
-     * disetujui checker; yang batal cuma keikutsertaannya pada berkas.
-     */
-    @Modifying @Transactional
-    @Query("update GlTabel g set g.statusPrint='BELUM UPLOAD' where g.exportReqId=:rid")
-    int unmarkExported(@Param("rid") Long reqId);
-
     /** Reject export: kembalikan baris agar bisa diajukan lagi. */
     @Modifying @Transactional
     @Query("update GlTabel g set g.statusPrint='BELUM UPLOAD', g.exportReqId=null where g.exportReqId=:rid")

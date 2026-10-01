@@ -75,20 +75,6 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
                                               @Param("until") LocalDateTime until);
 
     /**
-     * Penghuni berkas hari ini yang jatuh DI LUAR rentang yang baru dipilih (BUG_AUSY_00169).
-     *
-     * Mereka harus dilepas kembali ke daftar tunggu, bukan dibiarkan: berkasnya disusun ulang
-     * hanya dari rentang terpilih, jadi kalau penandanya tidak dilepas, catatan akan mengaku
-     * mereka ada di dalam berkas padahal isinya sudah tidak memuat mereka.
-     */
-    @Query("select r from GlExportRequest r where r.fileName = :file"
-         + " and (r.decidedAt is null or r.decidedAt < :from or r.decidedAt >= :until)"
-         + " order by r.id asc")
-    List<GlExportRequest> findInFileOutsideRange(@Param("file") String file,
-                                                 @Param("from") LocalDateTime from,
-                                                 @Param("until") LocalDateTime until);
-
-    /**
      * Isi berkas untuk tombol "Generate Hari Ini" (BUG_AUSY_00174): export yang disetujui
      * HARI INI dan masih menunggu, ditambah seluruh penghuni berkas itu sendiri.
      *

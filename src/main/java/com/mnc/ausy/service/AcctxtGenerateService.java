@@ -43,13 +43,21 @@ import java.util.Set;
  *       berkas bertanggal lampau tidak akan diambil core lagi.</li>
  * </ul>
  *
- * <h2>Rentang tanggal menentukan isi, bukan tambahan</h2>
+ * <h2>Kedua tombol menambah, tidak ada yang mengurangi (BUG_AUSY_00178)</h2>
  *
- * Isi berkas hari ini adalah export yang <b>disetujui checker dalam rentang yang dipilih
- * admin</b> — tidak lebih. Yang sempat masuk berkas ini dari penekanan sebelumnya tapi jatuh di
- * luar rentang baru akan dikeluarkan dan dikembalikan ke daftar tunggu, lengkap sampai penanda
- * statusnya, supaya tidak ada data yang hilang diam-diam: tidak ada di berkas tapi tercatat
- * sudah terkirim.
+ * Tombol "Hari Ini" memasukkan persetujuan hari ini; tombol "Susun Ulang" memasukkan persetujuan
+ * pada rentang tanggal lampau yang dipilih. Keduanya mengisi berkas yang sama dan tidak pernah
+ * mengeluarkan apa yang dimasukkan tombol satunya.
+ *
+ * Versi sebelumnya membuat Susun Ulang melepas penghuni yang jatuh di luar rentang — supaya
+ * catatannya tidak mengaku ada di berkas yang isinya sudah tidak memuat mereka. Niatnya benar,
+ * akibatnya tidak: export yang baru saja dimasukkan tombol Hari Ini terlempar keluar begitu
+ * admin memakai Susun Ulang, dan daftar "Menunggu digenerate" ikut berubah padahal yang sedang
+ * dikerjakan bagian Susun Ulang.
+ *
+ * Yang dibuang bukan penjagaannya melainkan sebabnya: berkas selalu disusun dari SELURUH
+ * penghuninya, jadi tidak ada penghuni yang isinya hilang dari berkas dan tidak ada yang perlu
+ * dilepas.
  */
 @Service
 public class AcctxtGenerateService {
@@ -127,18 +135,6 @@ public class AcctxtGenerateService {
                     + " Export yang disetujui hari ini tidak termasuk di sini — pakai tombol"
                     + " \"Generate File ACCTXT Hari Ini\".");
 
-        // Rentang tanggal menentukan ISI berkas, bukan sekadar apa yang ditambahkan. Penghuni
-        // berkas hari ini yang jatuh di luar rentang baru harus keluar — dan keluarnya sampai ke
-        // penanda statusnya, supaya mereka muncul lagi di daftar tunggu. Tanpa ini datanya
-        // menghilang diam-diam: tidak ada di berkas, tapi tercatat sudah terkirim.
-        List<GlExportRequest> dilepas = requests.findInFileOutsideRange(todayFile(), awal, akhir);
-        for (GlExportRequest req : dilepas) {
-            gl.unmarkExported(req.getId());
-            req.setFileName(null);
-            req.setTransferId(null);
-            requests.save(req);
-        }
-
         // Berkas lama yang ditinggalkan export-exportnya dicatat dulu, sebelum penandanya ditimpa.
         Set<String> berkasLama = new LinkedHashSet<>();
         for (GlExportRequest req : terpilih) {
@@ -153,21 +149,27 @@ public class AcctxtGenerateService {
         }
         rapikanBerkasLama(berkasLama);
 
-        Result r = publish(terpilih, me, "ACCTXT_GENERATE",
-                "Generate untuk " + rangeText(from, to)
-                + (berkasLama.isEmpty() ? "" : ", isi " + String.join(", ", berkasLama) + " ditarik ke berkas hari ini")
-                + (dilepas.isEmpty() ? "" : ", " + dilepas.size() + " export di luar rentang dilepas kembali"));
-        if (!r.ok()) return r;
+        // Tombol ini MENAMBAHKAN ke berkas hari ini, tidak pernah mengurangi (BUG_AUSY_00178).
+        //
+        // Sebelumnya penghuni berkas yang jatuh di luar rentang dilepas kembali ke daftar tunggu,
+        // supaya catatannya tidak mengaku ada di berkas yang isinya sudah tidak memuat mereka.
+        // Niatnya benar, akibatnya tidak: export yang baru saja dimasukkan tombol "Hari Ini"
+        // justru terlempar keluar begitu admin memakai Susun Ulang untuk tanggal lampau — satu
+        // tombol membatalkan pekerjaan tombol sebelahnya, dan daftar "Menunggu digenerate" ikut
+        // berubah padahal yang sedang dikerjakan bagian Susun Ulang.
+        //
+        // Yang dibuang bukan penjagaannya, melainkan sebabnya: berkas disusun dari SELURUH
+        // penghuninya — yang sudah ada ditambah yang baru dipilih — jadi tidak ada lagi penghuni
+        // yang isinya hilang dari berkas, dan tidak ada yang perlu dilepas.
+        List<GlExportRequest> isi = requests.findByFileNameOrderById(todayFile());
 
-        StringBuilder tambahan = new StringBuilder();
-        if (!berkasLama.isEmpty())
-            tambahan.append(" Isi ").append(String.join(", ", berkasLama))
-                    .append(" ikut ditarik ke file hari ini, jadi satu file.");
-        if (!dilepas.isEmpty())
-            tambahan.append(' ').append(dilepas.size())
-                    .append(" export di luar rentang itu dikeluarkan dari file dan kembali menunggu digenerate.");
-        return tambahan.isEmpty() ? r
-                : new Result(true, r.message() + tambahan, r.fileName(), r.rows(), r.exportCount());
+        Result r = publish(isi, me, "ACCTXT_GENERATE",
+                "Generate untuk " + rangeText(from, to)
+                + (berkasLama.isEmpty() ? "" : ", isi " + String.join(", ", berkasLama) + " ditarik ke berkas hari ini"));
+        if (!r.ok() || berkasLama.isEmpty()) return r;
+        return new Result(true, r.message() + " Isi " + String.join(", ", berkasLama)
+                + " ikut ditarik ke file hari ini, jadi satu file.",
+                r.fileName(), r.rows(), r.exportCount());
     }
 
     /**
