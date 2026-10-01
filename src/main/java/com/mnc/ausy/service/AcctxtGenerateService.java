@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,31 +34,25 @@ import java.util.Set;
  *
  * Sebuah berkas ACCTXT dikenali dari TANGGAL EKSEKUSI — kapan admin menekan tombolnya — bukan
  * dari tanggal data di dalamnya. Rentang tanggal yang dipilih admin menentukan data mana yang
- * ikut, tidak pernah menentukan nama berkas.
+ * ikut, tidak pernah menentukan nama berkas. Berapa kali pun tombol ditekan dalam satu hari,
+ * yang ada tetap satu berkas: isinya disusun ulang dari nol, tidak pernah ditambal.
  *
- * Dari situ dua hal mengikuti sendirinya:
+ * <h2>Dua tombol, dua satuan kerja (BUG_AUSY_00178)</h2>
+ *
+ * Aturannya ditetapkan pengguna, dan keduanya menimpa berkas hari ini — bukan menambahinya:
+ *
  * <ul>
- *   <li>berapa kali pun tombol ditekan dalam satu hari, hasilnya satu berkas — isinya selalu
- *       disusun ulang dari nol, tidak ditambal;</li>
- *   <li>menerbitkan ulang berkas lama berarti memindahkan isinya ke berkas hari ini, karena
- *       berkas bertanggal lampau tidak akan diambil core lagi.</li>
+ *   <li><b>Generate Hari Ini</b> bekerja atas EXPORT. Isinya persis daftar "Menunggu digenerate":
+ *       disetujui hari ini dan belum pernah dibuatkan berkas. Penekanan kedua pada hari yang sama
+ *       berisi yang baru disetujui sejak penekanan pertama, dan berkasnya menimpa yang pertama.</li>
+ *   <li><b>Susun Ulang</b> bekerja atas BERKAS HARIAN. Memilih 29 s/d 30 September berarti
+ *       menggabungkan isi ACCTXT tanggal 29 dan ACCTXT tanggal 30 — masing-masing versi
+ *       terakhirnya — menjadi satu berkas bertanggal hari ini.</li>
  * </ul>
  *
- * <h2>Kedua tombol menambah, tidak ada yang mengurangi (BUG_AUSY_00178)</h2>
- *
- * Tombol "Hari Ini" memasukkan persetujuan hari ini; tombol "Susun Ulang" memasukkan persetujuan
- * pada rentang tanggal lampau yang dipilih. Keduanya mengisi berkas yang sama dan tidak pernah
- * mengeluarkan apa yang dimasukkan tombol satunya.
- *
- * Versi sebelumnya membuat Susun Ulang melepas penghuni yang jatuh di luar rentang — supaya
- * catatannya tidak mengaku ada di berkas yang isinya sudah tidak memuat mereka. Niatnya benar,
- * akibatnya tidak: export yang baru saja dimasukkan tombol Hari Ini terlempar keluar begitu
- * admin memakai Susun Ulang, dan daftar "Menunggu digenerate" ikut berubah padahal yang sedang
- * dikerjakan bagian Susun Ulang.
- *
- * Yang dibuang bukan penjagaannya melainkan sebabnya: berkas selalu disusun dari SELURUH
- * penghuninya, jadi tidak ada penghuni yang isinya hilang dari berkas dan tidak ada yang perlu
- * dilepas.
+ * Susun Ulang tidak memindahkan kepemilikan: export tetap tercatat sebagai penghuni berkas
+ * tanggal asalnya, sehingga rentang yang sama bisa disusun ulang berkali-kali dan daftar
+ * "Menunggu digenerate" tidak pernah ikut bergerak karena ulahnya.
  */
 @Service
 public class AcctxtGenerateService {
@@ -85,7 +80,6 @@ public class AcctxtGenerateService {
     /** Tanggal paling awal yang boleh dipilih hari ini. */
     public LocalDate earliestSelectable() { return LocalDate.now().minusDays(MAX_DAYS_BACK); }
 
-    /** Tanggal paling akhir yang boleh dipilih. */
     /**
      * Tanggal paling akhir yang boleh dipilih: KEMARIN, bukan hari ini (BUG_AUSY_00172).
      *
@@ -104,10 +98,10 @@ public class AcctxtGenerateService {
     public List<GlExportRequest> allPending() { return requests.findApprovedNotGenerated(); }
 
     /**
-     * Gabungkan seluruh export approved pada rentang tanggal jadi satu file ACCTXT.
+     * Susun ulang: gabungkan isi berkas ACCTXT pada rentang tanggal jadi satu berkas hari ini.
      *
-     * Tanggal yang dipakai adalah tanggal PERSETUJUAN checker, bukan tanggal pengajuan maker:
-     * yang menentukan sebuah data boleh dikirim ke core adalah kapan ia disetujui.
+     * Satuannya berkas harian, bukan export satu per satu (BUG_AUSY_00178) — lihat keterangan
+     * kelas. Berkas hari ini ditimpa, bukan ditambahi.
      */
     @Transactional
     public Result generate(LocalDate from, LocalDate to, AusyUserDetails me) {
@@ -119,79 +113,45 @@ public class AcctxtGenerateService {
             return Result.fail("Tanggal hanya boleh dalam " + MAX_DAYS_BACK + " hari terakhir ("
                     + fmt(min) + " s/d " + fmt(max) + "). Pilihan di luar itu tidak diproses.");
 
-        LocalDateTime awal = from.atStartOfDay(), akhir = to.plusDays(1).atStartOfDay();
-        // SELURUH export yang disetujui pada rentang itu, termasuk yang sudah pernah masuk berkas
-        // hari lain (BUG_AUSY_00176). Menyusun ulang berarti menyusun ulang: export tanggal 29
-        // yang kemarin sudah dibuatkan berkas tetap ikut kalau tanggal 29 yang dipilih. Syarat
-        // lama — file_name kosong atau sama dengan berkas hari ini — membuat export semacam itu
-        // tidak pernah terjangkau, dan admin yang memilih tanggal 29 justru dijawab "tidak ada
-        // export pada tanggal itu" padahal exportnya jelas ada.
-        List<GlExportRequest> terpilih = requests.findApprovedBetween(awal, akhir);
-        if (terpilih.isEmpty())
+        // Satuan tombol ini BERKAS PER TANGGAL, bukan export satu per satu (BUG_AUSY_00178).
+        // Memilih 29 s/d 30 September berarti: ambil isi ACCTXT tanggal 29 dan isi ACCTXT tanggal
+        // 30 — masing-masing versi terakhirnya, karena generate berikutnya pada hari yang sama
+        // menimpa yang sebelumnya — lalu gabungkan jadi satu berkas bertanggal hari ini.
+        List<GlExportRequest> isi = new ArrayList<>();
+        Set<String> sumber = new LinkedHashSet<>();
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            String berkas = fileOf(d);
+            // Penulisan TERAKHIR atas berkas tanggal itu — kalau hari itu digenerate dua kali,
+            // yang berlaku isi penekanan kedua, bukan gabungan keduanya.
+            ExportTransfer t = transfers.findFirstByFileNameOrderByIdDesc(berkas).orElse(null);
+            if (t == null) continue;
+            List<GlExportRequest> bagian = requests.findByTransferIdOrderById(t.getId());
+            if (bagian.isEmpty()) continue;
+            isi.addAll(bagian);
+            sumber.add(berkas);
+        }
+        if (isi.isEmpty())
             // Dibedakan tegas dari kegagalan menulis (BUG_AUSY_00176): tidak ada yang cocok bukan
             // berarti penyimpanannya bermasalah, dan berkas yang sudah ada tidak ikut disentuh.
-            return Result.fail("Tidak ada export berstatus approved pada " + rangeText(from, to)
-                    + ". Tidak ada file yang ditulis, dan isi file hari ini tidak berubah."
-                    + " Export yang disetujui hari ini tidak termasuk di sini — pakai tombol"
-                    + " \"Generate File ACCTXT Hari Ini\".");
+            return Result.fail("Tidak ada file ACCTXT pada " + rangeText(from, to)
+                    + " yang bisa disusun ulang. Tidak ada file yang ditulis, dan isi file hari ini"
+                    + " tidak berubah. Export yang disetujui hari ini tidak termasuk di sini —"
+                    + " pakai tombol \"Generate File ACCTXT Hari Ini\".");
 
-        // Berkas lama yang ditinggalkan export-exportnya dicatat dulu, sebelum penandanya ditimpa.
-        Set<String> berkasLama = new LinkedHashSet<>();
-        for (GlExportRequest req : terpilih) {
-            String f = req.getFileName();
-            if (f != null && !f.equals(todayFile())) berkasLama.add(f);
-        }
-
-        for (GlExportRequest req : terpilih) {
-            gl.markExported(req.getId());
-            req.setFileName(todayFile());
-            requests.save(req);
-        }
-        rapikanBerkasLama(berkasLama);
-
-        // Tombol ini MENAMBAHKAN ke berkas hari ini, tidak pernah mengurangi (BUG_AUSY_00178).
-        //
-        // Sebelumnya penghuni berkas yang jatuh di luar rentang dilepas kembali ke daftar tunggu,
-        // supaya catatannya tidak mengaku ada di berkas yang isinya sudah tidak memuat mereka.
-        // Niatnya benar, akibatnya tidak: export yang baru saja dimasukkan tombol "Hari Ini"
-        // justru terlempar keluar begitu admin memakai Susun Ulang untuk tanggal lampau — satu
-        // tombol membatalkan pekerjaan tombol sebelahnya, dan daftar "Menunggu digenerate" ikut
-        // berubah padahal yang sedang dikerjakan bagian Susun Ulang.
-        //
-        // Yang dibuang bukan penjagaannya, melainkan sebabnya: berkas disusun dari SELURUH
-        // penghuninya — yang sudah ada ditambah yang baru dipilih — jadi tidak ada lagi penghuni
-        // yang isinya hilang dari berkas, dan tidak ada yang perlu dilepas.
-        List<GlExportRequest> isi = requests.findByFileNameOrderById(todayFile());
-
+        // Penanda berkas asalnya SENGAJA tidak diubah. Export tetap tercatat sebagai penghuni
+        // berkas tanggal itu, sehingga rentang yang sama bisa disusun ulang lagi kapan pun —
+        // memang itu gunanya tombol ini — dan daftar "Menunggu digenerate" tidak ikut bergerak
+        // sedikit pun, karena tidak ada yang dilepas maupun ditarik ke berkas lain.
         Result r = publish(isi, me, "ACCTXT_GENERATE",
-                "Generate untuk " + rangeText(from, to)
-                + (berkasLama.isEmpty() ? "" : ", isi " + String.join(", ", berkasLama) + " ditarik ke berkas hari ini"));
-        if (!r.ok() || berkasLama.isEmpty()) return r;
-        return new Result(true, r.message() + " Isi " + String.join(", ", berkasLama)
-                + " ikut ditarik ke file hari ini, jadi satu file.",
+                "Susun ulang " + rangeText(from, to) + " dari " + String.join(", ", sumber));
+        if (!r.ok()) return r;
+        return new Result(true, r.message() + " Digabung dari " + String.join(" + ", sumber) + ".",
                 r.fileName(), r.rows(), r.exportCount());
     }
 
-    /**
-     * Catatan berkas yang penghuninya pindah ke berkas hari ini (BUG_AUSY_00176).
-     *
-     * Kalau tidak dirapikan, catatannya tetap mengaku memuat sekian baris padahal isinya sudah
-     * pindah — dan berkas lamanya sendiri memang tidak ditulis ulang. Yang kosong ditandai MOVED;
-     * yang masih bersisa cukup disesuaikan jumlah exportnya.
-     */
-    private void rapikanBerkasLama(Set<String> namaBerkas) {
-        for (String nama : namaBerkas) {
-            ExportTransfer t = transfers.findFirstByFileNameOrderByIdAsc(nama).orElse(null);
-            if (t == null) continue;
-            List<GlExportRequest> sisa = requests.findByFileNameOrderById(nama);
-            if (sisa.isEmpty()) {
-                t.setStatus("MOVED");
-                t.setRowsCount(0);
-            } else {
-                t.setRowsCount(lineCount(contentOf(sisa)));
-            }
-            transfers.save(t);
-        }
+    /** Nama berkas ACCTXT untuk sebuah tanggal. */
+    private static String fileOf(LocalDate d) {
+        return "ACCTXT." + d.format(DateTimeFormatter.ofPattern("yyMMdd"));
     }
 
     /**
@@ -212,10 +172,15 @@ public class AcctxtGenerateService {
     @Transactional
     public Result generateToday(AusyUserDetails me) {
         LocalDate today = LocalDate.now();
-        List<GlExportRequest> isi = requests.findForFileOrApprovedBetween(
-                todayFile(), today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        // Persis isi daftar "Menunggu digenerate": disetujui hari ini DAN belum pernah dibuatkan
+        // berkas (BUG_AUSY_00178). Yang sudah ikut generate sebelumnya tidak diambil lagi, jadi
+        // penekanan kedua pada hari yang sama menghasilkan berkas berisi yang baru saja disetujui
+        // — menimpa berkas penekanan pertama, sesuai aturan satu berkas per hari.
+        List<GlExportRequest> isi = requests.findApprovedNotGeneratedBetween(
+                today.atStartOfDay(), today.plusDays(1).atStartOfDay());
         if (isi.isEmpty())
-            return Result.fail("Tidak ada export yang disetujui hari ini dan menunggu digenerate.");
+            return Result.fail("Tidak ada export yang disetujui hari ini dan belum digenerate."
+                    + " Daftar \"Menunggu digenerate\" sedang kosong untuk hari ini.");
 
         for (GlExportRequest req : isi) {
             gl.markExported(req.getId());
@@ -286,23 +251,23 @@ public class AcctxtGenerateService {
             return Result.fail("Gagal menulis file ACCTXT: " + e.getMessage());
         }
 
-        // Satu nama berkas = satu baris catatan. Penekanan berikutnya memperbarui baris yang
-        // sama, jadi daftar di layar tidak memuat dua baris untuk berkas yang sebenarnya satu.
-        ExportTransfer t = transfers.findFirstByFileNameOrderByIdAsc(fileName).orElseGet(() -> {
-            ExportTransfer baru = new ExportTransfer();
-            baru.setFileName(fileName);
-            baru.setCreatedAt(LocalDateTime.now());
-            baru.setInputer(me.getUsername());
-            baru.setAttempts(0);
-            return baru;
-        });
+        // Tiap penulisan dapat barisnya sendiri (BUG_AUSY_00178). Isi berkas yang berlaku adalah
+        // isi penulisan TERAKHIR; penulisan sebelumnya tetap tercatat supaya bisa dibedakan mana
+        // export yang benar-benar ada di berkas hari itu dan mana yang sempat masuk lalu
+        // tertimpa. Tombol Susun Ulang mengambil yang terakhir saja.
+        int keBerapa = transfers.findFirstByFileNameOrderByIdDesc(fileName)
+                .map(lama -> (lama.getAttempts() == null ? 1 : lama.getAttempts()) + 1).orElse(1);
+        ExportTransfer t = new ExportTransfer();
+        t.setFileName(fileName);
+        t.setCreatedAt(LocalDateTime.now());
+        t.setInputer(me.getUsername());
         t.setChecker(me.getUsername());
         t.setPaket(cakupan(isi));
         t.setRowsCount(rowCount);
         t.setStatus("SENT");
         t.setRemotePath(out.toString());
         t.setSentAt(LocalDateTime.now());
-        t.setAttempts((t.getAttempts() == null ? 0 : t.getAttempts()) + 1);
+        t.setAttempts(keBerapa);
         transfers.save(t);
 
         StringBuilder ids = new StringBuilder();

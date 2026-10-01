@@ -27,9 +27,13 @@ public interface ExportTransferRepository extends JpaRepository<ExportTransfer, 
             LocalDateTime from, LocalDateTime until);
 
     /**
-     * Catatan berkas untuk satu nama file (BUG_AUSY_00169). Satu nama = satu baris: penekanan
-     * tombol berikutnya pada hari yang sama memperbarui baris ini, tidak menambah baris baru,
-     * supaya daftar di layar tidak memuat dua baris untuk berkas yang sebenarnya satu.
+     * Penulisan TERAKHIR atas sebuah nama berkas (BUG_AUSY_00178).
+     *
+     * Tiap penekanan tombol menambah barisnya sendiri, dan isi berkas yang berlaku adalah isi
+     * penulisan terakhir — penekanan kedua pada hari yang sama menimpa yang pertama. Riwayat
+     * penulisan sebelumnya sengaja disimpan: tanpa itu tidak ada cara membedakan "export yang
+     * ada di berkas tanggal 30" dari "export yang sempat masuk lalu tertimpa", padahal tombol
+     * Susun Ulang justru harus mengambil versi terakhirnya saja.
      */
-    Optional<ExportTransfer> findFirstByFileNameOrderByIdAsc(String fileName);
+    Optional<ExportTransfer> findFirstByFileNameOrderByIdDesc(String fileName);
 }
