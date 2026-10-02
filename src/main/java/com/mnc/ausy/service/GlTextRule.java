@@ -41,14 +41,41 @@ public final class GlTextRule {
                 || c == ' ' || ALLOWED_PUNCT.indexOf(c) >= 0;
     }
 
+    /** Spasi dalam arti luas: termasuk NBSP dan spasi nol-lebar yang ikut terbawa saat salin-tempel. */
+    private static boolean spasi(char c) {
+        return Character.isWhitespace(c) || c == ' ' || c == '​' || c == '﻿';
+    }
+
+    /**
+     * Buang spasi di depan dan di belakang — termasuk {@code \n \r \t \f}, NBSP dan spasi
+     * nol-lebar (BUG_AUSY_00180).
+     *
+     * Dilakukan SEBELUM pemeriksaan karakter, dan hasilnya pula yang disimpan. Sebelumnya
+     * pemeriksaan jalan di nilai mentah, sehingga satu baris baru atau satu spasi hasil
+     * salin-tempel dari Excel membuat isian yang sebenarnya sah ditolak sebagai "karakter tidak
+     * diizinkan". Spasi semacam itu bukan isi datanya — cukup dibuang, tidak perlu
+     * dipersoalkan. {@link String#trim()} sendiri tidak cukup: ia hanya mengenali karakter
+     * sampai U+0020, sedangkan NBSP justru yang paling sering ikut tersalin.
+     */
+    public static String trim(String s) {
+        if (s == null) return null;
+        int a = 0, b = s.length();
+        while (a < b && spasi(s.charAt(a))) a++;
+        while (b > a && spasi(s.charAt(b - 1))) b--;
+        return s.substring(a, b);
+    }
+
     /**
      * Karakter terlarang yang ada di {@code s}, tanpa duplikat dan urut kemunculan.
      * Kosong = teksnya aman. Null / kosong dianggap aman — kolom kosong diurus aturan lain.
+     *
+     * Diperiksa setelah dirapikan {@link #trim(String)}: yang dipersoalkan hanya karakter yang
+     * benar-benar bagian dari isi, bukan spasi yang menempel di ujung.
      */
     public static Set<Character> offending(String s) {
         Set<Character> bad = new LinkedHashSet<>();
         if (s == null) return bad;
-        for (char c : s.toCharArray()) if (!ok(c)) bad.add(c);
+        for (char c : trim(s).toCharArray()) if (!ok(c)) bad.add(c);
         return bad;
     }
 

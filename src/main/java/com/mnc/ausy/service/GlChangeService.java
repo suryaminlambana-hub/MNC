@@ -155,8 +155,24 @@ public class GlChangeService {
         return null;
     }
 
+    /**
+     * Rapikan spasi di ujung SELURUH isian teks sebelum apa pun dikerjakan terhadapnya
+     * (BUG_AUSY_00180).
+     *
+     * Urutannya disengaja: trim dulu, baru diperiksa karakternya, dan yang tersimpan nilai yang
+     * sudah dirapikan itu juga. Tanpa langkah ini satu baris baru atau satu spasi sisa
+     * salin-tempel membuat isian yang sebenarnya sah ditolak, dan kalaupun lolos ia terbawa ke
+     * basis data lalu ke berkas ACCTXT — tempat spasi di ujung menggeser kolom.
+     */
+    private static Map<String,String> rapikan(Map<String,String> f) {
+        Map<String,String> out = new LinkedHashMap<>();
+        if (f != null) f.forEach((k, v) -> out.put(k, GlTextRule.trim(v)));
+        return out;
+    }
+
     @Transactional
     public Res submitAdd(Map<String,String> f, AusyUserDetails me, String note) {
+        f = rapikan(f);                                          // BUG_AUSY_00180
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         String lock = batchLockReason(n(f.get("noPaket")));      // BUG_AUSY_00106
@@ -175,6 +191,7 @@ public class GlChangeService {
 
     @Transactional
     public Res submitEdit(Long glId, Map<String,String> f, AusyUserDetails me, String note) {
+        f = rapikan(f);                                          // BUG_AUSY_00180
         if (blank(note)) return new Res(false, "Alasan/justifikasi wajib diisi.");
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         GlTabel g = gl.findById(glId).orElse(null);
@@ -238,6 +255,7 @@ public class GlChangeService {
             if (g == null) { skipped++; continue; }
             // Baris milik maker lain diabaikan, walau id-nya diketik manual di Excel (BUG_AUSY_00138)
             if (!scope.canSee(me, g.getGltrus())) { skipped++; continue; }
+            row = rapikan(row);                                // BUG_AUSY_00180
             Map<String,String> cur = rowMap(g);
             Map<String,String> neu = new LinkedHashMap<>(cur);
             for (String k : FIELDS.keySet()) if (row.get(k) != null) {

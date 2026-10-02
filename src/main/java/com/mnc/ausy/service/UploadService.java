@@ -57,7 +57,11 @@ public class UploadService {
         // kosong, sehingga berkas MNC yang sah tidak menghasilkan satu baris pun (BUG_AUSY_00154).
         CellType type = c.getCellType() == CellType.FORMULA ? c.getCachedFormulaResultType() : c.getCellType();
         return switch (type) {
-            case STRING -> c.getStringCellValue().trim();
+            // Dirapikan dengan GlTextRule.trim, bukan String.trim (BUG_AUSY_00180): yang terakhir
+            // hanya mengenali karakter sampai U+0020, sedangkan yang sering ikut tersalin dari
+            // Excel justru NBSP. Nilai inilah yang diperiksa DAN yang disimpan, jadi spasi di
+            // ujung tidak pernah lagi sampai ke basis data maupun ke berkas ACCTXT.
+            case STRING -> GlTextRule.trim(c.getStringCellValue());
             case NUMERIC -> {
                 // Tanggal ditulis dengan ejaan yang sama seperti yang diketik tangan di template
                 // lama (d-MMM-yy), supaya pemeriksaan & penguraian tanggal di bawah tidak peduli
