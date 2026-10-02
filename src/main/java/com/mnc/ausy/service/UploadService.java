@@ -127,8 +127,11 @@ public class UploadService {
         try (Workbook wb = WorkbookFactory.create(in)) {
             Sheet sh = dataSheet(wb);
             if (sh == null) {
+                // BUG_AUSY_00182: tidak lagi menyuruh "Unduh Template" — tombolnya sudah
+                // disembunyikan (BUG_AUSY_00181), jadi kalimat itu menunjuk ke sesuatu yang
+                // tidak ada di layar dan hanya membuat orang mencari-cari.
                 res.message = "Format file salah: sheet \"" + UploadTemplateService.DATA_SHEET
-                        + "\" tidak ditemukan. Unduh Template dan isi pada sheet itu.";
+                        + "\" tidak ditemukan.";
                 return res;
             }
             int last = sh.getLastRowNum();
