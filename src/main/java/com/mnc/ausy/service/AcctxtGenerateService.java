@@ -121,11 +121,7 @@ public class AcctxtGenerateService {
         Set<String> sumber = new LinkedHashSet<>();
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             String berkas = fileOf(d);
-            // Penulisan TERAKHIR atas berkas tanggal itu — kalau hari itu digenerate dua kali,
-            // yang berlaku isi penekanan kedua, bukan gabungan keduanya.
-            ExportTransfer t = transfers.findFirstByFileNameOrderByIdDesc(berkas).orElse(null);
-            if (t == null) continue;
-            List<GlExportRequest> bagian = requests.findByTransferIdOrderById(t.getId());
+            List<GlExportRequest> bagian = isiHarian(berkas);
             if (bagian.isEmpty()) continue;
             isi.addAll(bagian);
             sumber.add(berkas);
@@ -147,6 +143,32 @@ public class AcctxtGenerateService {
         if (!r.ok()) return r;
         return new Result(true, r.message() + " Digabung dari " + String.join(" + ", sumber) + ".",
                 r.fileName(), r.rows(), r.exportCount());
+    }
+
+    /**
+     * Isi berkas ACCTXT sebuah tanggal: penulisan terakhir yang BERPENGHUNI (BUG_AUSY_00178).
+     *
+     * Satu nama berkas bisa ditulisi beberapa kali, dan tidak semua penulisan berarti sama:
+     *
+     * <ul>
+     *   <li>penekanan tombol Hari Ini menulis persetujuan hari itu, dan export-exportnya MENGHUNI
+     *       berkas tersebut — penekanan berikutnya menimpa yang sebelumnya, jadi yang berlaku
+     *       penulisan terakhir yang berpenghuni;</li>
+     *   <li>penekanan tombol Susun Ulang juga menulis ke berkas hari ini, tapi isinya cuma salinan
+     *       hari-hari lain. Penulisan itu tidak punya penghuni sendiri.</li>
+     * </ul>
+     *
+     * Kalau yang diambil penulisan paling akhir tanpa memandang penghuninya, isi sebuah hari akan
+     * tampak lenyap begitu ada admin lain menekan Susun Ulang pada hari yang sama — persis yang
+     * dikeluhkan: dua batch yang disetujui hari itu berubah jadi hasil rekonstruksi tiga hari.
+     * Karena itu penulisan tanpa penghuni dilewati, bukan dianggap mengosongkan harinya.
+     */
+    private List<GlExportRequest> isiHarian(String berkas) {
+        for (ExportTransfer t : transfers.findByFileNameOrderByIdDesc(berkas)) {
+            List<GlExportRequest> bagian = requests.findByTransferIdOrderById(t.getId());
+            if (!bagian.isEmpty()) return bagian;
+        }
+        return List.of();
     }
 
     /** Nama berkas ACCTXT untuk sebuah tanggal. */

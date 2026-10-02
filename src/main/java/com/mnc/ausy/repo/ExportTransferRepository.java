@@ -36,4 +36,15 @@ public interface ExportTransferRepository extends JpaRepository<ExportTransfer, 
      * Susun Ulang justru harus mengambil versi terakhirnya saja.
      */
     Optional<ExportTransfer> findFirstByFileNameOrderByIdDesc(String fileName);
+
+    /**
+     * Seluruh penulisan atas sebuah nama berkas, terbaru lebih dulu (BUG_AUSY_00178).
+     *
+     * Tidak cukup mengambil yang paling akhir. Hasil tombol Susun Ulang juga ditulis ke berkas
+     * hari ini dan ikut tercatat di sini, padahal ia hanya menyalin isi hari-hari lain dan tidak
+     * punya penghuni sendiri. Kalau yang paling akhir langsung dipakai, isi hari itu seolah
+     * lenyap begitu ada admin lain menekan Susun Ulang. Yang dicari penulisan terakhir yang
+     * BENAR-BENAR berpenghuni.
+     */
+    List<ExportTransfer> findByFileNameOrderByIdDesc(String fileName);
 }
