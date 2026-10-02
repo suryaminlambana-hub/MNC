@@ -21,9 +21,14 @@
   </div>
 
   <div class="ausy-card" style="padding:22px">
+    <!--/* BUG_AUSY_00181: tombol Download Template disembunyikan. Sheet referensi di dalamnya —
+           Product_Code, COA, Cost_Center, Branch_Code — berisi salinan daftar MNC yang TIDAK ikut
+           diperbarui sendiri; begitu daftarnya berubah di sisi MNC, template yang beredar
+           menyesatkan. Endpoint-nya sengaja dibiarkan hidup supaya tautan yang sudah terlanjur
+           dibagikan tidak mati, dan supaya tombolnya gampang dimunculkan lagi begitu daftar
+           referensinya punya cara memperbarui diri. */-->
     <div class="d-flex justify-content-between align-items-center mb-3">
       <b><i class="fa-solid fa-file-excel"></i> Upload File Excel</b>
-      <a class="btn btn-sm btn-outline-secondary" th:href="@{/upload/template}"><i class="fa-solid fa-download"></i> Download Template</a>
     </div>
     <form th:action="@{/upload/process}" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
       <div class="col"><input class="form-control" type="file" name="file" accept=".xlsx,.xls" required></div>
