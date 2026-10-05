@@ -59,7 +59,9 @@ public class DashboardController {
             List<ConfigChangeService.PendingUser> mine = configChange.pendingListByMakerGroup(myGroup);
             model.addAttribute("pendingUsers", mine.size());
             model.addAttribute("pendingUserList", mine);
-            model.addAttribute("userHistory", tx.byActivityPrefix("CONFIG_CHANGE%", PageRequest.of(0, 50)));
+            // hanya jejak admin ini sendiri, bukan seluruh admin (BUG_AUSY_00188)
+            String meId = principal == null ? "" : principal.getUsername();
+            model.addAttribute("userHistory", tx.configHistoryForAdmin(meId, "%(maker=" + meId + ")%", PageRequest.of(0, 50)));
             return "dashboard-admin";
         }
 

@@ -34,6 +34,18 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
             "order by t.time_activity desc", nativeQuery = true)
     List<TlogTransaction> glHistoryForMaker(@Param("maker") String maker, @Param("makerLike") String makerLike, Pageable page);
 
+    /**
+     * Riwayat perubahan user/config milik SATU admin (BUG_AUSY_00188): pengajuannya sendiri +
+     * keputusan approver atas pengajuan itu (dicatat atas nama approver, dengan "(maker=...)" di
+     * teksnya). Admin lain tidak ikut terlihat. {@code makerLike} harus berbentuk
+     * {@code %(maker=<id>)%} supaya "admin" tidak ikut mencocokkan "admin2".
+     */
+    @Query(value = "select t.* from tlog_transaction t where " +
+            "(t.user_id = :admin and t.name_activity = 'CONFIG_CHANGE_REQ') or " +
+            "(t.name_activity in ('CONFIG_CHANGE_APPROVE','CONFIG_CHANGE_REJECT') and t.tinfo like :makerLike) " +
+            "order by t.time_activity desc", nativeQuery = true)
+    List<TlogTransaction> configHistoryForAdmin(@Param("admin") String admin, @Param("makerLike") String makerLike, Pageable page);
+
     /** Transactions whose activity name starts with a prefix, e.g. 'CONFIG_CHANGE%' for the user/config history. */
     @Query(value = "select t.* from tlog_transaction t where t.name_activity like :prefix " +
                    "order by t.time_activity desc", nativeQuery = true)
