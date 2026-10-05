@@ -1,10 +1,7 @@
 package com.mnc.ausy.service;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
-
 /**
- * Karakter yang boleh masuk ke data GL (BUG_AUSY_00162).
+ * Karakter yang boleh masuk ke data GL.
  *
  * ACCTXT adalah berkas teks lebar tetap yang dibaca core banking. Simbol seperti
  * {@code @ # $ % ^ & * ~ | < >} membuat isinya salah baca, dan karakter non-ASCII
@@ -13,28 +10,34 @@ import java.util.Set;
  * Karena itu penyaringannya di depan, saat maker mengunggah / mengisi, bukan saat file
  * dibuat: kalau ketahuan waktu generate, datanya sudah lewat otorisasi checker.
  *
- * <p><b>Hanya huruf, angka dan spasi.</b> Tanda baca apa pun ikut ditolak — titik, koma,
- * strip, garis miring, kurung. Aturan ini diminta tegas oleh pengguna (BUG_AUSY_00162)
- * sesudah alternatif yang lebih longgar ditawarkan, jadi jangan dilonggarkan lagi tanpa
- * permintaan baru.
+ * <h2>Dibersihkan, bukan ditolak (BUG_AUSY_00180)</h2>
  *
- * <p>Konsekuensinya disadari: jurnal contoh MNC sendiri memuat {@code BBN GEDUNG-PERAWATAN},
- * {@code CAB.KPNO MENARA ICB} dan {@code SRV FIN 6 7 8 3.111.}, dan data demo memakai
- * {@code BIAYA #1} — semuanya ditolak aturan ini dan harus ditulis ulang tanpa tanda baca.
- * Kalau nanti diputuskan sebagian tanda baca boleh, {@link #ALLOWED_PUNCT} tempatnya.
+ * Aturannya kini: <b>huruf, angka, spasi, serta titik, koma dan garis bawah</b>. Selain itu
+ * <b>diganti spasi</b>, lalu spasi di kedua ujung dibuang.
+ *
+ * Sebelumnya karakter asing membuat seluruh unggahan DITOLAK. Itu tidak bisa dipertahankan:
+ * daftar referensi MNC sendiri penuh tanda baca — dari 1.774 nama pada sheet COA, 1.279 memuat
+ * karakter di luar huruf/angka/spasi, dan di Branch_Code 78 dari 86. Nama-nama itu masuk ke
+ * Sheet1 lewat VLOOKUP tanpa diketik siapa pun, sehingga maker yang mengisi template dengan
+ * benar tetap ditolak pada sebagian besar akun GL. Membersihkan membuat data tetap bisa
+ * diproses, dan berkas ACCTXT tetap aman karena yang tersisa hanya karakter yang dikenal.
+ *
+ * <p>Urutannya disengaja, sesuai permintaan: ganti dulu, baru trim. Dengan begitu karakter
+ * asing di ujung tidak meninggalkan spasi menggantung — {@code "&KAS BESAR&"} menjadi
+ * {@code "KAS BESAR"}, bukan {@code " KAS BESAR "}.
  */
 public final class GlTextRule {
 
     private GlTextRule() {}
 
     /**
-     * Tanda baca yang ikut diizinkan selain huruf, angka dan spasi.
-     * Sengaja KOSONG: permintaannya hanya alfanumerik dan spasi.
+     * Tanda baca yang ikut diizinkan selain huruf, angka dan spasi (BUG_AUSY_00180).
+     * Tempat satu-satunya kalau daftar ini perlu diubah lagi.
      */
-    public static final String ALLOWED_PUNCT = "";
+    public static final String ALLOWED_PUNCT = ".,_";
 
-    /** Ditampilkan ke user supaya jelas apa yang boleh, bukan cuma "ada karakter salah". */
-    public static final String ALLOWED_TEXT = "huruf, angka, dan spasi";
+    /** Ditampilkan ke user supaya jelas apa yang dipertahankan, bukan cuma "ada yang diganti". */
+    public static final String ALLOWED_TEXT = "huruf, angka, spasi, titik, koma, dan garis bawah";
 
     private static boolean ok(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
@@ -48,14 +51,10 @@ public final class GlTextRule {
 
     /**
      * Buang spasi di depan dan di belakang — termasuk {@code \n \r \t \f}, NBSP dan spasi
-     * nol-lebar (BUG_AUSY_00180).
+     * nol-lebar.
      *
-     * Dilakukan SEBELUM pemeriksaan karakter, dan hasilnya pula yang disimpan. Sebelumnya
-     * pemeriksaan jalan di nilai mentah, sehingga satu baris baru atau satu spasi hasil
-     * salin-tempel dari Excel membuat isian yang sebenarnya sah ditolak sebagai "karakter tidak
-     * diizinkan". Spasi semacam itu bukan isi datanya — cukup dibuang, tidak perlu
-     * dipersoalkan. {@link String#trim()} sendiri tidak cukup: ia hanya mengenali karakter
-     * sampai U+0020, sedangkan NBSP justru yang paling sering ikut tersalin.
+     * {@link String#trim()} sendiri tidak cukup: ia hanya mengenali karakter sampai U+0020,
+     * sedangkan NBSP justru yang paling sering ikut tersalin dari Excel.
      */
     public static String trim(String s) {
         if (s == null) return null;
@@ -66,35 +65,24 @@ public final class GlTextRule {
     }
 
     /**
-     * Karakter terlarang yang ada di {@code s}, tanpa duplikat dan urut kemunculan.
-     * Kosong = teksnya aman. Null / kosong dianggap aman — kolom kosong diurus aturan lain.
+     * Rapikan sebuah isian: karakter di luar yang diizinkan diganti spasi, lalu kedua ujungnya
+     * dibuang (BUG_AUSY_00180).
      *
-     * Diperiksa setelah dirapikan {@link #trim(String)}: yang dipersoalkan hanya karakter yang
-     * benar-benar bagian dari isi, bukan spasi yang menempel di ujung.
+     * Null tetap null, dan teks yang sudah bersih dikembalikan apa adanya — pemanggil bisa
+     * membandingkan hasilnya dengan masukan untuk tahu ada yang berubah atau tidak.
      */
-    public static Set<Character> offending(String s) {
-        Set<Character> bad = new LinkedHashSet<>();
-        if (s == null) return bad;
-        for (char c : trim(s).toCharArray()) if (!ok(c)) bad.add(c);
-        return bad;
+    public static String clean(String s) {
+        if (s == null) return null;
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            sb.append(ok(c) ? c : ' ');
+        }
+        return trim(sb.toString());
     }
 
-    /** Ada karakter terlarang? */
-    public static boolean hasOffending(String s) { return !offending(s).isEmpty(); }
-
-    /**
-     * Pesan siap tampil untuk satu kolom, atau null kalau aman.
-     * Karakter kontrol ditulis sebagai kode supaya tidak jadi baris kosong di layar.
-     */
-    public static String problem(String label, String value) {
-        Set<Character> bad = offending(value);
-        if (bad.isEmpty()) return null;
-        StringBuilder sb = new StringBuilder();
-        for (char c : bad) {
-            if (!sb.isEmpty()) sb.append(' ');
-            sb.append(c < 32 || c == 127 ? "[kode " + (int) c + "]" : String.valueOf(c));
-        }
-        return label + " memuat karakter yang tidak diizinkan: " + sb
-                + ". Hanya boleh " + ALLOWED_TEXT + ".";
+    /** Apakah {@link #clean(String)} akan mengubah isinya. */
+    public static boolean needsClean(String s) {
+        return s != null && !s.equals(clean(s));
     }
 }

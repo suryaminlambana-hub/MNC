@@ -82,7 +82,7 @@ public class GlCodeService {
 
     /** @return null on success, or an error key (exists/error). */
     public String add(String code, String desc, Short status, String by) {
-        desc = GlTextRule.trim(desc);                    // BUG_AUSY_00180
+        desc = GlTextRule.clean(desc);                   // BUG_AUSY_00180: dibersihkan, bukan ditolak
         if (code == null || code.isBlank()) return "nocode";
         if (!validCode(code)) return "badcode";
         code = code.trim();
@@ -95,7 +95,7 @@ public class GlCodeService {
     }
 
     public String edit(Long id, String code, String desc, Short status, String by) {
-        desc = GlTextRule.trim(desc);                    // BUG_AUSY_00180
+        desc = GlTextRule.clean(desc);                   // BUG_AUSY_00180: dibersihkan, bukan ditolak
         GlCode g = glCodes.findById(id).orElse(null);
         if (g == null) return "error";
         if (used(g)) {
@@ -145,8 +145,8 @@ public class GlCodeService {
                 if (line == 1 && row.toLowerCase().contains("nogl")) continue;   // header
                 String[] c = row.split(",", -1);
                 String code = GlTextRule.trim(c.length > 0 ? c[0] : "");
-                String desc = GlTextRule.trim(c.length > 1 ? c[1] : "");
-                if (isSisaKolomDc(desc)) desc = GlTextRule.trim(c.length > 2 ? c[2] : "");
+                String desc = GlTextRule.clean(c.length > 1 ? c[1] : "");
+                if (isSisaKolomDc(desc)) desc = GlTextRule.clean(c.length > 2 ? c[2] : "");
                 if (code.isEmpty() || !validCode(code)) { bad++; continue; }
                 if (glCodes.existsByCode(code) || listed(rows, code)) { dup++; continue; }
                 Map<String,String> m = new LinkedHashMap<>();

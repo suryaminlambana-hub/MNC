@@ -104,20 +104,14 @@ public class UploadService {
     }
 
     /**
-     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT — {index kolom, index label}.
-     * Kolom angka (nominal) dan tanggal tidak ikut: keduanya sudah punya validasinya sendiri.
+     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT.
+     *
+     * Kolom angka (nominal) dan tanggal sengaja tidak ikut: tanda hubung pada "5-Oct-26" justru
+     * bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal diurai.
+     * Dipakai untuk menghitung berapa isian yang dirapikan, bukan untuk menolak apa pun
+     * (BUG_AUSY_00180).
      */
-    private static final int[][] TEXT_COLUMNS = {
-            {2, 0}, {4, 1}, {5, 2}, {6, 3}, {7, 4}, {8, 5},
-            {9, 6}, {10, 7}, {11, 8}, {12, 9}, {14, 10}, {15, 11}
-    };
-
-    private static final String[] COLUMN_LABEL = {
-            "Kolom C [Product]", "Kolom E [Tr. Account]", "Kolom F [GL Name]",
-            "Kolom G [Description]", "Kolom H [Branch]", "Kolom I [Branch Name]",
-            "Kolom J [Cost Centre]", "Kolom K [Cost Centre Name]", "Kolom L [Currency]",
-            "Kolom M [Tr. Year]", "Kolom O [Flag]", "Kolom P [Resp]"
-    };
+    private static final int[] TEXT_COLUMNS = { 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15 };
 
     @Transactional
     public UploadResult process(InputStream in, String fileName, String username) throws Exception {
@@ -157,21 +151,16 @@ public class UploadService {
                 return res;
             }
 
-            // Pass 2: karakter yang tidak bisa ditulis ke ACCTXT (BUG_AUSY_00162).
-            // Diperiksa sebelum satu baris pun disimpan, supaya file yang bermasalah ditolak
-            // utuh — bukan separuh masuk lalu ketahuan waktu checker sudah meng-approve.
+            // Pass 2: hitung berapa isian yang perlu dirapikan, semata untuk dilaporkan ke layar
+            // (BUG_AUSY_00180). Karakter asing tidak lagi menggagalkan unggahan — ia diganti
+            // spasi saat baris disusun di bawah. Tetap dihitung supaya maker tahu datanya ada
+            // yang berubah, bukan diam-diam.
+            int dirapikan = 0;
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
                 if (cell(row, KEY_COLUMN).isBlank()) continue;
-                for (int[] col : TEXT_COLUMNS) {
-                    String problem = GlTextRule.problem(COLUMN_LABEL[col[1]], cell(row, col[0]));
-                    if (problem != null)
-                        res.errors.add(new String[]{ String.valueOf(r + 1), problem });
-                }
-            }
-            if (!res.errors.isEmpty()) {
-                res.message = "Upload gagal: ada karakter yang tidak diizinkan. Perbaiki di file Excel lalu unggah ulang.";
-                return res;
+                for (int col : TEXT_COLUMNS)
+                    if (GlTextRule.needsClean(cell(row, col))) dirapikan++;
             }
 
             String paket = String.format("%02d", gl.maxPaket() + 1);
@@ -185,22 +174,28 @@ public class UploadService {
                 String ddmmyy;
                 try { ddmmyy = LocalDate.parse(postingDate, IN).format(DDMMYY); } catch (Exception e) { ddmmyy = ""; }
 
+                // Kolom teks dirapikan di sini, bukan ditolak (BUG_AUSY_00180): karakter di luar
+                // huruf/angka/spasi/titik/koma/garis bawah diganti spasi lalu ujungnya dibuang.
+                // Tanggal dan nominal TIDAK lewat sini — tanda hubung pada "5-Oct-26" justru
+                // bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal
+                // diurai.
                 GlTabel g = new GlTabel();
-                g.setGltrfy(cell(row, 12));
+                g.setGltrfy(GlTextRule.clean(cell(row, 12)));
                 g.setGltrcd(dc);
-                g.setGlprdc(cell(row, 2));
-                g.setGltrac(cell(row, 4));
+                g.setGlprdc(GlTextRule.clean(cell(row, 2)));
+                g.setGltrac(GlTextRule.clean(cell(row, 4)));
                 g.setGltrpd(ddmmyy);
-                g.setGlName(cell(row, 5));
-                String desc = cell(row, 6); if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
+                g.setGlName(GlTextRule.clean(cell(row, 5)));
+                String desc = GlTextRule.clean(cell(row, 6));
+                if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
                 g.setGltrds(desc);
-                g.setGltrbr(cell(row, 7));
-                g.setBrName(cell(row, 8));
+                g.setGltrbr(GlTextRule.clean(cell(row, 7)));
+                g.setBrName(GlTextRule.clean(cell(row, 8)));
                 g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));   // sama seperti source asli
-                g.setGltrcy(cell(row, 11));
+                g.setGltrcy(GlTextRule.clean(cell(row, 11)));
                 g.setGltram(amt);
-                g.setGlflag(cell(row, 14));
-                g.setGlresp(cell(row, 15));
+                g.setGlflag(GlTextRule.clean(cell(row, 14)));
+                g.setGlresp(GlTextRule.clean(cell(row, 15)));
                 g.setCsName(cell(row, 10));
                 g.setNoPaket(paket);
                 g.setGleqam(amt);
@@ -236,7 +231,11 @@ public class UploadService {
 
             res.success = true;
             res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
-                          (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!");
+                          (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!") +
+                          // Pembersihan tidak boleh diam-diam: maker berhak tahu datanya ada yang
+                          // berubah sebelum checker menyetujuinya (BUG_AUSY_00180).
+                          (dirapikan == 0 ? "" : " " + dirapikan + " isian dirapikan: karakter di luar "
+                                  + GlTextRule.ALLOWED_TEXT + " diganti spasi.");
             return res;
         }
     }

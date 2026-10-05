@@ -138,35 +138,23 @@ public class GlChangeService {
 
     // ---- maker actions: create pending request, do NOT touch live data ----
     /**
-     * Karakter terlarang di isian teks data GL (BUG_AUSY_00162).
+     * Rapikan isian sebelum apa pun dikerjakan terhadapnya (BUG_AUSY_00180).
      *
      * Jalur yang sama dengan upload Excel, tapi untuk data yang diketik sendiri lewat Kelola
      * Data GL — tanpa ini simbol tetap bisa masuk lewat pintu kedua, lolos otorisasi checker,
      * lalu merusak ACCTXT saat digenerate.
      *
-     * Hanya kolom teks bebas yang diperiksa: {@code gltrac} sudah dibatasi angka saja
-     * (BUG_AUSY_00104), {@code gltrcd} hanya D/C, dan {@code gltram} angka.
+     * Kolom TEKS dibersihkan: karakter di luar yang diizinkan diganti spasi, lalu kedua ujungnya
+     * dibuang. Kolom lain cukup dibuang spasi ujungnya — {@code gltram} memakai titik desimal
+     * dan {@code gltrac} sudah dibatasi angka saja (BUG_AUSY_00104), jadi membersihkannya tidak
+     * menambah apa-apa dan hanya berisiko mengubah angka.
      */
-    private Res checkText(Map<String,String> f) {
-        for (String key : new String[]{"gltrds", "noPaket"}) {
-            String problem = GlTextRule.problem(FIELDS.getOrDefault(key, key), f.get(key));
-            if (problem != null) return new Res(false, problem);
-        }
-        return null;
-    }
+    private static final Set<String> KOLOM_TEKS = Set.of("gltrds", "noPaket");
 
-    /**
-     * Rapikan spasi di ujung SELURUH isian teks sebelum apa pun dikerjakan terhadapnya
-     * (BUG_AUSY_00180).
-     *
-     * Urutannya disengaja: trim dulu, baru diperiksa karakternya, dan yang tersimpan nilai yang
-     * sudah dirapikan itu juga. Tanpa langkah ini satu baris baru atau satu spasi sisa
-     * salin-tempel membuat isian yang sebenarnya sah ditolak, dan kalaupun lolos ia terbawa ke
-     * basis data lalu ke berkas ACCTXT — tempat spasi di ujung menggeser kolom.
-     */
     private static Map<String,String> rapikan(Map<String,String> f) {
         Map<String,String> out = new LinkedHashMap<>();
-        if (f != null) f.forEach((k, v) -> out.put(k, GlTextRule.trim(v)));
+        if (f != null) f.forEach((k, v) ->
+                out.put(k, KOLOM_TEKS.contains(k) ? GlTextRule.clean(v) : GlTextRule.trim(v)));
         return out;
     }
 
@@ -179,8 +167,6 @@ public class GlChangeService {
         if (lock != null) return new Res(false, lock);
         Res badCode = checkGlCodeInput(f.get("gltrac"));         // BUG_AUSY_00104
         if (badCode != null) return badCode;
-        Res badText = checkText(f);                              // BUG_AUSY_00162
-        if (badText != null) return badText;
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
@@ -205,8 +191,6 @@ public class GlChangeService {
             Res badCode = checkGlCodeInput(newCode);
             if (badCode != null) return badCode;
         }
-        Res badText = checkText(f);                              // BUG_AUSY_00162
-        if (badText != null) return badText;
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
         if (before.equals(after))
             return new Res(false, "Tidak ada perubahan pada data GL — permintaan tidak diajukan.");
@@ -264,8 +248,11 @@ public class GlChangeService {
             // BUG_AUSY_00104: GL Code hasil edit di Excel juga harus angka
             String code = n(neu.get("gltrac")).trim();
             if (!code.equals(n(cur.get("gltrac")).trim()) && !GlCodeService.validCode(code)) { badCode++; continue; }
-            // BUG_AUSY_00162: bulk edit lewat Excel pintu ketiga ke kolom teks yang sama
-            if (GlTextRule.hasOffending(neu.get("gltrds"))) { badText++; continue; }
+            // Bulk edit lewat Excel pintu ketiga ke kolom teks yang sama: dibersihkan, bukan
+            // dilewati (BUG_AUSY_00180).
+            String rapi = GlTextRule.clean(neu.get("gltrds"));
+            if (!rapi.equals(n(neu.get("gltrds")))) badText++;
+            neu.put("gltrds", rapi);
             // normalise amount on both sides so "200000.00" vs "200000" isn't seen as a change
             cur.put("gltram", normAmt(cur.get("gltram")));
             neu.put("gltram", normAmt(neu.get("gltram")));
@@ -278,8 +265,8 @@ public class GlChangeService {
         if (after.isEmpty()) return new Res(false, "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini)."
                 + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
                 + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : "")
-                + (badText > 0 ? " " + badText + " baris dilewati karena Description memuat karakter yang tidak diizinkan ("
-                                 + GlTextRule.ALLOWED_TEXT + ")." : ""));
+                + (badText > 0 ? " " + badText + " Description dirapikan: karakter di luar "
+                                 + GlTextRule.ALLOWED_TEXT + " diganti spasi." : ""));
         GlChangeRequest c = base("BULK_EDIT", T_GL_ROW, null, me, note);
         c.setBeforeJson(toJsonList(before));
         c.setAfterJson(toJsonList(after));
@@ -290,8 +277,8 @@ public class GlChangeService {
                 + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".")
                 + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
                 + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : "")
-                + (badText > 0 ? " " + badText + " baris dilewati karena Description memuat karakter yang tidak diizinkan ("
-                                 + GlTextRule.ALLOWED_TEXT + ")." : ""));
+                + (badText > 0 ? " " + badText + " Description dirapikan: karakter di luar "
+                                 + GlTextRule.ALLOWED_TEXT + " diganti spasi." : ""));
     }
 
     /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
