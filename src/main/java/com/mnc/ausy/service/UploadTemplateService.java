@@ -119,7 +119,14 @@ public class UploadTemplateService {
                 String[] cells = splitCsv(line);
                 for (int c = 0; c < cells.length; c++) {
                     Cell cell = row.createCell(c);
-                    cell.setCellValue(cells[c]);
+                    // Isinya dibersihkan memakai aturan yang sama dengan upload (BUG_AUSY_00180).
+                    //
+                    // Sheet1 menarik Gl_Name, Branch_Name, Cost_Center_Name, Product Name dan
+                    // Responding_Branch_Name dari sheet-sheet ini lewat VLOOKUP. Selama daftarnya
+                    // masih memuat ( ) & / — dan di COA saja ada 399 baris — maker melihat satu
+                    // hal di template sementara yang tersimpan hal lain, karena upload merapikan
+                    // sendiri. Dibersihkan di sumbernya, keduanya jadi sama.
+                    cell.setCellValue(GlTextRule.clean(cells[c]));
                     if (r == 0) cell.setCellStyle(head);
                 }
                 r++;
