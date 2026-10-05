@@ -84,6 +84,27 @@ public final class GlTextRule {
     public static boolean hasOffending(String s) { return !offending(s).isEmpty(); }
 
     /**
+     * Ganti karakter terlarang dengan spasi, lalu buang spasi di kedua ujung.
+     *
+     * <p><b>Hanya untuk data yang KAMI sendiri terbitkan</b> — saat ini daftar referensi di
+     * dalam template unduhan. Data yang datang dari pengguna TIDAK dibersihkan melainkan
+     * ditolak, supaya yang salah diperbaiki di sumbernya dan Checker tidak pernah menyetujui
+     * teks yang berbeda dari yang diajukan.
+     *
+     * <p>Template perlu ini karena isinya salinan daftar MNC yang memuat {@code ( ) & /}; kalau
+     * diterbitkan apa adanya, berkas yang kami bagikan sendiri justru gagal diunggah.
+     */
+    public static String clean(String s) {
+        if (s == null) return null;
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            sb.append(ok(c) ? c : ' ');
+        }
+        return trim(sb.toString());
+    }
+
+    /**
      * Pesan siap tampil untuk satu kolom, atau null kalau isinya sah.
      *
      * Karakter yang bermasalah disebut satu per satu supaya yang memperbaiki tahu persis apa
