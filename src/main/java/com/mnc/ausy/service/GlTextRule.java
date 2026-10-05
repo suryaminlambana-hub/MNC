@@ -12,8 +12,10 @@ package com.mnc.ausy.service;
  *
  * <h2>Dibersihkan, bukan ditolak (BUG_AUSY_00180)</h2>
  *
- * Aturannya kini: <b>huruf, angka, spasi, serta titik, koma dan garis bawah</b>. Selain itu
- * <b>diganti spasi</b>, lalu spasi di kedua ujung dibuang.
+ * Aturannya kini: <b>huruf, angka, spasi, serta titik, koma, strip dan garis bawah</b>
+ * ({@code . , - _}). Selain itu <b>diganti spasi</b>, lalu spasi di kedua ujung dibuang.
+ *
+ * Yang ditegaskan TIDAK boleh dan karenanya menjadi spasi: {@code / ( ) ; ' " &}.
  *
  * Sebelumnya karakter asing membuat seluruh unggahan DITOLAK. Itu tidak bisa dipertahankan:
  * daftar referensi MNC sendiri penuh tanda baca — dari 1.774 nama pada sheet COA, 1.279 memuat
@@ -34,10 +36,11 @@ public final class GlTextRule {
      * Tanda baca yang ikut diizinkan selain huruf, angka dan spasi (BUG_AUSY_00180).
      * Tempat satu-satunya kalau daftar ini perlu diubah lagi.
      */
-    public static final String ALLOWED_PUNCT = ".,_";
+    public static final String ALLOWED_PUNCT = ".,-_";
 
     /** Ditampilkan ke user supaya jelas apa yang dipertahankan, bukan cuma "ada yang diganti". */
-    public static final String ALLOWED_TEXT = "huruf, angka, spasi, titik, koma, dan garis bawah";
+    public static final String ALLOWED_TEXT =
+            "huruf, angka, spasi, titik, koma, strip, dan garis bawah";
 
     private static boolean ok(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
