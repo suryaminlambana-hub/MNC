@@ -191,12 +191,15 @@ public class UploadService {
                 g.setGltrds(desc);
                 g.setGltrbr(GlTextRule.clean(cell(row, 7)));
                 g.setBrName(GlTextRule.clean(cell(row, 8)));
-                g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));   // sama seperti source asli
+                // Titik & koma dibuang lebih dulu (sama seperti source asli — cost centre itu
+                // kode angka), sisanya lewat pembersihan biasa supaya ( ) & / dan kawan-kawan
+                // tidak lolos lewat kolom ini (BUG_AUSY_00180).
+                g.setGltrcc(GlTextRule.clean(cell(row, 9).replace(".", "").replace(",", "")));
                 g.setGltrcy(GlTextRule.clean(cell(row, 11)));
                 g.setGltram(amt);
                 g.setGlflag(GlTextRule.clean(cell(row, 14)));
                 g.setGlresp(GlTextRule.clean(cell(row, 15)));
-                g.setCsName(cell(row, 10));
+                g.setCsName(GlTextRule.clean(cell(row, 10)));
                 g.setNoPaket(paket);
                 g.setGleqam(amt);
                 g.setGlotam(amt);
@@ -206,7 +209,7 @@ public class UploadService {
                 g.setGltrpd1(ddmmyy);
                 g.setStatusPrint("BELUM UPLOAD");
                 g.setGlsrc("p");
-                g.setGlotcc(cell(row, 11));
+                g.setGlotcc(GlTextRule.clean(cell(row, 11)));
                 g.setGltrrf(paket + "-01-" + String.format("%04d", seq.next()));
                 g.setStatusDual("PENDING");
                 gl.save(g);

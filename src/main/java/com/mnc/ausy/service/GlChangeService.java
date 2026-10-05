@@ -848,7 +848,7 @@ public class GlChangeService {
         String code = n(a.get("gltrac")).trim(), dc = n(a.get("gltrcd")).trim();
         BigDecimal amount = amt(a.get("gltram"));
         g.setGltrac(code); g.setGltrcd(dc);
-        g.setGltram(amount); g.setGltrds(a.get("gltrds"));
+        g.setGltram(amount); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
         g.setNoPaket(a.get("noPaket"));
         g.setGltrus(maker);   // username utuh — lihat BUG_AUSY_00138 di UploadService
         // Baris manual dulu hanya mengisi 5 kolom, sehingga tanggal posting kosong di List GL Aktif
@@ -858,7 +858,7 @@ public class GlChangeService {
         String ddmmyy = LocalDate.now().format(DDMMYY);
         g.setGltrpd(ddmmyy); g.setGltrpd1(ddmmyy);
         g.setGleqam(amount); g.setGlotam(amount);
-        g.setGlName(glCodeService.descriptionOf(code));
+        g.setGlName(GlTextRule.clean(glCodeService.descriptionOf(code)));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
         g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
@@ -873,7 +873,7 @@ public class GlChangeService {
         if (glId == null || a == null) return;
         gl.findById(glId).ifPresent(g -> {
             g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-            g.setGltram(amt(a.get("gltram"))); g.setGltrds(a.get("gltrds"));
+            g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
             g.setNoPaket(a.get("noPaket"));
             gl.save(g);
         });
@@ -888,7 +888,7 @@ public class GlChangeService {
             try { id = Long.valueOf(a.get("id")); } catch (Exception e) { continue; }
             gl.findById(id).ifPresent(g -> {
                 g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-                g.setGltram(amt(a.get("gltram"))); g.setGltrds(a.get("gltrds"));
+                g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
                 g.setNoPaket(a.get("noPaket"));
                 gl.save(g);
             });
