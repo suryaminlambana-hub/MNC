@@ -820,7 +820,17 @@ public class ConfigChangeService {
                 UserMenu um = new UserMenu(); um.setUserId(userId); um.setIdMenu(gm.getIdMenu());
                 userMenus.save(um);
             }
+        // Upload Excel menyala sejak awal untuk setiap maker (BUG_AUSY_00184), apa pun isi cetakan
+        // rolenya: cetakan yang pernah diubah dulu membuat maker baru tampil tanpa menu ini dan
+        // membingungkan. Maker = role yang memegang halaman pengisi data GL.
+        if (access.canSubmitGl(idGroup) && menuRepo.existsById(UPLOAD_EXCEL_MENU)
+                && !userMenus.existsByUserIdAndIdMenu(userId, UPLOAD_EXCEL_MENU)) {
+            UserMenu um = new UserMenu(); um.setUserId(userId); um.setIdMenu(UPLOAD_EXCEL_MENU);
+            userMenus.save(um);
+        }
     }
+    /** id_menu "Upload Excel" (/upload). */
+    private static final Integer UPLOAD_EXCEL_MENU = 10;
     private String applyApproval(ConfigChangeRequest c){
         Map<String,String> a = parse(c.getAfterJson());
         switch (c.getOp()) {

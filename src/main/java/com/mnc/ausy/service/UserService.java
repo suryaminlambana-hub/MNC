@@ -18,7 +18,7 @@ public class UserService {
 
     private String levelOf(Integer idGroup) {
         if (idGroup == null) return "USER";
-        return switch (idGroup) { case 1 -> "SUPERADMIN"; case 2 -> "ADMIN"; case 3 -> "SPV"; default -> "USER"; };
+        return switch (idGroup) { case 1 -> "ADMIN"; case 2 -> "SUPERADMIN"; case 3 -> "SPV"; default -> "USER"; };
     }
 
     public boolean add(String userId, String rawPass, String nama, String email, Integer idGroup, String addby) {
