@@ -75,18 +75,23 @@ DB_PORT=5432
 DB_NAME=ausy
 DB_USER=ausy_user
 DB_PASS=<password yang dipakai di setup-db.sql>
-# AUSY_EXPORT_DIR = folder tempat file ACCTXT hasil export DIBUAT, di mesin tempat aplikasi ini
-# jalan. Core banking mengambil file dari folder itu, jadi arahkan ke root FTP lokalnya.
-# Isi PATH ABSOLUT, pakai garis miring / walau di Windows. Kosong / tidak bisa dipakai = bawaan
-# C:/inetpub/ftproot (Windows) atau data/txt (OS lain).
-AUSY_EXPORT_DIR=C:/inetpub/ftproot
+# AUSY_EXPORT_DIR = salinan lokal file ACCTXT di mesin aplikasi. Kosong = bawaan data/txt
+# (di server ini /opt/ausy/data/txt). Path Windows seperti C:/inetpub/ftproot TIDAK berlaku di
+# Linux: diabaikan dan jatuh ke bawaan (BUG_AUSY_00187).
+AUSY_EXPORT_DIR=
+# FTP MNC tujuan file ACCTXT — ada di server DB (10.5.99.23), bukan di server aplikasi ini.
+FTP_HOST=10.5.99.23
+FTP_USER=ftpuser
+FTP_PASS=<password ftpuser>
+FTP_DIR=
 ```
 
-> **Pengiriman FTP sudah tidak ada di aplikasi.** Hasil export hanya berupa file yang ditulis ke
-> `AUSY_EXPORT_DIR`; tidak ada push FTP, antrian kirim, tombol kirim ulang, maupun setelan
-> host/kredensial FTP. Karena itu **folder ini harus folder di mesin ini** (root FTP lokal / share
-> yang dipantau core) — mengarahkannya ke root FTP mesin lain tidak akan berhasil, aplikasi
-> menulisnya sebagai folder lokal dan tidak ada yang memindahkannya.
+> **File ACCTXT dikirim ke FTP MNC** (BUG_AUSY_00189). Generate File ACCTXT menulis file ke
+> `AUSY_EXPORT_DIR`, lalu langsung mengunggahnya ke `FTP_HOST`. Kalau unggahan gagal, layar
+> menyebut alasannya dan export tetap menunggu, sehingga tombolnya bisa ditekan lagi. Server
+> aplikasi juga punya vsftpd dan user `ftpuser` sendiri. Itu **bukan** FTP MNC, jadi jangan
+> arahkan `AUSY_EXPORT_DIR` ke `/home/ftpuser` di mesin ini. Log saat start menyebut tujuannya:
+> `File ACCTXT dikirim ke FTP ftpuser@10.5.99.23:/ setelah ditulis`.
 
 ### "Hasil export tidak muncul di inetpub/ftproot" (BUG_AUSY_00151)
 

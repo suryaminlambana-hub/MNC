@@ -65,12 +65,13 @@ public class AcctxtGenerateService {
     private final ExportTransferRepository transfers;
     private final ExportFileStore files;
     private final AuditService audit;
+    private final FtpService ftp;
 
     public AcctxtGenerateService(GlExportRequestRepository requests, GlTabelRepository gl,
                                  ExportTransferRepository transfers, ExportFileStore files,
-                                 AuditService audit) {
+                                 AuditService audit, FtpService ftp) {
         this.requests = requests; this.gl = gl; this.transfers = transfers;
-        this.files = files; this.audit = audit;
+        this.files = files; this.audit = audit; this.ftp = ftp;
     }
 
     public record Result(boolean ok, String message, String fileName, int rows, int exportCount) {
@@ -284,6 +285,19 @@ public class AcctxtGenerateService {
             return Result.fail("Gagal menulis file ACCTXT: " + e.getMessage());
         }
 
+        // Berkas baru dianggap terbit setelah sampai di FTP MNC (BUG_AUSY_00189). Gagal kirim =
+        // catatan tidak diperbarui, jadi export tetap menunggu dan tombolnya bisa ditekan lagi.
+        String sentTo = null;
+        if (ftp.enabled()) {
+            try {
+                sentTo = ftp.push(out);
+            } catch (Exception e) {
+                return Result.fail("File " + fileName + " sudah dibuat di " + out
+                        + " tetapi GAGAL dikirim ke FTP " + ftp.target() + ": " + e.getMessage()
+                        + ". Export tetap menunggu; coba generate lagi.");
+            }
+        }
+
         // Tiap penulisan dapat barisnya sendiri (BUG_AUSY_00178). Isi berkas yang berlaku adalah
         // isi penulisan TERAKHIR; penulisan sebelumnya tetap tercatat supaya bisa dibedakan mana
         // export yang benar-benar ada di berkas hari itu dan mana yang sempat masuk lalu
@@ -298,7 +312,7 @@ public class AcctxtGenerateService {
         t.setPaket(cakupan(isi));
         t.setRowsCount(rowCount);
         t.setStatus("SENT");
-        t.setRemotePath(out.toString());
+        t.setRemotePath(sentTo != null ? sentTo : out.toString());
         t.setSentAt(LocalDateTime.now());
         t.setAttempts(keBerapa);
         transfers.save(t);
@@ -320,13 +334,14 @@ public class AcctxtGenerateService {
 
         audit.transaction(me.getUsername(), auditAction,
                 alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
-                + rowCount + " baris di " + out);
+                + rowCount + " baris di " + out + (sentTo != null ? ", terkirim ke FTP " + sentTo : ""));
 
         // Lokasinya disebutkan, bukan hanya nama berkasnya (BUG_AUSY_00176). Sejak bagian "File
         // ACCTXT yang sudah dibuat" di-take out (BUG_AUSY_00173), layar tidak lagi punya tempat
         // lain yang memperlihatkan berkasnya mendarat di mana — "tersimpan atau tidak" jadi tidak
         // bisa dipastikan dari aplikasi, dan penguji melaporkannya sebagai gagal tersimpan.
-        return new Result(true, "File " + out + " berisi " + isi.size()
+        String lokasi = sentTo != null ? out + " dan terkirim ke FTP " + sentTo : out.toString();
+        return new Result(true, "File " + lokasi + " berisi " + isi.size()
                 + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ". "
                 + rincian(isi),
                 fileName, rowCount, isi.size());
