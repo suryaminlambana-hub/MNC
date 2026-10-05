@@ -628,9 +628,17 @@ public class GlChangeService {
         return false;
     }
 
+    /**
+     * Isi permintaan perubahan Kode GL — deskripsinya SUDAH dibersihkan di sini (BUG_AUSY_00180).
+     *
+     * Sebelumnya pembersihan baru terjadi saat permintaan diterapkan, sehingga deskripsi yang
+     * diketik maker tersimpan apa adanya di permintaan dan Checker membaca "KAS (A) & B/C" —
+     * karakter yang justru tidak boleh ada. Yang disetujui harus persis yang akan tersimpan;
+     * kalau tidak, Checker menyetujui sesuatu yang berbeda dari hasilnya.
+     */
     private Map<String,String> glCodeMap(String code, String desc, Short status) {
         Map<String,String> m = new LinkedHashMap<>();
-        m.put("code", n(code)); m.put("description", n(desc));
+        m.put("code", n(code)); m.put("description", n(GlTextRule.clean(desc)));
         m.put("status", status == null ? "1" : String.valueOf(status));
         return m;
     }
