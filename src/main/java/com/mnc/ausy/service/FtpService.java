@@ -36,15 +36,21 @@ public class FtpService {
 
     public boolean enabled() { return host != null && !host.isBlank(); }
 
-    /** Tujuan untuk ditampilkan, mis. {@code ftpuser@10.5.99.23:/}. */
+    /**
+     * Tujuan untuk ditampilkan, mis. {@code /home/ftpuser di server FTP 10.5.99.23}.
+     *
+     * Disebut sebagai folder yang dilihat tim infra di server FTP, bukan "/" yang dilihat user FTP
+     * di dalam chroot-nya: penguji mencocokkannya dengan {@code ls /home/ftpuser} di server itu.
+     * {@code FTP_DIR} kosong = folder awal user FTP, yaitu home-nya.
+     */
     public String target() {
-        String d = dir == null || dir.isBlank() ? "/" : dir.trim();
-        return user + "@" + host.trim() + ":" + d;
+        String d = dir == null || dir.isBlank() ? "/home/" + user : dir.trim();
+        return d + " di server FTP " + host.trim();
     }
 
     @jakarta.annotation.PostConstruct
     void logTarget() {
-        if (enabled()) LOG.info("File ACCTXT dikirim ke FTP {} setelah ditulis", target());
+        if (enabled()) LOG.info("File ACCTXT dikirim ke {} setelah ditulis", target());
         else LOG.info("Pengiriman FTP mati (FTP_HOST kosong): file ACCTXT hanya ditulis ke folder lokal");
     }
 
@@ -69,7 +75,8 @@ public class FtpService {
                     throw new IllegalStateException("simpan file ditolak: " + c.getReplyString().trim());
             }
             c.logout();
-            return target().replaceAll("/+$", "") + "/" + remote;
+            String d = dir == null || dir.isBlank() ? "/home/" + user : dir.trim();
+            return d.replaceAll("/+$", "") + "/" + remote + " di server FTP " + host.trim();
         } finally {
             try { if (c.isConnected()) c.disconnect(); } catch (Exception ignore) {}
         }

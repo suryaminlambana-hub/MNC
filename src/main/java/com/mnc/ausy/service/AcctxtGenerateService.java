@@ -221,7 +221,11 @@ public class AcctxtGenerateService {
      * berlaku belum tentu sama dengan yang tertulis di setelan: ExportFileStore mengabaikan
      * setelan yang tidak bisa dipakai dan memperbaiki salah tulis sendiri.
      */
-    public String exportDirText() { return files.dir().toString(); }
+    public String exportDirText() {
+        // Yang perlu diketahui admin adalah tempat core mengambil berkasnya, yaitu FTP MNC —
+        // bukan salinan lokal di server aplikasi (BUG_AUSY_00189).
+        return ftp.enabled() ? ftp.target() : files.dir().toString();
+    }
 
     /**
      * Isi daftar "Menunggu digenerate": export yang disetujui HARI INI dan belum pernah
@@ -293,7 +297,7 @@ public class AcctxtGenerateService {
                 sentTo = ftp.push(out);
             } catch (Exception e) {
                 return Result.fail("File " + fileName + " sudah dibuat di " + out
-                        + " tetapi GAGAL dikirim ke FTP " + ftp.target() + ": " + e.getMessage()
+                        + " tetapi GAGAL dikirim ke " + ftp.target() + ": " + e.getMessage()
                         + ". Export tetap menunggu; coba generate lagi.");
             }
         }
@@ -334,13 +338,13 @@ public class AcctxtGenerateService {
 
         audit.transaction(me.getUsername(), auditAction,
                 alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
-                + rowCount + " baris di " + out + (sentTo != null ? ", terkirim ke FTP " + sentTo : ""));
+                + rowCount + " baris di " + out + (sentTo != null ? ", terkirim ke " + sentTo : ""));
 
         // Lokasinya disebutkan, bukan hanya nama berkasnya (BUG_AUSY_00176). Sejak bagian "File
         // ACCTXT yang sudah dibuat" di-take out (BUG_AUSY_00173), layar tidak lagi punya tempat
         // lain yang memperlihatkan berkasnya mendarat di mana — "tersimpan atau tidak" jadi tidak
         // bisa dipastikan dari aplikasi, dan penguji melaporkannya sebagai gagal tersimpan.
-        String lokasi = sentTo != null ? out + " dan terkirim ke FTP " + sentTo : out.toString();
+        String lokasi = sentTo != null ? sentTo : out.toString();
         return new Result(true, "File " + lokasi + " berisi " + isi.size()
                 + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ". "
                 + rincian(isi),

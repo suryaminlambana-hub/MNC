@@ -91,7 +91,7 @@ FTP_DIR=
 > menyebut alasannya dan export tetap menunggu, sehingga tombolnya bisa ditekan lagi. Server
 > aplikasi juga punya vsftpd dan user `ftpuser` sendiri. Itu **bukan** FTP MNC, jadi jangan
 > arahkan `AUSY_EXPORT_DIR` ke `/home/ftpuser` di mesin ini. Log saat start menyebut tujuannya:
-> `File ACCTXT dikirim ke FTP ftpuser@10.5.99.23:/ setelah ditulis`.
+> `File ACCTXT dikirim ke /home/ftpuser di server FTP 10.5.99.23 setelah ditulis`.
 
 ### "Hasil export tidak muncul di inetpub/ftproot" (BUG_AUSY_00151)
 
