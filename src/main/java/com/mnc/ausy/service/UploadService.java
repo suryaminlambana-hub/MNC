@@ -104,14 +104,22 @@ public class UploadService {
     }
 
     /**
-     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT.
+     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT — {index kolom, index label}.
      *
-     * Kolom angka (nominal) dan tanggal sengaja tidak ikut: tanda hubung pada "5-Oct-26" justru
-     * bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal diurai.
-     * Dipakai untuk menghitung berapa isian yang dirapikan, bukan untuk menolak apa pun
-     * (BUG_AUSY_00180).
+     * Kolom tanggal dan nominal sengaja tidak ikut: tanda hubung pada "5-Oct-26" bagian dari
+     * formatnya, dan titik pada nominal bagian dari angkanya.
      */
-    private static final int[] TEXT_COLUMNS = { 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15 };
+    private static final int[][] TEXT_COLUMNS = {
+            {2, 0}, {4, 1}, {5, 2}, {6, 3}, {7, 4}, {8, 5},
+            {9, 6}, {10, 7}, {11, 8}, {12, 9}, {14, 10}, {15, 11}
+    };
+
+    private static final String[] COLUMN_LABEL = {
+            "Kolom C [Product Code]", "Kolom E [Transaction_Account]", "Kolom F [Gl_Name]",
+            "Kolom G [Transaction_Description]", "Kolom H [Branch]", "Kolom I [Branch_Name]",
+            "Kolom J [Cost_Center]", "Kolom K [Cost_Center_Name]", "Kolom L [Currency]",
+            "Kolom M [Foreign_Curr]", "Kolom O [Flag]", "Kolom P [Responding_Branch]"
+    };
 
     @Transactional
     public UploadResult process(InputStream in, String fileName, String username) throws Exception {
@@ -151,16 +159,27 @@ public class UploadService {
                 return res;
             }
 
-            // Pass 2: hitung berapa isian yang perlu dirapikan, semata untuk dilaporkan ke layar
-            // (BUG_AUSY_00180). Karakter asing tidak lagi menggagalkan unggahan — ia diganti
-            // spasi saat baris disusun di bawah. Tetap dihitung supaya maker tahu datanya ada
-            // yang berubah, bukan diam-diam.
-            int dirapikan = 0;
+            // Pass 2: karakter yang tidak diizinkan (BUG_AUSY_00180).
+            //
+            // Berkasnya ditolak UTUH, bukan separuh masuk lalu ketahuan saat Checker sudah
+            // menyetujui. Barisnya disebut satu per satu lengkap dengan kolom dan karakternya,
+            // supaya yang memperbaiki tahu persis apa yang harus dicari — sebagian besar berasal
+            // dari kolom yang terisi VLOOKUP, jadi perbaikannya di sheet referensi, bukan di
+            // baris yang diketik.
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
                 if (cell(row, KEY_COLUMN).isBlank()) continue;
-                for (int col : TEXT_COLUMNS)
-                    if (GlTextRule.needsClean(cell(row, col))) dirapikan++;
+                for (int[] col : TEXT_COLUMNS) {
+                    String problem = GlTextRule.problem(COLUMN_LABEL[col[1]], cell(row, col[0]));
+                    if (problem != null)
+                        res.errors.add(new String[]{ String.valueOf(r + 1), problem });
+                }
+            }
+            if (!res.errors.isEmpty()) {
+                res.message = "Upload gagal: ada karakter yang tidak diizinkan. "
+                        + "Hanya boleh " + GlTextRule.ALLOWED_TEXT
+                        + ". Perbaiki di file Excel lalu unggah ulang.";
+                return res;
             }
 
             String paket = String.format("%02d", gl.maxPaket() + 1);
@@ -180,26 +199,25 @@ public class UploadService {
                 // bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal
                 // diurai.
                 GlTabel g = new GlTabel();
-                g.setGltrfy(GlTextRule.clean(cell(row, 12)));
+                g.setGltrfy(GlTextRule.trim(cell(row, 12)));
                 g.setGltrcd(dc);
-                g.setGlprdc(GlTextRule.clean(cell(row, 2)));
-                g.setGltrac(GlTextRule.clean(cell(row, 4)));
+                g.setGlprdc(GlTextRule.trim(cell(row, 2)));
+                g.setGltrac(GlTextRule.trim(cell(row, 4)));
                 g.setGltrpd(ddmmyy);
-                g.setGlName(GlTextRule.clean(cell(row, 5)));
-                String desc = GlTextRule.clean(cell(row, 6));
+                g.setGlName(GlTextRule.trim(cell(row, 5)));
+                String desc = GlTextRule.trim(cell(row, 6));
                 if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
                 g.setGltrds(desc);
-                g.setGltrbr(GlTextRule.clean(cell(row, 7)));
-                g.setBrName(GlTextRule.clean(cell(row, 8)));
-                // Titik & koma dibuang lebih dulu (sama seperti source asli — cost centre itu
-                // kode angka), sisanya lewat pembersihan biasa supaya ( ) & / dan kawan-kawan
-                // tidak lolos lewat kolom ini (BUG_AUSY_00180).
-                g.setGltrcc(GlTextRule.clean(cell(row, 9).replace(".", "").replace(",", "")));
-                g.setGltrcy(GlTextRule.clean(cell(row, 11)));
+                g.setGltrbr(GlTextRule.trim(cell(row, 7)));
+                g.setBrName(GlTextRule.trim(cell(row, 8)));
+                // Titik & koma dibuang — cost centre itu kode angka, sama seperti source asli.
+                // Karakter lain sudah dijamin bersih oleh pemeriksaan di atas.
+                g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));
+                g.setGltrcy(GlTextRule.trim(cell(row, 11)));
                 g.setGltram(amt);
-                g.setGlflag(GlTextRule.clean(cell(row, 14)));
-                g.setGlresp(GlTextRule.clean(cell(row, 15)));
-                g.setCsName(GlTextRule.clean(cell(row, 10)));
+                g.setGlflag(GlTextRule.trim(cell(row, 14)));
+                g.setGlresp(GlTextRule.trim(cell(row, 15)));
+                g.setCsName(GlTextRule.trim(cell(row, 10)));
                 g.setNoPaket(paket);
                 g.setGleqam(amt);
                 g.setGlotam(amt);
@@ -209,7 +227,7 @@ public class UploadService {
                 g.setGltrpd1(ddmmyy);
                 g.setStatusPrint("BELUM UPLOAD");
                 g.setGlsrc("p");
-                g.setGlotcc(GlTextRule.clean(cell(row, 11)));
+                g.setGlotcc(GlTextRule.trim(cell(row, 11)));
                 g.setGltrrf(paket + "-01-" + String.format("%04d", seq.next()));
                 g.setStatusDual("PENDING");
                 gl.save(g);
@@ -233,12 +251,10 @@ public class UploadService {
             audit.transaction(username, "UPLOAD", "Batch " + paket + " — " + n + " baris (D=" + res.debit + ", C=" + res.credit + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
 
             res.success = true;
+            // Keterangan "N isian dirapikan" dilepas atas permintaan pengguna (BUG_AUSY_00180):
+            // pembersihan karakter dianggap urusan internal, tidak perlu diumumkan tiap unggahan.
             res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
-                          (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!") +
-                          // Pembersihan tidak boleh diam-diam: maker berhak tahu datanya ada yang
-                          // berubah sebelum checker menyetujuinya (BUG_AUSY_00180).
-                          (dirapikan == 0 ? "" : " " + dirapikan + " isian dirapikan: karakter di luar "
-                                  + GlTextRule.ALLOWED_TEXT + " diganti spasi.");
+                          (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!");
             return res;
         }
     }

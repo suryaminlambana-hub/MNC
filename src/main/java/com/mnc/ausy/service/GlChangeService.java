@@ -153,9 +153,26 @@ public class GlChangeService {
 
     private static Map<String,String> rapikan(Map<String,String> f) {
         Map<String,String> out = new LinkedHashMap<>();
-        if (f != null) f.forEach((k, v) ->
-                out.put(k, KOLOM_TEKS.contains(k) ? GlTextRule.clean(v) : GlTextRule.trim(v)));
+        if (f != null) f.forEach((k, v) -> out.put(k, GlTextRule.trim(v)));
         return out;
+    }
+
+    /**
+     * Karakter terlarang di isian teks data GL (BUG_AUSY_00180).
+     *
+     * Jalur yang sama dengan upload Excel, tapi untuk data yang diketik sendiri lewat Kelola
+     * Data GL — tanpa ini simbol tetap bisa masuk lewat pintu kedua, lolos otorisasi Checker,
+     * lalu merusak ACCTXT saat digenerate.
+     *
+     * Hanya kolom teks bebas yang diperiksa: {@code gltrac} sudah dibatasi angka saja
+     * (BUG_AUSY_00104), {@code gltrcd} hanya D/C, dan {@code gltram} angka.
+     */
+    private Res checkText(Map<String,String> f) {
+        for (String key : KOLOM_TEKS) {
+            String problem = GlTextRule.problem(FIELDS.getOrDefault(key, key), f.get(key));
+            if (problem != null) return new Res(false, problem);
+        }
+        return null;
     }
 
     @Transactional
@@ -167,6 +184,8 @@ public class GlChangeService {
         if (lock != null) return new Res(false, lock);
         Res badCode = checkGlCodeInput(f.get("gltrac"));         // BUG_AUSY_00104
         if (badCode != null) return badCode;
+        Res badText = checkText(f);                              // BUG_AUSY_00180
+        if (badText != null) return badText;
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
         c.setAfterJson(toJson(formMap(f)));
@@ -191,6 +210,8 @@ public class GlChangeService {
             Res badCode = checkGlCodeInput(newCode);
             if (badCode != null) return badCode;
         }
+        Res badText = checkText(f);                              // BUG_AUSY_00180
+        if (badText != null) return badText;
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
         if (before.equals(after))
             return new Res(false, "Tidak ada perubahan pada data GL — permintaan tidak diajukan.");
@@ -248,11 +269,9 @@ public class GlChangeService {
             // BUG_AUSY_00104: GL Code hasil edit di Excel juga harus angka
             String code = n(neu.get("gltrac")).trim();
             if (!code.equals(n(cur.get("gltrac")).trim()) && !GlCodeService.validCode(code)) { badCode++; continue; }
-            // Bulk edit lewat Excel pintu ketiga ke kolom teks yang sama: dibersihkan, bukan
-            // dilewati (BUG_AUSY_00180).
-            String rapi = GlTextRule.clean(neu.get("gltrds"));
-            if (!rapi.equals(n(neu.get("gltrds")))) badText++;
-            neu.put("gltrds", rapi);
+            // Bulk edit lewat Excel pintu ketiga ke kolom teks yang sama (BUG_AUSY_00180).
+            // Barisnya dilewati, bukan dibersihkan — konsisten dengan unggahan yang menolak.
+            if (GlTextRule.hasOffending(neu.get("gltrds"))) { badText++; continue; }
             // normalise amount on both sides so "200000.00" vs "200000" isn't seen as a change
             cur.put("gltram", normAmt(cur.get("gltram")));
             neu.put("gltram", normAmt(neu.get("gltram")));
@@ -265,8 +284,8 @@ public class GlChangeService {
         if (after.isEmpty()) return new Res(false, "Tidak ada perubahan terdeteksi di file (dibandingkan data saat ini)."
                 + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
                 + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : "")
-                + (badText > 0 ? " " + badText + " Description dirapikan: karakter di luar "
-                                 + GlTextRule.ALLOWED_TEXT + " diganti spasi." : ""));
+                + (badText > 0 ? " " + badText + " baris dilewati karena Description memuat karakter yang tidak diizinkan ("
+                                 + GlTextRule.ALLOWED_TEXT + ")." : ""));
         GlChangeRequest c = base("BULK_EDIT", T_GL_ROW, null, me, note);
         c.setBeforeJson(toJsonList(before));
         c.setAfterJson(toJsonList(after));
@@ -277,8 +296,8 @@ public class GlChangeService {
                 + (skipped > 0 ? " — " + skipped + " baris dilewati (ID tidak valid / tidak ditemukan)." : ".")
                 + (held > 0 ? " " + held + " baris dilewati karena sedang menunggu otorisasi." : "")
                 + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : "")
-                + (badText > 0 ? " " + badText + " Description dirapikan: karakter di luar "
-                                 + GlTextRule.ALLOWED_TEXT + " diganti spasi." : ""));
+                + (badText > 0 ? " " + badText + " baris dilewati karena Description memuat karakter yang tidak diizinkan ("
+                                 + GlTextRule.ALLOWED_TEXT + ")." : ""));
     }
 
     /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
@@ -312,6 +331,8 @@ public class GlChangeService {
         if (!approval.hasActiveApprover(me.getIdGroup())) return new Res(false, ApprovalService.NO_APPROVER);
         Res bad = checkCode(code);
         if (bad != null) return bad;
+        String badDesc = GlTextRule.problem("Description", desc);   // BUG_AUSY_00180
+        if (badDesc != null) return new Res(false, badDesc);
         code = code.trim();
         if (glCodeService.exists(code)) return new Res(false, "NoGL tersebut sudah terdaftar.");
         if (pendingCombo(code)) return new Res(false, "Sudah ada permintaan untuk NoGL tersebut yang menunggu otorisasi Checker.");
@@ -341,6 +362,8 @@ public class GlChangeService {
             if (!newCode.equals(g.getCode()) && glCodeService.exists(newCode))
                 return new Res(false, "NoGL tersebut sudah terdaftar.");
         }
+        String badDesc = GlTextRule.problem("Description", desc);   // BUG_AUSY_00180
+        if (badDesc != null) return new Res(false, badDesc);
         Map<String,String> before = glCodeMap(g), after = glCodeMap(newCode, desc, status);
         if (before.equals(after))
             return new Res(false, "Tidak ada perubahan pada Kode GL — permintaan tidak diajukan.");
@@ -638,7 +661,7 @@ public class GlChangeService {
      */
     private Map<String,String> glCodeMap(String code, String desc, Short status) {
         Map<String,String> m = new LinkedHashMap<>();
-        m.put("code", n(code)); m.put("description", n(GlTextRule.clean(desc)));
+        m.put("code", n(code)); m.put("description", n(GlTextRule.trim(desc)));
         m.put("status", status == null ? "1" : String.valueOf(status));
         return m;
     }
@@ -856,7 +879,7 @@ public class GlChangeService {
         String code = n(a.get("gltrac")).trim(), dc = n(a.get("gltrcd")).trim();
         BigDecimal amount = amt(a.get("gltram"));
         g.setGltrac(code); g.setGltrcd(dc);
-        g.setGltram(amount); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
+        g.setGltram(amount); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
         g.setNoPaket(a.get("noPaket"));
         g.setGltrus(maker);   // username utuh — lihat BUG_AUSY_00138 di UploadService
         // Baris manual dulu hanya mengisi 5 kolom, sehingga tanggal posting kosong di List GL Aktif
@@ -866,7 +889,7 @@ public class GlChangeService {
         String ddmmyy = LocalDate.now().format(DDMMYY);
         g.setGltrpd(ddmmyy); g.setGltrpd1(ddmmyy);
         g.setGleqam(amount); g.setGlotam(amount);
-        g.setGlName(GlTextRule.clean(glCodeService.descriptionOf(code)));
+        g.setGlName(GlTextRule.trim(glCodeService.descriptionOf(code)));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
         g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
@@ -881,7 +904,7 @@ public class GlChangeService {
         if (glId == null || a == null) return;
         gl.findById(glId).ifPresent(g -> {
             g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-            g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
+            g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
             g.setNoPaket(a.get("noPaket"));
             gl.save(g);
         });
@@ -896,7 +919,7 @@ public class GlChangeService {
             try { id = Long.valueOf(a.get("id")); } catch (Exception e) { continue; }
             gl.findById(id).ifPresent(g -> {
                 g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-                g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.clean(a.get("gltrds")));
+                g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
                 g.setNoPaket(a.get("noPaket"));
                 gl.save(g);
             });
