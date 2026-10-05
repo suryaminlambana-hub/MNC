@@ -20,7 +20,7 @@
     <!--/* BUG_AUSY_00176: folder tujuannya ikut ditulis. Tanpa ini admin tidak punya cara
            memastikan hasilnya mendarat di mana — dan folder yang berlaku belum tentu sama
            dengan isi setelan, karena setelan yang tidak bisa dipakai diabaikan. */-->
-    Filenya terbit di <code th:text="${exportDir}">C:\inetpub\ftproot</code>.
+    Filenya terkirim ke <code th:text="${exportDir}">/home/ftpuser</code>.
   </p>
 
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>

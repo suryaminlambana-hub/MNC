@@ -224,7 +224,7 @@ public class AcctxtGenerateService {
     public String exportDirText() {
         // Yang perlu diketahui admin adalah tempat core mengambil berkasnya, yaitu FTP MNC —
         // bukan salinan lokal di server aplikasi (BUG_AUSY_00189).
-        return ftp.enabled() ? ftp.target() : files.dir().toString();
+        return ftp.enabled() ? ftp.folder() : files.dir().toString();
     }
 
     /**
@@ -296,8 +296,8 @@ public class AcctxtGenerateService {
             try {
                 sentTo = ftp.push(out);
             } catch (Exception e) {
-                return Result.fail("File " + fileName + " sudah dibuat di " + out
-                        + " tetapi GAGAL dikirim ke " + ftp.target() + ": " + e.getMessage()
+                return Result.fail("File " + fileName + " GAGAL dikirim ke FTP " + ftp.target()
+                        + ": " + e.getMessage()
                         + ". Export tetap menunggu; coba generate lagi.");
             }
         }
@@ -338,13 +338,15 @@ public class AcctxtGenerateService {
 
         audit.transaction(me.getUsername(), auditAction,
                 alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
-                + rowCount + " baris di " + out + (sentTo != null ? ", terkirim ke " + sentTo : ""));
+                + rowCount + " baris, " + (sentTo != null ? "terkirim ke FTP " + ftp.target() : "di " + out));
 
         // Lokasinya disebutkan, bukan hanya nama berkasnya (BUG_AUSY_00176). Sejak bagian "File
         // ACCTXT yang sudah dibuat" di-take out (BUG_AUSY_00173), layar tidak lagi punya tempat
         // lain yang memperlihatkan berkasnya mendarat di mana — "tersimpan atau tidak" jadi tidak
         // bisa dipastikan dari aplikasi, dan penguji melaporkannya sebagai gagal tersimpan.
-        String lokasi = sentTo != null ? sentTo : out.toString();
+        // Dengan FTP aktif yang disebut hanya tujuan FTP-nya; salinan lokal di server aplikasi
+        // bukan urusan admin dan dulu dibaca sebagai "file kembali ke folder lama" (BUG_AUSY_00189).
+        String lokasi = sentTo != null ? fileName + " terkirim ke FTP " + ftp.target() : out.toString();
         return new Result(true, "File " + lokasi + " berisi " + isi.size()
                 + " export (" + rowCount + " baris), mencakup " + cakupan(isi) + ". "
                 + rincian(isi),

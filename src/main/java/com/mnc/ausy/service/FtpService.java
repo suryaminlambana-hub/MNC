@@ -36,21 +36,19 @@ public class FtpService {
 
     public boolean enabled() { return host != null && !host.isBlank(); }
 
+    /** Tujuan untuk pesan di layar, mis. {@code ftpuser@10.5.99.23}. */
+    public String target() { return user + "@" + host.trim(); }
+
     /**
-     * Tujuan untuk ditampilkan, mis. {@code /home/ftpuser di server FTP 10.5.99.23}.
-     *
-     * Disebut sebagai folder yang dilihat tim infra di server FTP, bukan "/" yang dilihat user FTP
-     * di dalam chroot-nya: penguji mencocokkannya dengan {@code ls /home/ftpuser} di server itu.
-     * {@code FTP_DIR} kosong = folder awal user FTP, yaitu home-nya.
+     * Folder tujuan seperti yang dilihat tim infra di server FTP, mis. {@code /home/ftpuser} —
+     * bukan "/" yang dilihat user FTP di dalam chroot-nya. {@code FTP_DIR} kosong = folder awal
+     * user FTP, yaitu home-nya.
      */
-    public String target() {
-        String d = dir == null || dir.isBlank() ? "/home/" + user : dir.trim();
-        return d + " di server FTP " + host.trim();
-    }
+    public String folder() { return dir == null || dir.isBlank() ? "/home/" + user : dir.trim(); }
 
     @jakarta.annotation.PostConstruct
     void logTarget() {
-        if (enabled()) LOG.info("File ACCTXT dikirim ke {} setelah ditulis", target());
+        if (enabled()) LOG.info("File ACCTXT dikirim ke FTP {}:{} setelah ditulis", target(), folder());
         else LOG.info("Pengiriman FTP mati (FTP_HOST kosong): file ACCTXT hanya ditulis ke folder lokal");
     }
 
@@ -75,8 +73,7 @@ public class FtpService {
                     throw new IllegalStateException("simpan file ditolak: " + c.getReplyString().trim());
             }
             c.logout();
-            String d = dir == null || dir.isBlank() ? "/home/" + user : dir.trim();
-            return d.replaceAll("/+$", "") + "/" + remote + " di server FTP " + host.trim();
+            return target() + ":" + folder().replaceAll("/+$", "") + "/" + remote;
         } finally {
             try { if (c.isConnected()) c.disconnect(); } catch (Exception ignore) {}
         }
