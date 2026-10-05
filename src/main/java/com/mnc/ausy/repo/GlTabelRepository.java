@@ -20,13 +20,20 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
      * Sisi D/C tidak lagi ikut disaring (BUG_AUSY_00170): master Kode GL sekarang hanya memuat
      * nomor akun, jadi 100 terpakai berarti kode 100 terpakai — tidak ada lagi 100-D dan 100-C
      * yang bisa dipakai atau dihapus sendiri-sendiri.
+     *
+     * Baris milik user yang sudah tidak ada juga TIDAK dihitung (BUG_AUSY_00185): pemiliknya sudah
+     * dihapus (mis. reset akun UAT), jadi tidak ada maker maupun checker yang bisa melihat atau
+     * membersihkannya — kode yang hanya dipakai baris itu tertulis "Terpakai" selamanya padahal
+     * tidak ada data yang bisa ditunjukkan.
      */
-    @Query("select count(g) from GlTabel g where g.gltrac = :code and g.active = 1")
+    @Query("select count(g) from GlTabel g where g.gltrac = :code and g.active = 1"
+         + " and g.gltrus in (select u.userId from User u)")
     long countUsage(@Param("code") String code);
 
     /** Dari pemakaian itu, berapa yang batch-nya masih menunggu otorisasi upload. */
     @Query("select count(g) from GlTabel g where g.gltrac = :code"
-         + " and g.active = 1 and g.statusDual = 'PENDING'")
+         + " and g.active = 1 and g.statusDual = 'PENDING'"
+         + " and g.gltrus in (select u.userId from User u)")
     long countUsagePending(@Param("code") String code);
 
     // Hanya cast baris yang no_paket-nya angka murni; hindari error "invalid input syntax
