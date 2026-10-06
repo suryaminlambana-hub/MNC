@@ -119,15 +119,14 @@ public class UploadTemplateService {
                 String[] cells = splitCsv(line);
                 for (int c = 0; c < cells.length; c++) {
                     Cell cell = row.createCell(c);
-                    // Isinya dibersihkan lebih dulu (BUG_AUSY_00180).
+                    // Isinya diterbitkan apa adanya, hanya dirapikan spasinya.
                     //
-                    // Sheet1 menarik Gl_Name, Branch_Name, Cost_Center_Name, Product Name dan
-                    // Responding_Branch_Name dari sheet-sheet ini lewat VLOOKUP, sedangkan
-                    // daftar MNC memuat ( ) & / — di COA saja 399 baris. Karena unggahan MENOLAK
-                    // karakter itu, template yang diterbitkan apa adanya justru gagal diunggah
-                    // oleh aplikasinya sendiri. Yang dibersihkan hanya data yang kami terbitkan;
-                    // berkas milik pengguna tetap ditolak, bukan diubah diam-diam.
-                    cell.setCellValue(GlTextRule.clean(cells[c]));
+                    // Dulu di sini tanda baca diganti spasi, karena unggahan menolak berkas yang
+                    // memuatnya — daftar MNC sendiri penuh ( ) & /, di COA saja 399 baris, jadi
+                    // template yang diterbitkan utuh justru gagal diunggah oleh aplikasinya
+                    // sendiri. Penolakan itu sudah dicabut (BUG_AUSY_00191), jadi nama COA kini
+                    // terbit persis seperti di daftar MNC.
+                    cell.setCellValue(GlTextRule.trim(cells[c]));
                     if (r == 0) cell.setCellStyle(head);
                 }
                 r++;

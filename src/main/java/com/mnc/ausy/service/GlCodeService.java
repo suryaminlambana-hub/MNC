@@ -148,9 +148,6 @@ public class GlCodeService {
                 String desc = GlTextRule.trim(c.length > 1 ? c[1] : "");
                 if (isSisaKolomDc(desc)) desc = GlTextRule.trim(c.length > 2 ? c[2] : "");
                 if (code.isEmpty() || !validCode(code)) { bad++; continue; }
-                // Deskripsi berkarakter terlarang ikut dihitung tidak valid (BUG_AUSY_00180),
-                // bukan dibersihkan diam-diam — sejalan dengan unggahan Excel yang menolak.
-                if (GlTextRule.hasOffending(desc)) { bad++; continue; }
                 if (glCodes.existsByCode(code) || listed(rows, code)) { dup++; continue; }
                 Map<String,String> m = new LinkedHashMap<>();
                 m.put("code", code); m.put("description", desc);

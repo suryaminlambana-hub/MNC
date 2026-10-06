@@ -140,7 +140,7 @@ public class ConfigChangeService {
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         userId = userId==null?"":userId.toLowerCase().trim();
         if (userId.isEmpty()) return "Username tidak valid.";
-        { String no = aboveMe(idGroup, me); if (no != null) return no; }
+        // Role tujuan tidak dibatasi lagi — CONFIG APPROVER pun boleh diajukan (BUG_AUSY_00194).
         if (users.existsByUserId(userId)) return "Username sudah dipakai.";
         if (invalidEmail(email)) return "Format email tidak valid.";
         Map<String,String> after = new LinkedHashMap<>();
@@ -157,7 +157,8 @@ public class ConfigChangeService {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (invalidEmail(email)) return "Format email tidak valid.";
-        { String no = aboveMe(idGroup, me); if (no != null) return no; }   // pindah ke role penyetuju
+        // Mengangkat user menjadi CONFIG APPROVER kini diperbolehkan (BUG_AUSY_00194); yang tetap
+        // di luar wewenang Admin adalah menyentuh user yang SUDAH menjadi penyetujunya (di bawah).
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
@@ -432,8 +433,13 @@ public class ConfigChangeService {
 
     /**
      * Role penyetuju config berada DI ATAS admin: admin diotorisasi olehnya, jadi admin tidak boleh
-     * mengisi maupun mengubah keanggotaan role itu (BUG_AUSY_00132) dan tidak boleh mengubah hak
+     * mengubah user yang sudah memegang role itu (BUG_AUSY_00132) dan tidak boleh mengubah hak
      * aksesnya (BUG_AUSY_00133). Yang boleh hanya role penyetuju config itu sendiri.
+     *
+     * <p>Yang TIDAK lagi dihalangi: mengajukan user baru dengan role CONFIG APPROVER, atau
+     * mengangkat user biasa ke role itu (BUG_AUSY_00194) — pengajuannya tetap harus diotorisasi
+     * Admin Approval, jadi tidak ada seorang pun yang mengangkat approver sendirian. Tanpa itu,
+     * begitu satu-satunya approver non-aktif seluruh pengajuan config mati kunci.
      * @return alasan penolakan, atau null kalau boleh.
      */
     private String aboveMe(Integer targetGroup, AusyUserDetails me) {

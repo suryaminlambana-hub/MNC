@@ -5,7 +5,6 @@ import com.mnc.ausy.domain.User;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
-import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.ConfigChangeService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -25,22 +24,27 @@ public class UserController {
     private final UserRepository users;
     private final GroupUserRepository groups;
     private final ConfigChangeService configChange;
-    private final ApprovalService approval;
 
-    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange,
-                          ApprovalService approval) {
-        this.users = users; this.groups = groups; this.configChange = configChange; this.approval = approval;
+    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange) {
+        this.users = users; this.groups = groups; this.configChange = configChange;
     }
 
     @GetMapping
     public String list(Model model, @AuthenticationPrincipal AusyUserDetails me) {
         model.addAttribute("users", users.findAll());
         List<GroupUser> allGroups = groups.findAllByOrderByNamaGroupAsc();
-        // Role yang mengotorisasi kita tidak boleh diisi/diubah dari sini (BUG_AUSY_00132)
-        boolean iAmConfigApprover = approval.configAuthorizer(me == null ? null : me.getIdGroup());
-        List<GroupUser> assignable = allGroups.stream()
-                .filter(g -> iAmConfigApprover || !approval.configAuthorizer(g.getIdGroup()))
-                .toList();
+        // Seluruh role bisa dipilih, termasuk CONFIG APPROVER (BUG_AUSY_00194).
+        //
+        // Dulu role yang mengotorisasi kita disembunyikan dari sini (BUG_AUSY_00132). Akibatnya
+        // Admin tidak bisa mengajukan CONFIG APPROVER kedua sama sekali — padahal justru itu yang
+        // dibutuhkan: begitu satu-satunya approver non-aktif, seluruh pengajuan config berhenti
+        // (lihat ApprovalService.NO_APPROVER) dan tidak ada jalan keluar dari dalam aplikasi.
+        //
+        // Pemisahan wewenangnya tidak ikut hilang: menambah maupun mengubah user di sini bukan
+        // aksi langsung melainkan pengajuan, yang tetap harus diotorisasi lewat Admin Approval,
+        // dan ApprovalService tidak pernah mengizinkan seseorang menyetujui pengajuan group-nya
+        // sendiri. Jadi tidak ada satu orang pun yang bisa mengangkat approver seorang diri.
+        List<GroupUser> assignable = allGroups;
         // BUG_AUSY_00110: kolom Group dulu menampilkan users.level (kolom lama yang tidak ikut
         // terisi saat group baru dipasang) sehingga group baru tampil kosong. Ambil dari master.
         Map<Integer,String> groupNames = new HashMap<>();

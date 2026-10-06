@@ -103,23 +103,45 @@ public class UploadService {
         try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
     }
 
+    /** Kolom currency — wajib berisi IDR (BUG_AUSY_00190). */
+    private static final int KOLOM_CURRENCY = 11;
+
     /**
-     * Kolom Excel yang isinya teks dan ikut tertulis ke ACCTXT — {index kolom, index label}.
-     *
-     * Kolom tanggal dan nominal sengaja tidak ikut: tanda hubung pada "5-Oct-26" bagian dari
-     * formatnya, dan titik pada nominal bagian dari angkanya.
+     * Kolom kode yang hanya boleh berisi angka (BUG_AUSY_00192):
+     * Product Code, Transaction_Account dan Responding_Branch.
      */
-    private static final int[][] TEXT_COLUMNS = {
-            {2, 0}, {4, 1}, {5, 2}, {6, 3}, {7, 4}, {8, 5},
-            {9, 6}, {10, 7}, {11, 8}, {12, 9}, {14, 10}, {15, 11}
+    private static final int[][] KOLOM_ANGKA = {
+            {2,  0}, {4,  1}, {15, 2}
+    };
+    private static final String[] LABEL_ANGKA = {
+            "Kolom C [Product Code]", "Kolom E [Transaction_Account]", "Kolom P [Responding_Branch]"
     };
 
-    private static final String[] COLUMN_LABEL = {
-            "Kolom C [Product Code]", "Kolom E [Transaction_Account]", "Kolom F [Gl_Name]",
-            "Kolom G [Transaction_Description]", "Kolom H [Branch]", "Kolom I [Branch_Name]",
-            "Kolom J [Cost_Center]", "Kolom K [Cost_Center_Name]", "Kolom L [Currency]",
-            "Kolom M [Foreign_Curr]", "Kolom O [Flag]", "Kolom P [Responding_Branch]"
+    /**
+     * Kolom yang boleh berisi angka DAN tanda petik satu (BUG_AUSY_00193): Branch dan
+     * Cost_Center. Tanda petiknya dipakai di spreadsheet untuk menjaga angka nol di depan.
+     */
+    private static final int[][] KOLOM_ANGKA_PETIK = {
+            {7, 0}, {9, 1}
     };
+    private static final String[] LABEL_ANGKA_PETIK = {
+            "Kolom H [Branch]", "Kolom J [Cost_Center]"
+    };
+
+    /** Hanya angka 0-9. */
+    private static boolean angkaSaja(String v) {
+        for (int i = 0; i < v.length(); i++) if (v.charAt(i) < '0' || v.charAt(i) > '9') return false;
+        return true;
+    }
+
+    /** Angka 0-9 atau tanda petik satu. */
+    private static boolean angkaAtauPetik(String v) {
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if ((c < '0' || c > '9') && c != '\'') return false;
+        }
+        return true;
+    }
 
     @Transactional
     public UploadResult process(InputStream in, String fileName, String username) throws Exception {
@@ -159,26 +181,48 @@ public class UploadService {
                 return res;
             }
 
-            // Pass 2: karakter yang tidak diizinkan (BUG_AUSY_00180).
+            // Pass 2: bentuk isian per kolom.
+            //
+            // Penyaringan simbol menyeluruh sudah dicabut (BUG_AUSY_00191) — kolom nama dan
+            // deskripsi adalah free text yang memang wajar memuat tanda baca. Yang diperiksa kini
+            // hanya kolom yang bentuknya memang ditentukan aturan bisnis, masing-masing dengan
+            // aturannya sendiri.
             //
             // Berkasnya ditolak UTUH, bukan separuh masuk lalu ketahuan saat Checker sudah
-            // menyetujui. Barisnya disebut satu per satu lengkap dengan kolom dan karakternya,
-            // supaya yang memperbaiki tahu persis apa yang harus dicari — sebagian besar berasal
-            // dari kolom yang terisi VLOOKUP, jadi perbaikannya di sheet referensi, bukan di
-            // baris yang diketik.
+            // menyetujui, dan tiap pelanggaran disebut lengkap dengan baris serta kolomnya.
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
                 if (cell(row, KEY_COLUMN).isBlank()) continue;
-                for (int[] col : TEXT_COLUMNS) {
-                    String problem = GlTextRule.problem(COLUMN_LABEL[col[1]], cell(row, col[0]));
-                    if (problem != null)
-                        res.errors.add(new String[]{ String.valueOf(r + 1), problem });
+                String baris = String.valueOf(r + 1);
+
+                // BUG_AUSY_00190 — currency wajib IDR. Kosong pun ditolak: baris GL tanpa mata
+                // uang tidak punya arti, dan dulu baris seperti itu lolos tanpa sepatah pesan.
+                String curr = cell(row, KOLOM_CURRENCY);
+                if (!curr.equalsIgnoreCase("IDR"))
+                    res.errors.add(new String[]{ baris, "Kolom L [Currency] wajib diisi \"IDR\""
+                            + (curr.isBlank() ? " (saat ini kosong)." : " (saat ini \"" + curr + "\").") });
+
+                // BUG_AUSY_00192 — kode hanya angka. Kolom kosong dilewati: Responding_Branch
+                // memang hanya terisi pada baris antar-cabang.
+                for (int[] col : KOLOM_ANGKA) {
+                    String v = cell(row, col[0]);
+                    if (!v.isEmpty() && !angkaSaja(v))
+                        res.errors.add(new String[]{ baris, LABEL_ANGKA[col[1]]
+                                + " hanya boleh berisi angka (0-9) — saat ini \"" + v + "\"." });
+                }
+
+                // BUG_AUSY_00193 — cabang & cost centre: angka dan tanda petik satu.
+                for (int[] col : KOLOM_ANGKA_PETIK) {
+                    String v = cell(row, col[0]);
+                    if (!v.isEmpty() && !angkaAtauPetik(v))
+                        res.errors.add(new String[]{ baris, LABEL_ANGKA_PETIK[col[1]]
+                                + " hanya boleh berisi angka (0-9) dan tanda petik satu (') — saat ini \""
+                                + v + "\"." });
                 }
             }
             if (!res.errors.isEmpty()) {
-                res.message = "Upload gagal: ada karakter yang tidak diizinkan. "
-                        + "Hanya boleh " + GlTextRule.ALLOWED_TEXT
-                        + ". Perbaiki di file Excel lalu unggah ulang.";
+                res.message = "Upload gagal: ada isian yang tidak sesuai ketentuan kolom. "
+                        + "Perbaiki di file Excel lalu unggah ulang.";
                 return res;
             }
 
