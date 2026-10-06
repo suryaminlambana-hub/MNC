@@ -28,6 +28,9 @@ class UploadKolomValidationTest {
 
     private static final DateTimeFormatter IN = DateTimeFormatter.ofPattern("d-MMM-yy", Locale.ENGLISH);
 
+    /** Penanda di data uji: tulis sel ini sebagai nilai galat Excel, bukan teks. */
+    private static final String GALAT = "<#N/A>";
+
     /** Satu baris data yang seluruh kolomnya sah. Dipakai sebagai dasar, lalu dirusak satu kolom. */
     private static String[] barisSah() {
         String[] c = new String[17];
@@ -65,7 +68,14 @@ class UploadKolomValidationTest {
             for (int i = 0; i < head.length; i++) hr.createCell(i).setCellValue(head[i]);
             for (int r = 0; r < baris.length; r++) {
                 Row row = sh.createRow(r + 1);
-                for (int c = 0; c < baris[r].length; c++) row.createCell(c).setCellValue(baris[r][c]);
+                for (int c = 0; c < baris[r].length; c++) {
+                    // "#N/A" ditulis sebagai sel GALAT sungguhan, bukan teks berbunyi "#N/A" —
+                    // itulah yang Excel simpan saat VLOOKUP tidak menemukan padanan.
+                    if (GALAT.equals(baris[r][c]))
+                        row.createCell(c).setCellErrorValue(org.apache.poi.ss.usermodel.FormulaError.NA.getCode());
+                    else
+                        row.createCell(c).setCellValue(baris[r][c]);
+                }
             }
             wb.write(out);
             return out.toByteArray();
@@ -176,6 +186,65 @@ class UploadKolomValidationTest {
     void costCenterDenganHurufDitolak() throws Exception {
         String[] b = barisSah(); b[9] = "KP01";
         assertTrue(pesanBaris(proses(b), 2).contains("Cost_Center"), "Cost_Center harus ditolak");
+    }
+
+    // ---- Sel galat Excel (#N/A) — kode diketik sebagai teks / tidak terdaftar ----
+
+    /**
+     * Inti laporan "tanda petik masih bisa bypass".
+     *
+     * Tanda petik di depan angka BUKAN bagian dari nilai sel — Excel memakainya untuk menandai
+     * sel itu teks, dan yang tersimpan tetap "10911513". Jadi tidak ada yang bisa disaring dari
+     * nilainya; yang rusak adalah VLOOKUP-nya, yang lalu menghasilkan #N/A di Gl_Name.
+     */
+    @Test
+    void gagalVlookupDitolak() throws Exception {
+        String[] b = barisSah();
+        b[4] = "10911513";      // tersimpan sebagai teks, persis seperti hasil ketik '10911513
+        b[5] = GALAT;           // maka Gl_Name = #N/A
+        UploadResult res = proses(b);
+
+        assertFalse(res.success);
+        assertEquals(0, res.rows, "tidak satu baris pun boleh tersimpan");
+        assertTrue(pesanBaris(res, 2).contains("Gl_Name"), pesanBaris(res, 2));
+        assertTrue(pesanBaris(res, 2).contains("#N/A"), pesanBaris(res, 2));
+    }
+
+    @Test
+    void galatDiKolomPencarianLainJugaDitolak() throws Exception {
+        String[] b = barisSah(); b[10] = GALAT;      // Cost_Center_Name
+        assertTrue(pesanBaris(proses(b), 2).contains("Cost_Center_Name"), pesanBaris(proses(b), 2));
+    }
+
+    /**
+     * Baris template yang BELUM diisi tidak boleh ikut ditolak.
+     *
+     * Berkas MNC datang dengan 167 baris berumus; selama kolom E kosong, VLOOKUP di F/I/K/Q
+     * semuanya berbunyi #N/A. Kalau baris begitu ikut diperiksa, tidak akan ada satu berkas pun
+     * yang bisa diunggah.
+     */
+    @Test
+    void barisKosongBerNaTidakIkutDitolak() throws Exception {
+        String[] kosong = new String[17];
+        java.util.Arrays.fill(kosong, "");
+        kosong[5] = GALAT; kosong[8] = GALAT; kosong[10] = GALAT; kosong[16] = GALAT;
+
+        String[] rusak = barisSah(); rusak[11] = "USD";     // supaya berkasnya tetap ditolak
+        UploadResult res = proses(rusak, kosong);
+
+        assertEquals("", pesanBaris(res, 3), "baris kosong tidak boleh dipersoalkan: " + pesanBaris(res, 3));
+        assertTrue(pesanBaris(res, 2).contains("Currency"), pesanBaris(res, 2));
+    }
+
+    /**
+     * Angka-sebagai-teks yang pencariannya BERHASIL tetap diterima. Berkas MNC memakai tanda
+     * petik untuk menjaga angka nol di depan, jadi menolak teks begitu saja akan membuang data
+     * yang sah — yang ditolak adalah pencarian yang gagal, bukan bentuk selnya.
+     */
+    @Test
+    void angkaSebagaiTeksDenganPencarianBerhasilTetapDiterima() throws Exception {
+        String[] b = barisSah(); b[4] = "10911513"; b[5] = "PYMAD KYD-MODAL KERJA - KORPORASI";
+        assertEquals("", pesanBaris(currencyAtauKolomLain(b), 2), pesanBaris(currencyAtauKolomLain(b), 2));
     }
 
     // ---- BUG_AUSY_00191: simbol di kolom teks bebas tidak lagi ditolak ----

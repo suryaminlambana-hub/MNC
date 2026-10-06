@@ -134,6 +134,35 @@ public class UploadService {
             "Kolom H [Branch]", "Kolom J [Cost_Center]"
     };
 
+    /** Nama kolom seperti terbaca di Excel, untuk menyebut letak kesalahan secara tepat. */
+    private static final String[] LABEL_KOLOM = {
+            "Kolom A [Posting_Date]", "Kolom B [D/C]", "Kolom C [Product Code]", "Kolom D [Product Name]",
+            "Kolom E [Transaction_Account]", "Kolom F [Gl_Name]", "Kolom G [Transaction_Description]",
+            "Kolom H [Branch]", "Kolom I [Branch_Name]", "Kolom J [Cost_Center]",
+            "Kolom K [Cost_Center_Name]", "Kolom L [Currency]", "Kolom M [Foreign_Curr]",
+            "Kolom N [Transaction_Amount]", "Kolom O [Flag]", "Kolom P [Responding_Branch]",
+            "Kolom Q [Responding_Branch_Name]"
+    };
+
+    /**
+     * Nilai galat Excel ({@code #N/A}, {@code #REF!}, …) pada sebuah sel, atau null kalau selnya
+     * baik-baik saja.
+     *
+     * <p>Dipakai untuk menangkap VLOOKUP yang gagal. {@link #cell} memetakan sel galat menjadi
+     * string kosong — cocok untuk membaca nilai, tapi berbahaya kalau dipakai memutuskan: baris
+     * yang Gl_Name-nya {@code #N/A} dulu tersimpan dengan nama GL KOSONG, lalu terbawa apa adanya
+     * ke berkas ACCTXT tanpa sepatah peringatan pun.
+     */
+    private static String galatExcel(Row r, int i) {
+        if (r == null) return null;
+        Cell c = r.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (c == null) return null;
+        CellType t = c.getCellType() == CellType.FORMULA ? c.getCachedFormulaResultType() : c.getCellType();
+        if (t != CellType.ERROR) return null;
+        try { return FormulaError.forInt(c.getErrorCellValue()).getString(); }
+        catch (Exception e) { return "#ERROR"; }
+    }
+
     /** Hanya angka 0-9. */
     private static boolean angkaSaja(String v) {
         for (int i = 0; i < v.length(); i++) if (v.charAt(i) < '0' || v.charAt(i) > '9') return false;
@@ -200,6 +229,25 @@ public class UploadService {
                 Row row = sh.getRow(r);
                 if (cell(row, KEY_COLUMN).isBlank()) continue;
                 String baris = String.valueOf(r + 1);
+
+                // Sel bernilai galat Excel — hampir selalu VLOOKUP yang tidak menemukan padanan.
+                //
+                // Inilah yang sebenarnya terjadi saat kode diketik dengan tanda petik di depan
+                // ("'10911513"): tanda petiknya BUKAN bagian dari nilai — Excel memakainya untuk
+                // menandai sel itu teks, dan yang tersimpan tetap "10911513". Jadi tidak ada yang
+                // bisa disaring dari nilainya. Yang rusak adalah pencariannya: angka-sebagai-teks
+                // tidak cocok dengan daftar COA yang berisi angka, sehingga Gl_Name menjadi #N/A.
+                //
+                // Dulu baris itu tetap masuk: cell() memetakan sel galat menjadi string kosong,
+                // jadi yang tersimpan adalah baris GL dengan NAMA GL KOSONG, dan begitulah ia
+                // terbawa ke berkas ACCTXT. Sekarang berkasnya ditolak dan sebabnya disebut.
+                for (int c = 0; c < LABEL_KOLOM.length; c++) {
+                    String galat = galatExcel(row, c);
+                    if (galat != null)
+                        res.errors.add(new String[]{ baris, LABEL_KOLOM[c] + " bernilai " + galat
+                                + " — rumus pencarian tidak menemukan padanannya. Pastikan kodenya"
+                                + " terdaftar dan diisi sebagai angka, bukan teks (diawali tanda petik)." });
+                }
 
                 // BUG_AUSY_00190 — currency wajib IDR. Kosong pun ditolak: baris GL tanpa mata
                 // uang tidak punya arti, dan dulu baris seperti itu lolos tanpa sepatah pesan.
