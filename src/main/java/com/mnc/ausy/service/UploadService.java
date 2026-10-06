@@ -107,14 +107,20 @@ public class UploadService {
     private static final int KOLOM_CURRENCY = 11;
 
     /**
-     * Kolom kode yang hanya boleh berisi angka (BUG_AUSY_00192):
-     * Product Code, Transaction_Account dan Responding_Branch.
+     * Kolom kode yang hanya boleh berisi angka 0-9 — tanda petik satu pun tidak
+     * (BUG_AUSY_00192 / REQ_AUSY_00003): Product Code dan Transaction_Account.
+     *
+     * <p>Responding_Branch (kolom P) sengaja TIDAK ikut diperiksa. Isinya bukan ketikan maker
+     * melainkan rumus {@code IF(O{n}=2,$H$2,"")} yang menyalin cabang dari H2, jadi bentuknya
+     * mengikuti apa pun yang ada di sana — termasuk tanda petik penjaga angka nol di depan.
+     * Memeriksanya berarti menolak berkas yang sah karena isi sel yang tidak pernah diketik
+     * orangnya.
      */
     private static final int[][] KOLOM_ANGKA = {
-            {2,  0}, {4,  1}, {15, 2}
+            {2,  0}, {4,  1}
     };
     private static final String[] LABEL_ANGKA = {
-            "Kolom C [Product Code]", "Kolom E [Transaction_Account]", "Kolom P [Responding_Branch]"
+            "Kolom C [Product Code]", "Kolom E [Transaction_Account]"
     };
 
     /**
@@ -202,8 +208,8 @@ public class UploadService {
                     res.errors.add(new String[]{ baris, "Kolom L [Currency] wajib diisi \"IDR\""
                             + (curr.isBlank() ? " (saat ini kosong)." : " (saat ini \"" + curr + "\").") });
 
-                // BUG_AUSY_00192 — kode hanya angka. Kolom kosong dilewati: Responding_Branch
-                // memang hanya terisi pada baris antar-cabang.
+                // BUG_AUSY_00192 — kode hanya angka. Sel kosong dilewati: yang dipersoalkan
+                // bentuk isiannya, bukan ada atau tidaknya isi.
                 for (int[] col : KOLOM_ANGKA) {
                     String v = cell(row, col[0]);
                     if (!v.isEmpty() && !angkaSaja(v))

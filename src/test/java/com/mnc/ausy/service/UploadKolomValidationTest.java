@@ -129,10 +129,18 @@ class UploadKolomValidationTest {
         assertTrue(pesanBaris(proses(b), 2).contains("Transaction_Account"), "Transaction_Account harus ditolak");
     }
 
+    /**
+     * Responding_Branch (kolom P) TIDAK divalidasi — REQ_AUSY_00003.
+     *
+     * Isinya rumus {@code IF(O{n}=2,$H$2,"")} yang menyalin cabang dari H2, jadi tanda petik
+     * penjaga angka nol di depan ikut terbawa ke sana. Kalau kolom ini ikut dipatok angka saja,
+     * berkas yang sah ditolak gara-gara sel yang tidak pernah diketik makernya.
+     */
     @Test
-    void respondingBranchBukanAngkaDitolak() throws Exception {
-        String[] b = barisSah(); b[15] = "00A";
-        assertTrue(pesanBaris(proses(b), 2).contains("Responding_Branch"), "Responding_Branch harus ditolak");
+    void respondingBranchTidakIkutDivalidasi() throws Exception {
+        String[] b = barisSah(); b[15] = "'001";
+        assertEquals("", pesanBaris(currencyAtauKolomLain(b), 2),
+                "kolom rumus tidak boleh dipersoalkan, tapi masih: " + pesanBaris(currencyAtauKolomLain(b), 2));
     }
 
     @Test
@@ -140,6 +148,14 @@ class UploadKolomValidationTest {
         String[] b = barisSah(); b[15] = "";
         assertEquals("", pesanBaris(currencyAtauKolomLain(b), 2),
                 "hanya baris antar-cabang yang mengisinya, jadi kosong bukan kesalahan");
+    }
+
+    /** Product Code & Transaction_Account: tanda petik satu pun TIDAK diizinkan (REQ_AUSY_00003). */
+    @Test
+    void productCodeDenganTandaPetikTetapDitolak() throws Exception {
+        String[] b = barisSah(); b[2] = "'01";
+        assertTrue(pesanBaris(proses(b), 2).contains("Product Code"),
+                "tanda petik hanya untuk Branch & Cost_Center, bukan kolom ini");
     }
 
     // ---- BUG_AUSY_00193: Branch & Cost_Center — angka dan tanda petik satu ----
