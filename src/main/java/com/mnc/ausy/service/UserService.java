@@ -26,7 +26,7 @@ public class UserService {
         if (userId.isEmpty() || users.existsByUserId(userId)) return false;
         User u = new User();
         u.setUserId(userId);
-        u.setPass(encoder.encode(rawPass));
+        u.gantiPassword(encoder.encode(rawPass));
         u.setNama(nama);
         u.setEmail(email);
         u.setIdGroup(idGroup);
@@ -45,7 +45,7 @@ public class UserService {
             u.setIdGroup(idGroup);
             u.setLevel(levelOf(idGroup));
             u.setStatusAccount(status);
-            if (rawPass != null && !rawPass.isBlank()) u.setPass(encoder.encode(rawPass));
+            if (rawPass != null && !rawPass.isBlank()) u.gantiPassword(encoder.encode(rawPass));
             users.save(u);
         });
     }

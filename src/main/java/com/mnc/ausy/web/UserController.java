@@ -6,6 +6,7 @@ import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.ConfigChangeService;
+import com.mnc.ausy.service.PasswordPolicyService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,9 +25,12 @@ public class UserController {
     private final UserRepository users;
     private final GroupUserRepository groups;
     private final ConfigChangeService configChange;
+    private final PasswordPolicyService passwordPolicy;
 
-    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange) {
+    public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange,
+                          PasswordPolicyService passwordPolicy) {
         this.users = users; this.groups = groups; this.configChange = configChange;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @GetMapping
@@ -59,6 +63,17 @@ public class UserController {
         }
         model.addAttribute("resettable", resettable);
         model.addAttribute("protectedUsers", protectedIds);
+        // Sisa masa berlaku password per user (REQ_AUSY_00009). Dihitung di sini, bukan di
+        // Thymeleaf, supaya aturannya hanya ada di satu tempat.
+        Map<String,String> masaLabel = new HashMap<>(), masaWarna = new HashMap<>();
+        for (User u : users.findAll()) {
+            masaLabel.put(u.getUserId(), passwordPolicy.label(u));
+            masaWarna.put(u.getUserId(), passwordPolicy.warna(u));
+        }
+        model.addAttribute("masaLabel", masaLabel);
+        model.addAttribute("masaWarna", masaWarna);
+        model.addAttribute("peringatanPassword", passwordPolicy.daftarPeringatan());
+        model.addAttribute("masaAktifHari", PasswordPolicyService.MASA_AKTIF_HARI);
         model.addAttribute("pendingConfig", configChange.pendingListByMakerGroup(me == null ? null : me.getIdGroup()).size());
         model.addAttribute("pendingIds", configChange.pendingIds("USER"));
         return "users/list";

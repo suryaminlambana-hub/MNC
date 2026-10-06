@@ -8,6 +8,7 @@ import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
+import com.mnc.ausy.service.PasswordPolicyService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -35,14 +36,17 @@ public class DashboardController {
     private final AccessService access;
     private final AuditScopeService auditScope;
     private final DataScopeService scope;
+    private final PasswordPolicyService passwordPolicy;
 
     public DashboardController(UserRepository users, GroupUserRepository groups, GlTabelRepository gl,
                                TlogTransactionRepository tx, GlChangeService glChange,
                                ConfigChangeService configChange, GlExportService glExport,
-                               AccessService access, AuditScopeService auditScope, DataScopeService scope) {
+                               AccessService access, AuditScopeService auditScope, DataScopeService scope,
+                               PasswordPolicyService passwordPolicy) {
         this.users = users; this.groups = groups; this.gl = gl; this.tx = tx;
         this.glChange = glChange; this.configChange = configChange; this.glExport = glExport;
         this.access = access; this.auditScope = auditScope; this.scope = scope;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @GetMapping("/")
@@ -62,6 +66,10 @@ public class DashboardController {
             // hanya jejak admin ini sendiri, bukan seluruh admin (BUG_AUSY_00188)
             String meId = principal == null ? "" : principal.getUsername();
             model.addAttribute("userHistory", tx.configHistoryForAdmin(meId, "%(maker=" + meId + ")%", PageRequest.of(0, 50)));
+            // Pengingat H-3 masa berlaku password (REQ_AUSY_00009). Sengaja TIDAK dipersempit
+            // ke akun admin ini sendiri seperti Riwayat User di atas: ini daftar pekerjaan —
+            // admin perlu tahu akun siapa pun yang passwordnya akan habis supaya bisa mereset.
+            model.addAttribute("peringatanPassword", passwordPolicy.daftarPeringatan());
             return "dashboard-admin";
         }
 

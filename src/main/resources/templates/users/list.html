@@ -12,11 +12,42 @@
         <i class="fa-solid fa-clock"></i> <b th:text="${pendingConfig}">0</b> permintaan perubahan user sedang menunggu otorisasi Admin Approval.
     </div>
 
+    <!--/* REQ_AUSY_00009: pengingat H-3 masa berlaku password. Tanggal ganti terakhir dan
+           tanggal kedaluwarsanya ikut disebut, bukan hanya sisa harinya — tanpa itu admin masih
+           harus menebak kapan tepatnya akun itu berhenti bisa dipakai. */-->
+    <div th:if="${not #lists.isEmpty(peringatanPassword)}" class="alert alert-warning py-2">
+        <div class="mb-1"><i class="fa-solid fa-key"></i>
+            <b th:text="${#lists.size(peringatanPassword)}">0</b> akun masa berlaku passwordnya
+            akan habis dalam 3 hari atau kurang
+            <span class="text-muted">(berlaku <span th:text="${masaAktifHari}">30</span> hari sejak reset terakhir)</span>.
+        </div>
+        <table class="table table-sm mb-0 bg-transparent">
+            <thead><tr><th>Username</th><th>Nama</th><th>Reset Terakhir</th><th>Kedaluwarsa</th><th>Sisa</th></tr></thead>
+            <tbody>
+            <tr th:each="p : ${peringatanPassword}">
+                <td><code th:text="${p.userId}"></code></td>
+                <td th:text="${p.nama}"></td>
+                <td th:text="${p.gantiTerakhir}"></td>
+                <td th:text="${p.kedaluwarsa}"></td>
+                <td>
+                    <span th:if="${p.lewat()}" class="badge bg-danger-subtle text-danger"
+                          th:text="'Lewat ' + ${-p.sisaHari} + ' hari'"></span>
+                    <span th:if="${p.hariIni()}" class="badge bg-danger-subtle text-danger">Habis hari ini</span>
+                    <span th:if="${!p.lewat() and !p.hariIni()}" class="badge bg-warning-subtle text-warning"
+                          th:text="${p.sisaHari} + ' hari lagi'"></span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
     <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addUser"><i class="fa-solid fa-plus"></i> Tambah User</button>
 
     <div class="ausy-card">
         <table class="table table-hover align-middle mb-0 dt">
-            <thead><tr><th>No</th><th>Username</th><th>Nama</th><th>Role</th><th>Email</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>No</th><th>Username</th><th>Nama</th><th>Role</th><th>Email</th><th>Status</th>
+                <th title="Sisa masa berlaku password, dihitung 30 hari sejak reset terakhir">Masa Password</th>
+                <th>Aksi</th></tr></thead>
             <tbody>
             <tr th:each="u, i : ${users}">
                 <td th:text="${i.count}">1</td>
@@ -34,6 +65,12 @@
                         <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
                     <span th:if="${!pending and u.statusAccount == 1}" class="badge bg-success-subtle text-success">Active</span>
                     <span th:if="${!pending and u.statusAccount != 1}" class="badge bg-secondary-subtle text-secondary">Non Active</span>
+                </td>
+                <!--/* REQ_AUSY_00009: label sisa hari per user. */-->
+                <td>
+                    <span class="badge"
+                          th:classappend="'bg-' + ${masaWarna.get(u.userId)} + '-subtle text-' + ${masaWarna.get(u.userId)}"
+                          th:text="${masaLabel.get(u.userId)}">—</span>
                 </td>
                 <td th:with="pending=${pendingIds != null and pendingIds.contains(u.userId)}">
                     <th:block th:unless="${pending}">

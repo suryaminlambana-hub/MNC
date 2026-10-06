@@ -680,7 +680,7 @@ public class ConfigChangeService {
         if (users.existsByUserId(uid)) return "Username '" + uid + "' sudah dipakai (tidak bisa di-approve).";
         Integer idGroup = gid(a);
         User u = new User();
-        u.setUserId(uid); u.setPass(a.get("pass")); u.setNama(a.get("nama")); u.setEmail(a.get("email"));
+        u.setUserId(uid); u.gantiPassword(a.get("pass")); u.setNama(a.get("nama")); u.setEmail(a.get("email"));
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount((short)1); u.setCreDate(LocalDateTime.now()); u.setAddby(maker);
         users.save(u);
@@ -691,7 +691,9 @@ public class ConfigChangeService {
         if (a == null || a.get("pass") == null) return "Data permintaan rusak.";
         User u = users.findByUserId(targetId).orElse(null);
         if (u == null) return "User '" + targetId + "' sudah tidak ada.";
-        u.setPass(a.get("pass"));
+        // Jalur inilah yang menyetel ulang hitungan 30 hari (REQ_AUSY_00009): reset password
+        // oleh Admin adalah "pembaruan password terakhir" yang dimaksud kebijakan itu.
+        u.gantiPassword(a.get("pass"));
         users.save(u);
         return null;
     }
@@ -704,7 +706,7 @@ public class ConfigChangeService {
         u.setNama(a.get("nama")); u.setEmail(a.get("email"));
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount("Active".equals(a.get("status")) ? (short)1 : (short)0);
-        if (a.get("pass") != null && !a.get("pass").isBlank()) u.setPass(a.get("pass"));
+        if (a.get("pass") != null && !a.get("pass").isBlank()) u.gantiPassword(a.get("pass"));
         users.save(u);
         // Pindah role = pindah pekerjaan: haknya disusun ulang dari cetakan role yang baru, bukan
         // membawa hak role lama yang sudah tidak relevan (BUG_AUSY_00143). Pasangan otorisasinya

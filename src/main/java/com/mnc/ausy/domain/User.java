@@ -39,13 +39,32 @@ public class User {
     /** Akun bawaan sistem (admin & admin approver utama) — tidak boleh dihapus (BUG_AUSY_00131). */
     @Column(name = "protected_account") private Short protectedAccount = 0;
 
+    /** Kapan password terakhir diganti — dasar hitung mundur masa berlakunya (REQ_AUSY_00009). */
+    @Column(name = "pass_changed_at") private LocalDateTime passChangedAt;
+
+    /**
+     * Pasang password baru SEKALIGUS mencatat tanggalnya.
+     *
+     * Dipakai di SEMUA tempat yang mengubah password. Memisahkan keduanya pernah dicoba dan
+     * mudah sekali terlewat: satu jalur yang lupa mencatat tanggal membuat akun itu tidak pernah
+     * muncul di pengingat, dan tidak ada yang menyadarinya sampai passwordnya benar-benar
+     * kedaluwarsa — persis keluhan yang hendak diperbaiki.
+     */
+    public void gantiPassword(String hash) {
+        this.pass = hash;
+        this.passChangedAt = LocalDateTime.now();
+    }
+
     // getters / setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
     public String getPass() { return pass; }
+    /** Menyetel hash TANPA mencatat tanggalnya — untuk mengubah password pakai {@link #gantiPassword}. */
     public void setPass(String pass) { this.pass = pass; }
+    public LocalDateTime getPassChangedAt() { return passChangedAt; }
+    public void setPassChangedAt(LocalDateTime v) { this.passChangedAt = v; }
     public String getNama() { return nama; }
     public void setNama(String nama) { this.nama = nama; }
     public boolean isProtectedAccount() { return protectedAccount != null && protectedAccount == 1; }

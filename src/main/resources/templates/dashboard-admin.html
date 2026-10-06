@@ -11,6 +11,36 @@
     <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
     <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
+    <!--/* REQ_AUSY_00009: pengingat H-3 masa berlaku password, di beranda supaya terlihat tanpa
+           perlu membuka halaman User lebih dulu. Username, tanggal reset terakhir dan tanggal
+           kedaluwarsanya disebut sekaligus — admin harus bisa langsung bertindak dari sini. */-->
+    <div th:if="${not #lists.isEmpty(peringatanPassword)}" class="alert alert-warning">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span><i class="fa-solid fa-key"></i>
+                <b th:text="${#lists.size(peringatanPassword)}">0</b> akun masa berlaku passwordnya
+                akan habis dalam 3 hari atau kurang</span>
+            <a class="btn btn-sm btn-outline-secondary" th:href="@{/users}">Buka halaman User</a>
+        </div>
+        <table class="table table-sm mb-0 bg-transparent">
+            <thead><tr><th>Username</th><th>Nama</th><th>Reset Terakhir</th><th>Kedaluwarsa</th><th>Sisa</th></tr></thead>
+            <tbody>
+            <tr th:each="p : ${peringatanPassword}">
+                <td><code th:text="${p.userId}"></code></td>
+                <td th:text="${p.nama}"></td>
+                <td th:text="${p.gantiTerakhir}"></td>
+                <td th:text="${p.kedaluwarsa}"></td>
+                <td>
+                    <span th:if="${p.lewat()}" class="badge bg-danger-subtle text-danger"
+                          th:text="'Lewat ' + ${-p.sisaHari} + ' hari'"></span>
+                    <span th:if="${p.hariIni()}" class="badge bg-danger-subtle text-danger">Habis hari ini</span>
+                    <span th:if="${!p.lewat() and !p.hariIni()}" class="badge bg-warning-subtle text-warning"
+                          th:text="${p.sisaHari} + ' hari lagi'"></span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
     <div class="dash-grid">
         <div th:if="${cards.contains('cfg-stats')}" class="dash-card">
             <div class="dash-ico c-accent"><i class="fa-solid fa-users"></i></div>
