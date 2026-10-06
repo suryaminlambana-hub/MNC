@@ -422,8 +422,9 @@ public class ConfigChangeService {
         if (u == null) return "User tidak ditemukan.";
         if (isPending("USER", userId)) return pendingMsg("USER");
         if (!resettableByAdmin(u))
-            return "Password user " + userId + " tidak dapat direset dari sini — tombol ini hanya untuk"
-                 + " user sisi operasional (Maker & Checker).";
+            return "Password user " + userId + " tidak dapat direset dari sini — akun utama sistem"
+                 + " (mncadmin & mncsuperadmin) passwordnya tidak pernah kedaluwarsa dan tidak"
+                 + " direset lewat halaman ini.";
         Map<String,String> a=new LinkedHashMap<>();
         a.put("userId", n(u.getUserId())); a.put("nama", n(u.getNama()));
         a.put("pass", encoder.encode(newPass.trim()));
@@ -461,9 +462,20 @@ public class ConfigChangeService {
         return out;
     }
 
-    /** User sisi operasional (Maker/Checker) — hanya mereka yang passwordnya boleh direset Admin. */
+    /**
+     * Password siapa yang boleh direset Admin dari halaman User.
+     *
+     * Dulu hanya sisi operasional (Maker/Checker). Sejak REQ_AUSY_00011 role sisi config —
+     * Admin dan Admin Approval — ikut, sebab password mereka kini bisa kedaluwarsa
+     * (BUG_AUSY_00190) dan tanpa tombol ini akun yang terkunci tidak punya jalan keluar sama
+     * sekali.
+     *
+     * KECUALI Akun Utama (mncadmin & mncsuperadmin). Keduanya memang tidak pernah kedaluwarsa
+     * (REQ_AUSY_00010) jadi tidak pernah butuh ini, dan membiarkannya bisa direset akan membuka
+     * jalan bagi Admin untuk mengambil alih akun yang justru mengawasinya.
+     */
     public boolean resettableByAdmin(User u) {
-        return u != null && "BUSINESS".equals(access.sideOf(u.getIdGroup()));
+        return u != null && !u.isProtectedAccount();
     }
 
     // ================= APPROVAL (approval_group) =================

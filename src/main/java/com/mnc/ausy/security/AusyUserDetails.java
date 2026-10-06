@@ -1,6 +1,7 @@
 package com.mnc.ausy.security;
 
 import com.mnc.ausy.domain.User;
+import com.mnc.ausy.service.PasswordPolicyService;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -32,6 +33,20 @@ public class AusyUserDetails implements UserDetails {
     @Override public String getUsername() { return user.getUserId(); }
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
-    @Override public boolean isCredentialsNonExpired() { return true; }
+    /**
+     * Password yang lewat masa berlakunya menolak login (BUG_AUSY_00190).
+     *
+     * Diperiksa Spring Security SETELAH passwordnya cocok, jadi pesan "password kedaluwarsa"
+     * hanya muncul bagi orang yang memang tahu passwordnya — salah password tetap berbunyi
+     * salah password, tidak membocorkan keadaan akun kepada yang menebak-nebak.
+     *
+     * Hitungannya dipinjam utuh dari {@link PasswordPolicyService}, bukan ditulis ulang di sini:
+     * pintu masuk dan layar peringatan harus memakai aturan yang sama, kalau tidak layar akan
+     * menjanjikan sesuatu yang tidak ditepati pintunya. Akun Utama dikecualikan di sana
+     * (REQ_AUSY_00010).
+     */
+    @Override public boolean isCredentialsNonExpired() {
+        return !PasswordPolicyService.sudahLewat(user);
+    }
     @Override public boolean isEnabled() { return user.getStatusAccount() != null && user.getStatusAccount() == 1; }
 }

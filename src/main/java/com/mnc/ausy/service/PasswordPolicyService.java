@@ -19,11 +19,18 @@ import java.util.Locale;
  * {@value #AMBANG_PERINGATAN_HARI} hari sebelum habis akun itu mulai diingatkan — "H-3" pada
  * hari ke-27.
  *
- * <h2>Pengingat, bukan penguncian</h2>
- * Kelas ini HANYA menghitung dan memberi tahu. Tidak ada satu pun jalur login yang ditolak
- * karenanya: {@code AusyUserDetails.isCredentialsNonExpired()} tetap mengembalikan true, seperti
- * sebelumnya. Yang diminta adalah pemberitahuan sebelum password habis, dan memasang penguncian
- * sekaligus akan mengunci akun yang hari ini masih dipakai UAT tanpa seorang pun memintanya.
+ * <h2>Pengingat DAN penguncian</h2>
+ * Hitungan yang sama dipakai dua kali: untuk memperingatkan sebelum habis (REQ_AUSY_00009) dan
+ * untuk menolak login setelah habis (BUG_AUSY_00190). Perhitungannya dibuat statis supaya
+ * {@code AusyUserDetails} memakai kode yang sama persis — kalau gerbang login punya salinan
+ * aturannya sendiri, suatu saat keduanya akan berbeda dan layar akan menjanjikan sesuatu yang
+ * tidak ditepati pintu masuknya.
+ *
+ * <h2>Akun Utama tidak pernah kedaluwarsa (REQ_AUSY_00010)</h2>
+ * mncadmin dan mncsuperadmin dikecualikan. Bukan kemurahan hati: merekalah satu-satunya jalan
+ * memperbaiki keadaan dari dalam aplikasi. Kalau keduanya ikut terkunci, tidak ada seorang pun
+ * yang bisa mereset password siapa pun lagi — sistemnya mati kunci dan hanya bisa dibuka lewat
+ * basis data langsung.
  */
 @Service
 public class PasswordPolicyService {
@@ -50,10 +57,35 @@ public class PasswordPolicyService {
         public boolean hariIni() { return sisaHari == 0; }
     }
 
-    /** Tanggal password ini kedaluwarsa, atau null kalau tanggal gantinya belum tercatat. */
-    public LocalDate kedaluwarsa(User u) {
-        if (u == null || u.getPassChangedAt() == null) return null;
+    /**
+     * Akun yang dikecualikan dari masa berlaku password (REQ_AUSY_00010) — Akun Utama bawaan
+     * sistem, yaitu mncadmin dan mncsuperadmin.
+     *
+     * Ditandai dari {@code protected_account}, bukan dari user_id yang ditulis di kode: itu
+     * penanda yang sama yang sudah dipakai untuk melarang keduanya dihapus (BUG_AUSY_00131),
+     * dan alasannya pun sama — keduanya adalah jalan terakhir memperbaiki keadaan dari dalam
+     * aplikasi.
+     */
+    public static boolean dikecualikan(User u) {
+        return u != null && u.isProtectedAccount();
+    }
+
+    /** Tanggal password ini kedaluwarsa; null kalau dikecualikan atau tanggal gantinya belum tercatat. */
+    public static LocalDate kedaluwarsa(User u) {
+        if (u == null || dikecualikan(u) || u.getPassChangedAt() == null) return null;
         return u.getPassChangedAt().toLocalDate().plusDays(MASA_AKTIF_HARI);
+    }
+
+    /**
+     * Sudah lewat masa berlakunya — dasar penolakan login (BUG_AUSY_00190).
+     *
+     * <p>Tanggal yang belum tercatat TIDAK dianggap kedaluwarsa. Mengunci akun karena keadaannya
+     * tidak diketahui adalah menghukum orang atas data yang hilang; di layar ia tetap ditandai
+     * "Belum tercatat" supaya admin melihatnya dan bisa mereset.
+     */
+    public static boolean sudahLewat(User u) {
+        LocalDate exp = kedaluwarsa(u);
+        return exp != null && LocalDate.now().isAfter(exp);
     }
 
     /**
@@ -64,22 +96,22 @@ public class PasswordPolicyService {
      * gantinya hilang adalah akun yang tidak diketahui keadaannya, dan menampilkannya seolah
      * masih panjang justru menyembunyikan hal yang perlu dilihat orang.
      */
-    public Long sisaHari(User u) {
+    public static Long sisaHari(User u) {
         LocalDate exp = kedaluwarsa(u);
         return exp == null ? null : ChronoUnit.DAYS.between(LocalDate.now(), exp);
     }
 
     /** Sudah masuk masa pengingat (termasuk yang sudah lewat batas). */
-    public boolean perluDiingatkan(User u) {
+    public static boolean perluDiingatkan(User u) {
         if (u == null || u.getStatusAccount() == null || u.getStatusAccount() != 1) return false;
         Long sisa = sisaHari(u);
         return sisa != null && sisa <= AMBANG_PERINGATAN_HARI;
     }
 
     /** Akun aktif yang tanggal ganti passwordnya belum tercatat — tidak bisa dihitung. */
-    public boolean tanggalnyaBelumTercatat(User u) {
+    public static boolean tanggalnyaBelumTercatat(User u) {
         return u != null && u.getStatusAccount() != null && u.getStatusAccount() == 1
-                && u.getPassChangedAt() == null;
+                && !dikecualikan(u) && u.getPassChangedAt() == null;
     }
 
     /**
@@ -105,8 +137,9 @@ public class PasswordPolicyService {
     }
 
     /** Label singkat untuk kolom di halaman User — "sisa 5 hari", "habis hari ini", dst. */
-    public String label(User u) {
+    public static String label(User u) {
         if (u == null) return "—";
+        if (dikecualikan(u)) return "Tidak kedaluwarsa";
         if (u.getPassChangedAt() == null) return "Belum tercatat";
         long sisa = sisaHari(u);
         if (sisa < 0)  return "Lewat " + (-sisa) + " hari";
@@ -115,8 +148,8 @@ public class PasswordPolicyService {
     }
 
     /** Warna Bootstrap untuk label di atas, supaya yang mendesak terbaca lebih dulu. */
-    public String warna(User u) {
-        if (u == null || u.getPassChangedAt() == null) return "secondary";
+    public static String warna(User u) {
+        if (u == null || dikecualikan(u) || u.getPassChangedAt() == null) return "secondary";
         long sisa = sisaHari(u);
         if (sisa <= 0) return "danger";
         if (sisa <= AMBANG_PERINGATAN_HARI) return "warning";

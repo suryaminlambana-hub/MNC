@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -64,7 +65,12 @@ public class SecurityConfig {
                 .usernameParameter("username")
                 .passwordParameter("password")
                 .defaultSuccessUrl("/dashboard", true)
-                .failureUrl("/login?error")
+                // Password kedaluwarsa dibedakan dari password salah (BUG_AUSY_00190): tanpa ini
+                // orangnya membaca "username atau password salah" lalu mencoba berkali-kali
+                // dengan password yang sebenarnya benar, dan tidak pernah tahu harus minta reset.
+                // Aman dibedakan karena pemeriksaannya terjadi SETELAH passwordnya cocok.
+                .failureHandler((req, res, ex) -> res.sendRedirect(req.getContextPath()
+                        + (ex instanceof CredentialsExpiredException ? "/login?passexpired" : "/login?error")))
                 .permitAll()
             )
             .logout(logout -> logout
