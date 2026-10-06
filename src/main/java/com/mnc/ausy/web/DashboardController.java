@@ -71,9 +71,8 @@ public class DashboardController {
             Integer myGroup = principal == null ? null : principal.getIdGroup();
             model.addAttribute("pendingUsers", configChange.countPendingFor(myGroup));
             model.addAttribute("pendingUserList", configChange.pendingListFor(myGroup));
-            // Jejak yang terlihat mengikuti pasangan Admin - Admin Approval (REQ_AUSY_00008);
-            // hanya akun pengawas yang melihat seluruhnya.
-            model.addAttribute("recent", auditScope.configTransactions(principal, 15));
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.CONFIG), PageRequest.of(0, 15)));
             return "dashboard-adminapv";
         }
 
@@ -147,7 +146,8 @@ public class DashboardController {
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.BUSINESS), PageRequest.of(0, 8)));
         else if (cards.contains("audit-recent-admin"))
-            model.addAttribute("recent", auditScope.configTransactions(principal, 8));
+            model.addAttribute("recent", tx.findByUserGroups(
+                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.CONFIG), PageRequest.of(0, 8)));
         model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
     }

@@ -79,19 +79,9 @@ public class AuditController {
     }
 
     private String render(String side, Model model, AusyUserDetails me) {
-        if (AuditScopeService.CONFIG.equals(side)) {
-            // Sisi administratif: mengikuti pasangan Admin - Admin Approval, kecuali bagi akun
-            // pengawas yang melihat seluruhnya (REQ_AUSY_00007 & 00008).
-            model.addAttribute("transactions", scope.configTransactions(me, 100));
-            model.addAttribute("activities", scope.configActivities(me, 100));
-            model.addAttribute("scoped", true);
-            model.addAttribute("scopeLabel", scope.label(side));
-            model.addAttribute("exportUrl", "/audit-admin/export");
-            return "audit/index";
-        }
         // Sisi operasional: isinya mengikuti pasangan Checker - Maker, jadi checker tidak melihat
         // aktivitas maker di luar naungannya (BUG_AUSY_00149).
-        Set<String> users = dataScope.visibleMakers(me);
+        Set<String> users = AuditScopeService.BUSINESS.equals(side) ? dataScope.visibleMakers(me) : null;
         if (users != null) {
             if (users.isEmpty()) users = Set.of("\u0000");     // tidak ada pasangan: kosongkan
             model.addAttribute("transactions", tx.findByUserIds(users, PageRequest.of(0, 100)));
@@ -116,26 +106,17 @@ public class AuditController {
      * kertas mendatar, logo, tiga baris judul.
      */
     private void export(String side, HttpServletResponse resp, AusyUserDetails me) throws Exception {
+        Set<String> users = AuditScopeService.BUSINESS.equals(side) ? dataScope.visibleMakers(me) : null;
+        if (users != null && users.isEmpty()) users = Set.of("\u0000");
+        List<Integer> groups = users != null ? List.of()
+                : scope.groupsVisibleTo(me == null ? null : me.getIdGroup(), side);
+
+        List<TlogTransaction> txRows = users != null ? tx.findByUserIds(users, PageRequest.of(0, 5000))
+                                                    : tx.findByUserGroups(groups, PageRequest.of(0, 5000));
+        List<TlogActivity> actRows = users != null ? act.findByUserIds(users, PageRequest.of(0, 5000))
+                                                   : act.findByUserGroups(groups, PageRequest.of(0, 5000));
+
         boolean config = AuditScopeService.CONFIG.equals(side);
-
-        // Cetakan ini bukti untuk auditor, jadi isinya harus PERSIS sama dengan yang terlihat di
-        // layar — kalau tidak, seseorang bisa mengunduh jejak yang tidak boleh dilihatnya.
-        List<TlogTransaction> txRows;
-        List<TlogActivity> actRows;
-        if (config) {
-            txRows = scope.configTransactions(me, 5000);
-            actRows = scope.configActivities(me, 5000);
-        } else {
-            Set<String> users = dataScope.visibleMakers(me);
-            if (users != null && users.isEmpty()) users = Set.of("\u0000");
-            List<Integer> groups = users != null ? List.of()
-                    : scope.groupsVisibleTo(me == null ? null : me.getIdGroup(), side);
-            txRows = users != null ? tx.findByUserIds(users, PageRequest.of(0, 5000))
-                                   : tx.findByUserGroups(groups, PageRequest.of(0, 5000));
-            actRows = users != null ? act.findByUserIds(users, PageRequest.of(0, 5000))
-                                    : act.findByUserGroups(groups, PageRequest.of(0, 5000));
-        }
-
         String name = config ? "Audit_Trail_Admin" : "Audit_Trail_Maker_Checker";
         String judul = config ? "AUDIT TRAIL — ADMIN & ADMIN APPROVAL"
                               : "AUDIT TRAIL — MAKER & CHECKER";

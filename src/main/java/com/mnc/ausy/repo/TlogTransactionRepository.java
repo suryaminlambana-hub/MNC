@@ -46,22 +46,6 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
             "order by t.time_activity desc", nativeQuery = true)
     List<TlogTransaction> configHistoryForAdmin(@Param("admin") String admin, @Param("makerLike") String makerLike, Pageable page);
 
-    /**
-     * Jejak sisi config yang boleh dilihat SEORANG admin di Audit Trail (REQ_AUSY_00008):
-     * seluruh aktivitasnya sendiri, ditambah keputusan approver ATAS PENGAJUANNYA — tercatat
-     * atas nama approver, dengan "(maker=...)" di teksnya.
-     *
-     * <p>Sengaja bukan "seluruh log pasangannya": seorang Admin Approval memegang banyak admin,
-     * jadi menampilkan lognya utuh akan membocorkan pengajuan admin lain — persis yang dilarang
-     * requirement ini. {@code makerLike} harus berbentuk {@code %(maker=<id>)%} supaya "admin"
-     * tidak ikut mencocokkan "admin2".
-     */
-    @Query(value = "select t.* from tlog_transaction t where t.user_id = :admin or " +
-            "(t.name_activity in ('CONFIG_CHANGE_APPROVE','CONFIG_CHANGE_REJECT') and t.tinfo like :makerLike) " +
-            "order by t.time_activity desc", nativeQuery = true)
-    List<TlogTransaction> configVisibleToAdmin(@Param("admin") String admin,
-                                               @Param("makerLike") String makerLike, Pageable page);
-
     /** Transactions whose activity name starts with a prefix, e.g. 'CONFIG_CHANGE%' for the user/config history. */
     @Query(value = "select t.* from tlog_transaction t where t.name_activity like :prefix " +
                    "order by t.time_activity desc", nativeQuery = true)

@@ -78,46 +78,6 @@ public class PairingService {
     public boolean isMaker(User u) { return u != null && isMakerGroup(u.getIdGroup()); }
     public boolean isChecker(User u) { return u != null && isCheckerGroup(u.getIdGroup()); }
 
-    // ------------------------------------------------- pasangan sisi config (REQ_AUSY_00006)
-
-    /**
-     * Role sisi administratif yang MENGAJUKAN perubahan config — "Admin".
-     *
-     * Dibaca dari hak aksesnya ({@link AccessService#sideOf} = CONFIG) dan dari kenyataan bahwa
-     * ia bukan pemegang menu Otorisasi Config, bukan dari id role yang ditulis di kode — supaya
-     * role administratif buatan admin ikut terbawa tanpa menyentuh kelas ini lagi.
-     */
-    public boolean isConfigMakerGroup(Integer idGroup) {
-        return idGroup != null && "CONFIG".equals(access.sideOf(idGroup)) && !approval.configAuthorizer(idGroup);
-    }
-
-    /** Role yang MENGOTORISASI perubahan config — "Admin Approval". */
-    public boolean isConfigApproverGroup(Integer idGroup) {
-        return approval.configAuthorizer(idGroup);
-    }
-
-    public boolean isConfigMaker(User u)    { return u != null && isConfigMakerGroup(u.getIdGroup()); }
-    public boolean isConfigApprover(User u) { return u != null && isConfigApproverGroup(u.getIdGroup()); }
-
-    /** User aktif yang berperan sebagai Admin Approval, urut nama. */
-    public List<User> configApproverUsers() { return activeUsersWhere(this::isConfigApprover); }
-
-    /** User aktif yang berperan sebagai Admin, urut nama. */
-    public List<User> configMakerUsers() { return activeUsersWhere(this::isConfigMaker); }
-
-    /**
-     * Admin yang belum dipegang Admin Approval mana pun.
-     *
-     * Berbeda dari sisi bisnis, pengajuannya TETAP terlihat — otorisasi config ditentukan
-     * matriks approval, bukan pasangan ini. Yang hilang adalah jejak audit: tanpa pasangan,
-     * admin itu hanya melihat lognya sendiri. Karena itu tetap perlu ditandai di layar.
-     */
-    public List<User> unpairedConfigMakers() {
-        List<User> out = new ArrayList<>();
-        for (User u : configMakerUsers()) if (!pairs.existsByMaker(u.getUserId())) out.add(u);
-        return out;
-    }
-
     /** User aktif yang berperan sebagai checker bisnis, urut nama. */
     public List<User> checkerUsers() { return activeUsersWhere(this::isChecker); }
 
