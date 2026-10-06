@@ -27,6 +27,7 @@ public class ConfigChangeService {
         ENTITY_FIELDS.put("MENU", fields("namaMenu","Nama Menu","url","URL","parent","Parent","urutan","Urutan"));
         ENTITY_FIELDS.put("ACCESS", fields("user","User","group","Role","aksesMenu","Menu yang Diberi Akses"));
         ENTITY_FIELDS.put("PAIRING", fields("checker","Checker","makers","Maker yang Diotorisasi"));
+        ENTITY_FIELDS.put("PAIRING_ADM", fields("checker","Admin Approval","makers","Admin yang Diotorisasi"));
         ENTITY_FIELDS.put("APPROVAL", fields("approver","Role Penyetuju","target","Berwenang Menyetujui"));
     }
     private static LinkedHashMap<String,String> fields(String... kv){
@@ -37,6 +38,10 @@ public class ConfigChangeService {
     private static String entityLabel(String e){
         return switch (e==null?"":e){ case "GROUP"->"Role"; case "MENU"->"Menu"; case "ACCESS"->"Access User";
             case "PAIRING"->"Pasangan Checker - Maker";
+            // Dibedakan dari PAIRING supaya yang mengotorisasi tahu persis pasangan mana yang
+            // sedang disetujuinya — dua hal berbeda tidak boleh tampil dengan nama yang sama
+            // di layar Otorisasi Config.
+            case "PAIRING_ADM"->"Pasangan Admin - Admin Approval";
             case "APPROVAL"->"Approval Group"; default->"User"; };
     }
     /** Kept for backward compat (GL/user forms may reference it). */
@@ -397,6 +402,48 @@ public class ConfigChangeService {
         c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
         return saveReq(c,"PAIRING","EDIT","'"+checker+"'");
     }
+
+    /**
+     * Pemasangan Admin Approval dengan Admin yang diotorisasinya (REQ_AUSY_00006).
+     *
+     * Tabelnya sama ({@code checker_maker}) karena maknanya sama persis — "X berwenang atas Y" —
+     * hanya sisinya yang berbeda. Yang dipengaruhi pasangan ini BUKAN wewenang otorisasi (itu
+     * tetap ditentukan matriks Approval Group), melainkan siapa melihat jejak siapa di Audit
+     * Trail Admin (REQ_AUSY_00008).
+     *
+     * Tetap dual control: admin mengajukan dengan alasan, Admin Approval yang menerapkannya —
+     * jadi tidak ada admin yang bisa memilih sendiri siapa yang mengawasi jejaknya.
+     */
+    @Transactional
+    public String submitPairingAdmin(String approver, List<String> admins, AusyUserDetails me, String note){
+        if (note==null||note.isBlank()) return "Alasan (reason) wajib diisi.";
+        { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
+        if (approver==null||approver.isBlank()) return "Admin Approval belum dipilih.";
+        User apv = users.findByUserId(approver).orElse(null);
+        if (apv == null) return "User Admin Approval tidak ditemukan.";
+        if (!pairing.isConfigApprover(apv))
+            return "User '" + approver + "' bukan role Admin Approval, jadi tidak bisa dipasangkan ke admin.";
+        if (isPending("PAIRING_ADM", approver)) return pendingMsg("PAIRING_ADM");
+
+        List<String> want = new ArrayList<>();
+        if (admins != null) for (String a : admins) {
+            if (a == null || a.isBlank()) continue;
+            String id = a.trim();
+            User adm = users.findByUserId(id).orElse(null);
+            if (adm == null) return "User admin '" + id + "' tidak ditemukan.";
+            if (!pairing.isConfigMaker(adm)) return "User '" + id + "' bukan role Admin.";
+            if (id.equals(approver)) return "Admin Approval tidak dapat dipasangkan pada dirinya sendiri.";
+            if (!want.contains(id)) want.add(id);
+        }
+        List<String> cur = new ArrayList<>(pairing.makersOf(approver));
+        Map<String,String> before = pairingMap(approver, cur);
+        Map<String,String> after  = pairingMap(approver, want);
+        if (unchanged(before, after, "makerIds")) return NO_CHANGE;
+        ConfigChangeRequest c=base("PAIRING_ADM","EDIT",approver,me,note);
+        c.setBeforeJson(toJson(before)); c.setAfterJson(toJson(after));
+        return saveReq(c,"PAIRING_ADM","EDIT","'"+approver+"'");
+    }
+
     private Map<String,String> pairingMap(String checker, List<String> makers){
         List<String> sorted = new ArrayList<>(makers);
         Collections.sort(sorted);
@@ -532,7 +579,7 @@ public class ConfigChangeService {
 
     /** One section per Master Data entity, fixed order; only non-empty sections returned. */
     public record ReviewSection(String entity, String label, List<ReviewItem> items) {}
-    private static final String[] SECTION_ORDER = {"USER","GROUP","MENU","ACCESS","PAIRING","APPROVAL"};
+    private static final String[] SECTION_ORDER = {"USER","GROUP","MENU","ACCESS","PAIRING","PAIRING_ADM","APPROVAL"};
     public List<ReviewSection> pendingReviewSectionsFor(Integer approverGroup) {
         Map<String,List<ReviewItem>> byEntity = new LinkedHashMap<>();
         for (ReviewItem it : pendingReviewFor(approverGroup))
@@ -614,7 +661,7 @@ public class ConfigChangeService {
             case "GROUP"    -> ref!=null && ref.get("namaGroup")!=null ? ref.get("namaGroup") : ("Group #"+n(c.getTargetId()));
             case "MENU"     -> ref!=null && ref.get("namaMenu")!=null ? ref.get("namaMenu") : ("Menu #"+n(c.getTargetId()));
             case "ACCESS"   -> ref!=null && ref.get("user")!=null ? ref.get("user") : n(c.getTargetId());
-            case "PAIRING"  -> ref!=null && ref.get("checker")!=null ? ref.get("checker") : n(c.getTargetId());
+            case "PAIRING", "PAIRING_ADM" -> ref!=null && ref.get("checker")!=null ? ref.get("checker") : n(c.getTargetId());
             case "APPROVAL" -> ref!=null ? n(ref.get("approver"))+" → "+n(ref.get("target")) : "Aturan #"+n(c.getTargetId());
             default -> {
                 String t=c.getTargetId();
@@ -634,7 +681,7 @@ public class ConfigChangeService {
             case "GROUP"    -> applyGroup(c);
             case "MENU"     -> applyMenu(c);
             case "ACCESS"   -> applyAccess(c);
-            case "PAIRING"  -> applyPairing(c);
+            case "PAIRING", "PAIRING_ADM" -> applyPairing(c);
             case "APPROVAL" -> applyApproval(c);
             default          -> applyUser(c);
         };
@@ -799,11 +846,12 @@ public class ConfigChangeService {
         return null;
     }
 
+    /** Dipakai dua sisi: PAIRING (Checker - Maker) dan PAIRING_ADM (Admin - Admin Approval). */
     private String applyPairing(ConfigChangeRequest c){
         Map<String,String> a = parse(c.getAfterJson());
         String checker = c.getTargetId();
         if (a==null || checker==null || checker.isBlank()) return "Data rusak.";
-        if (!users.existsByUserId(checker)) return "User checker sudah tidak ada.";
+        if (!users.existsByUserId(checker)) return "User penyetuju sudah tidak ada.";
         String ids = n(a.get("makerIds"));
         List<String> makers = new ArrayList<>();
         if (!ids.isBlank()) for (String s : ids.split(",")) {
