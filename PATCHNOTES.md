@@ -18,7 +18,21 @@ Setiap entri memuat:
 
 ## Belum di-deploy
 
-Belum ada.
+> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
+> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+
+- **Role baru EXECUTE untuk data center** (REQ_AUSY_00016).
+  - Role `EXECUTE` (level `EXECUTE`, inisial `EXE`) memegang menu **Generate File ACCTXT**,
+    beserta aksi Susun Ulang dan Hari Ini.
+  - Menu itu **dicabut dari admin** (role CONFIG / SETTING), dari cetakan role dan dari hak
+    per user.
+  - Role EXECUTE muncul di dropdown Role saat Tambah/Ubah User. User-nya tetap dibuat admin dan
+    diotorisasi Admin Approval.
+  - Jejak generate ACCTXT oleh user EXECUTE terlihat di Audit Trail sisi Admin Approval.
+  - Beranda user EXECUTE belum punya card ringkasan; menunya ada di sidebar, di bawah Master Data.
+
+### Migrasi DB
+- `V46__req_00016_role_execute.sql`. id role diambil dari sequence, bukan angka tetap.
 
 ---
 
