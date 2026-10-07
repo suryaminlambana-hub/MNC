@@ -3,8 +3,16 @@
       th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>User — AUSY</title></head>
 <main>
-    <h1 class="ausy-page-title">User</h1>
-    <p class="text-muted">Manajemen akun pengguna. Setiap Add/Edit/Delete <b>butuh alasan</b> dan menunggu approval Admin Approval (dual control).</p>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <h1 class="ausy-page-title">User</h1>
+        <p class="text-muted">Manajemen akun pengguna. Setiap Add/Edit/Delete <b>butuh alasan</b> dan menunggu approval Admin Approval (dual control).</p>
+      </div>
+      <!--/* REQ_AUSY_00021: unduh daftar user untuk keperluan laporan/backup. */-->
+      <a class="btn btn-secondary" th:href="@{/users/export}">
+        <i class="fa-solid fa-file-excel"></i> Download Excel
+      </a>
+    </div>
 
     <div th:if="${ok}" class="alert alert-info py-2" th:text="${ok}"></div>
     <div th:if="${err}" class="alert alert-danger py-2" th:text="${err}"></div>

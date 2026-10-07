@@ -53,8 +53,13 @@ public class AccessController {
         Map<Integer,String> roleName = new HashMap<>();
         for (var g : groups.findAllByOrderByNamaGroupAsc()) roleName.put(g.getIdGroup(), g.getNamaGroup());
 
+        // REQ_AUSY_00018: user ber-role EXECUTE tidak ditampilkan di sini. Role itu hanya
+        // memegang satu hal — Generate File ACCTXT — dan haknya datang dari cetakan rolenya,
+        // bukan dari pengaturan per user. Menampilkannya hanya membuat daftar ini panjang
+        // tanpa ada yang bisa diatur.
         List<User> selectable = users.findAll().stream()
                 .filter(u -> iAmConfigApprover || !approval.configAuthorizer(u.getIdGroup()))
+                .filter(u -> !access.isExecuteRole(u.getIdGroup()))
                 .sorted(Comparator.comparing(u -> u.getUserId() == null ? "" : u.getUserId()))
                 .toList();
         model.addAttribute("users", selectable);
@@ -64,6 +69,8 @@ public class AccessController {
         model.addAttribute("pendingIds", configChange.pendingIds("ACCESS"));
 
         User target = user == null ? null : users.findByUserId(user).orElse(null);
+        // Diperiksa lagi di sini: ?user=... bisa diketik langsung di alamat (REQ_AUSY_00018).
+        if (target != null && access.isExecuteRole(target.getIdGroup())) target = null;
         if (target != null) {
             Set<Integer> granted = new HashSet<>();
             for (UserMenu um : userMenus.findByUserId(target.getUserId())) granted.add(um.getIdMenu());

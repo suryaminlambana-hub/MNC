@@ -2,6 +2,7 @@ package com.mnc.ausy.config;
 
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AccessService;
+import com.mnc.ausy.service.MenuService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,8 +21,12 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 public class SecurityConfig {
 
     private final AccessService access;
+    private final MenuService menuService;
 
-    public SecurityConfig(AccessService access) { this.access = access; }
+    public SecurityConfig(AccessService access, MenuService menuService) {
+        this.access = access;
+        this.menuService = menuService;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -64,7 +69,21 @@ public class SecurityConfig {
                 .loginProcessingUrl("/login")
                 .usernameParameter("username")
                 .passwordParameter("password")
-                .defaultSuccessUrl("/dashboard", true)
+                // REQ_AUSY_00019: role bermenu tunggal (EXECUTE) diantar langsung ke menunya.
+                // Dashboard baginya halaman perantara yang tidak pernah berisi apa pun yang ia
+                // butuhkan, dan menunya pun disembunyikan dari sidebar. Role lain tetap ke
+                // Dashboard seperti biasa.
+                .successHandler((req, res, auth) -> {
+                    String target = "/dashboard";
+                    if (auth.getPrincipal() instanceof AusyUserDetails u
+                            && access.isExecuteRole(u.getIdGroup())) {
+                        String first = menuService.firstMenuUrl(u.getUsername());
+                        // Kalau haknya belum diisi, jatuh kembali ke Dashboard daripada
+                        // mengantar ke halaman yang akan ditolak.
+                        if (first != null) target = first;
+                    }
+                    res.sendRedirect(req.getContextPath() + target);
+                })
                 // Password kedaluwarsa dibedakan dari password salah (BUG_AUSY_00190): tanpa ini
                 // orangnya membaca "username atau password salah" lalu mencoba berkali-kali
                 // dengan password yang sebenarnya benar, dan tidak pernah tahu harus minta reset.

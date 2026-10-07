@@ -51,6 +51,18 @@ public class GlobalModelAdvice {
         return user;
     }
 
+    /**
+     * Tautan Home ditampilkan atau tidak (REQ_AUSY_00019).
+     *
+     * Role EXECUTE hanya memegang satu menu, jadi Dashboard baginya halaman perantara yang
+     * tidak pernah berisi apa pun yang ia butuhkan. Tautannya ditulis langsung di layout, bukan
+     * baris menu, jadi penyembunyiannya harus lewat sini.
+     */
+    @ModelAttribute("showHome")
+    public boolean showHome(@AuthenticationPrincipal AusyUserDetails user) {
+        return user == null || !access.isExecuteRole(user.getIdGroup());
+    }
+
     @ModelAttribute("sidebar")
     public Object sidebar(@AuthenticationPrincipal AusyUserDetails user) {
         return user == null ? java.util.List.of() : menuService.sidebarForUser(user.getUsername());

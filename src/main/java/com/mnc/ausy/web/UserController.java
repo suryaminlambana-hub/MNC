@@ -5,7 +5,9 @@ import com.mnc.ausy.domain.User;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.ConfigChangeService;
+import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.PasswordPolicyService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -13,6 +15,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -26,11 +32,13 @@ public class UserController {
     private final GroupUserRepository groups;
     private final ConfigChangeService configChange;
     private final PasswordPolicyService passwordPolicy;
+    private final ExcelExportService excel;
+    private final AuditService audit;
 
     public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange,
-                          PasswordPolicyService passwordPolicy) {
+                          PasswordPolicyService passwordPolicy, ExcelExportService excel, AuditService audit) {
         this.users = users; this.groups = groups; this.configChange = configChange;
-        this.passwordPolicy = passwordPolicy;
+        this.passwordPolicy = passwordPolicy; this.excel = excel; this.audit = audit;
     }
 
     @GetMapping
@@ -115,4 +123,37 @@ public class UserController {
         ra.addFlashAttribute("ok", configChange.submitDelete(userId, me, note));
         return "redirect:/users";
     }
+
+    /**
+     * Unduh daftar user sebagai .xlsx (REQ_AUSY_00021).
+     *
+     * Isinya mengikuti kolom yang terlihat di layar, bukan seluruh isi tabel: yang dibutuhkan
+     * untuk laporan dan backup adalah apa yang sedang dilihat admin. Role diambil dari master
+     * group, bukan kolom {@code users.level} yang tidak ikut terisi saat group baru dipasang
+     * (BUG_AUSY_00110).
+     */
+    @GetMapping("/export")
+    public void export(HttpServletResponse resp, @AuthenticationPrincipal AusyUserDetails me) throws Exception {
+        Map<Integer,String> groupNames = new HashMap<>();
+        for (GroupUser g : groups.findAllByOrderByNamaGroupAsc()) groupNames.put(g.getIdGroup(), g.getNamaGroup());
+
+        List<List<Object>> rows = new ArrayList<>();
+        for (User u : users.findAll()) {
+            rows.add(Arrays.asList(
+                    nz(u.getUserId()),
+                    nz(u.getNama()),
+                    nz(groupNames.get(u.getIdGroup())),
+                    u.getStatusAccount() != null && u.getStatusAccount() == 1 ? "Aktif" : "Non-Aktif",
+                    nz(u.getEmail()),
+                    nz(u.getAddby())));
+        }
+        excel.download(resp, "User", "Daftar_User",
+                List.of("Username", "Nama", "Role", "Status", "Email", "Dibuat Oleh"), rows, false);
+
+        if (me != null)
+            audit.transaction(me.getUsername(), "EXPORT_USER_XLSX",
+                    "Unduh daftar user sebagai Excel: " + rows.size() + " user");
+    }
+
+    private static String nz(String s) { return s == null ? "" : s; }
 }

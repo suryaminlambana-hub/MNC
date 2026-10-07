@@ -1,6 +1,7 @@
 package com.mnc.ausy.service;
 
 import com.mnc.ausy.domain.Menu;
+import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.MenuRepository;
 import org.springframework.stereotype.Service;
 
@@ -37,8 +38,26 @@ import java.util.*;
 public class AccessService {
 
     private final MenuRepository menus;
+    private final GroupUserRepository groups;
 
-    public AccessService(MenuRepository menus) { this.menus = menus; }
+    public AccessService(MenuRepository menus, GroupUserRepository groups) {
+        this.menus = menus;
+        this.groups = groups;
+    }
+
+    /**
+     * Role EXECUTE — posisi data center yang hanya memegang Generate File ACCTXT
+     * (REQ_AUSY_00016).
+     *
+     * Dikenali dari kolom {@code level}, bukan dari id: V46 mengambil id dari sequence karena
+     * angka tetap bisa saja sudah dipakai role buatan admin di lingkungan lain.
+     */
+    public boolean isExecuteRole(Integer idGroup) {
+        if (idGroup == null) return false;
+        return groups.findById(idGroup)
+                .map(g -> "EXECUTE".equalsIgnoreCase(g.getLevel()) || "EXECUTE".equalsIgnoreCase(g.getNamaGroup()))
+                .orElse(false);
+    }
 
     // ---------------------------------------------------------------- per user (yang berlaku)
 

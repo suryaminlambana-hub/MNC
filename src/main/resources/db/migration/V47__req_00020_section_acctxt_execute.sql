@@ -1,0 +1,11 @@
+-- REQ_AUSY_00020 — pilihan "Generate File ACCTXT" tidak lagi muncul di Access User role ADMIN.
+--
+-- Menu itu dulu milik admin (V36), lalu V46 memindahkannya ke role EXECUTE tapi kolom
+-- section-nya tertinggal 'ADMIN'. Halaman Access User menyaring centangannya PER SECTION,
+-- jadi selama labelnya masih 'ADMIN' pilihan itu tetap muncul untuk admin — padahal haknya
+-- sudah dicabut dan mencentangnya tidak ada gunanya.
+--
+-- Sekalian menutup kebalikannya: section role EXECUTE dihitung dari menu yang dipegangnya,
+-- sehingga dengan label 'ADMIN' seorang EXECUTE justru akan melihat SELURUH centangan admin
+-- di halaman itu.
+UPDATE menu SET section = 'EXECUTE' WHERE id_menu IN (43, 608, 610);

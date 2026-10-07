@@ -22,6 +22,19 @@ public class MenuService {
         return group(menus.findAccessibleChildrenForUser(userId));
     }
 
+    /**
+     * Menu pertama yang benar-benar bisa dibuka user ini, atau null kalau tidak punya apa pun.
+     * Dipakai untuk mengantar role bermenu tunggal langsung ke tujuannya (REQ_AUSY_00019).
+     */
+    public String firstMenuUrl(String userId) {
+        if (userId == null) return null;
+        for (Menu m : menus.findAccessibleChildrenForUser(userId)) {
+            String url = m.getUrl();
+            if (url != null && url.startsWith("/")) return url;
+        }
+        return null;
+    }
+
     private List<Menu> group(List<Menu> children) {
         // group children under their parent id, preserving order
         Map<Integer, List<Menu>> byParent = new LinkedHashMap<>();

@@ -21,7 +21,7 @@
     <aside class="ausy-sidebar">
         <div class="ausy-brand"><i class="fa-solid fa-building-columns"></i> <span>MNC <b>AUSY</b></span></div>
         <ul class="ausy-nav">
-            <li><a th:href="@{/dashboard}" title="Home" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
+            <li th:if="${showHome}"><a th:href="@{/dashboard}" title="Home" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
         </ul>
         <div class="ausy-group" th:each="p : ${sidebar}" th:attr="data-group=${p.namaMenu}">
             <button type="button" class="ausy-group-title" th:title="${p.namaMenu}">
