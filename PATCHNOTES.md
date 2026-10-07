@@ -1,4 +1,4 @@
-# Changelog AUSY
+# Patch Notes AUSY
 
 Catatan rilis per deploy ke server DEV (10.5.99.24, `http://10.5.99.24:8080/ausy`).
 Entri terbaru di atas.
