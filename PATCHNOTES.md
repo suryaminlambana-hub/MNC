@@ -18,13 +18,17 @@ Setiap entri memuat:
 
 ## Belum di-deploy
 
-> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
-> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+Belum ada.
 
-Tidak ada migrasi DB.
+---
 
+## dev-20261007-1 — 07-10-2026 15:23
+
+Commit `11fb17d`. DB tetap v45 (tidak ada migrasi baru).
+
+### Perubahan
 - **Nominal di audit trail** (REQ_AUSY_00012). Log `UPLOAD` di Audit Trail dan card Aktivitas
-  Terakhir kini menulis `D=5.000.000,00`, bukan `D=5000000`. Log lama tidak diubah.
+  Terakhir kini menulis `D=5.000.000,00`, bukan `D=5000000`. Log yang sudah ada tidak diubah.
 - **Tombol Download PDF di List GL Aktif dicabut** (REQ_AUSY_00013), beserta endpoint
   `/gl-legacy/pdf`.
 - **Section "Upload Menunggu Otorisasi" di List GL Aktif** (REQ_AUSY_00014).
@@ -37,9 +41,14 @@ Tidak ada migrasi DB.
   - Checker hanya melihat jejaknya sendiri dan maker pasangannya.
   - Dulu card ini menyaring per group, sehingga semua maker dan checker lain ikut terlihat.
 
-Operasional saat deploy:
-- **Audit log dibersihkan lagi** (BUG_AUSY_00191), supaya log berformat nominal lama hilang dan
-  log baru memakai format `5.000.000,00`.
+### Operasional
+- **BUG_AUSY_00191 (bersihkan audit log) belum dikerjakan.** Saat deploy, `tlog_transaction`
+  berisi 39 baris (06-10-2026 09:26 s/d 07-10-2026 13:47), termasuk 5 log `UPLOAD` berformat
+  lama. Pembersihannya menunggu persetujuan.
+
+### Catatan untuk developer
+- **ID bug ganda:** `BUG_AUSY_00191` dan `BUG_AUSY_00192` juga dipakai di `1be7a04` untuk
+  masalah lain (penyaringan simbol dan kolom kode angka). Cocokkan dengan tracker QA.
 
 ---
 
