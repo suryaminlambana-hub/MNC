@@ -42,9 +42,11 @@ Commit `11fb17d`. DB tetap v45 (tidak ada migrasi baru).
   - Dulu card ini menyaring per group, sehingga semua maker dan checker lain ikut terlihat.
 
 ### Operasional
-- **BUG_AUSY_00191 (bersihkan audit log) belum dikerjakan.** Saat deploy, `tlog_transaction`
-  berisi 39 baris (06-10-2026 09:26 s/d 07-10-2026 13:47), termasuk 5 log `UPLOAD` berformat
-  lama. Pembersihannya menunggu persetujuan.
+- **Audit log dibersihkan setelah deploy** (BUG_AUSY_00191). Semua 39 baris `tlog_transaction`
+  (06-10-2026 09:26 s/d 07-10-2026 13:47, id sampai 279) dihapus, termasuk 5 log `UPLOAD`
+  berformat nominal lama. Log baru memakai format `5.000.000,00`.
+  - Backup: `/opt/ausy/backup-tlog_transaction-20261007.csv` di server aplikasi (chmod 600).
+  - `tlog_activity` (log login) tidak disentuh.
 
 ### Catatan untuk developer
 - **ID bug ganda:** `BUG_AUSY_00191` dan `BUG_AUSY_00192` juga dipakai di `1be7a04` untuk
