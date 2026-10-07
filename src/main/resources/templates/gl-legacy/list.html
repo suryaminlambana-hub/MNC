@@ -187,7 +187,13 @@
   <!--/* Dipaginasi di server: 10 baris per halaman. Dulu seluruh baris (belasan ribu) dirender
          sekaligus dan halamannya blank saat di-scroll — BUG_AUSY_00147. Kelas "dt" sengaja
          dilepas supaya tidak ada paging ganda di sisi browser. */-->
-  <div class="ausy-card">
+  <!--/* REQ_AUSY_00015: judul tabel, supaya tidak terbaca sebagai lanjutan section
+         "Upload Menunggu Otorisasi" di atasnya ketika daftar pending-nya panjang. */-->
+  <div class="ausy-card" style="padding:0">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-table-list text-success"></i> Tabel List GL Aktif
+      <span class="text-muted fw-normal small">— sudah diotorisasi checker</span></h2>
+    <div class="px-3 pb-3">
     <table class="table table-sm table-hover align-middle mb-0">
       <thead><tr><th>ID</th><th>Batch</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
       <tbody>
@@ -208,6 +214,7 @@
       </tr>
       </tbody>
     </table>
+    </div>
   </div>
 
   <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2"

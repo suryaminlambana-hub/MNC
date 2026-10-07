@@ -18,7 +18,10 @@ Setiap entri memuat:
 
 ## Belum di-deploy
 
-Sudah di `main`, belum terpasang di DEV. Tidak ada migrasi DB.
+> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
+> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+
+Tidak ada migrasi DB.
 
 - **Nominal di audit trail** (REQ_AUSY_00012). Log `UPLOAD` di Audit Trail dan card Aktivitas
   Terakhir kini menulis `D=5.000.000,00`, bukan `D=5000000`. Log lama tidak diubah.
@@ -28,6 +31,8 @@ Sudah di `main`, belum terpasang di DEV. Tidak ada migrasi DB.
   - Isinya batch upload yang belum diotorisasi checker, disaring per maker.
   - Tiap batch punya tombol PDF jurnalnya sendiri: `/gl-legacy/pending/{paket}/pdf`.
   - Batch milik maker lain menghasilkan 404.
+- **Judul "Tabel List GL Aktif"** di atas tabel GL Aktif (REQ_AUSY_00015), supaya tidak terbaca
+  sebagai lanjutan section pending di atasnya.
 
 ---
 
