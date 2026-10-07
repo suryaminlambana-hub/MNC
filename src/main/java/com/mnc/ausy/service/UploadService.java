@@ -103,6 +103,18 @@ public class UploadService {
         try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
     }
 
+    /**
+     * Nominal untuk teks audit trail: {@code 5.000.000,00} (REQ_AUSY_00012), format yang sama
+     * dengan kolom Amount di layar. Teks audit dibaca di Audit Trail dan card Aktivitas Terakhir,
+     * dan angka mentah {@code 5000000} sulit dibaca sekilas.
+     */
+    static String nominal(BigDecimal v) {
+        java.text.DecimalFormatSymbols s = new java.text.DecimalFormatSymbols(Locale.ROOT);
+        s.setGroupingSeparator('.');
+        s.setDecimalSeparator(',');
+        return new java.text.DecimalFormat("#,##0.00", s).format(v == null ? BigDecimal.ZERO : v);
+    }
+
     /** Kolom currency — wajib berisi IDR (BUG_AUSY_00190). */
     private static final int KOLOM_CURRENCY = 11;
 
@@ -346,7 +358,8 @@ public class UploadService {
             t.setAdddt(LocalDateTime.now());
             tUploads.save(t);
 
-            audit.transaction(username, "UPLOAD", "Batch " + paket + " — " + n + " baris (D=" + res.debit + ", C=" + res.credit + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
+            audit.transaction(username, "UPLOAD", "Batch " + paket + " — " + n + " baris (D=" + nominal(res.debit)
+                    + ", C=" + nominal(res.credit) + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
 
             res.success = true;
             // Keterangan "N isian dirapikan" dilepas atas permintaan pengguna (BUG_AUSY_00180):

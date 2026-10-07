@@ -16,6 +16,21 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Sudah di `main`, belum terpasang di DEV. Tidak ada migrasi DB.
+
+- **Nominal di audit trail** (REQ_AUSY_00012). Log `UPLOAD` di Audit Trail dan card Aktivitas
+  Terakhir kini menulis `D=5.000.000,00`, bukan `D=5000000`. Log lama tidak diubah.
+- **Tombol Download PDF di List GL Aktif dicabut** (REQ_AUSY_00013), beserta endpoint
+  `/gl-legacy/pdf`.
+- **Section "Upload Menunggu Otorisasi" di List GL Aktif** (REQ_AUSY_00014).
+  - Isinya batch upload yang belum diotorisasi checker, disaring per maker.
+  - Tiap batch punya tombol PDF jurnalnya sendiri: `/gl-legacy/pending/{paket}/pdf`.
+  - Batch milik maker lain menghasilkan 404.
+
+---
+
 ## dev-20261006-1 — 06-10-2026 18:13
 
 Commit `90b7a73`. DB naik dari v43 ke **v45**.

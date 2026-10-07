@@ -111,7 +111,20 @@ public class GlDataController {
         model.addAttribute("pendingPakets", glExport.pendingPaketKeys());   // BUG_AUSY_00102
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
+        model.addAttribute("pendingUploads", pendingUploads(me));   // REQ_AUSY_00014
         return "gl-legacy/list";
+    }
+
+    /**
+     * Batch upload yang menunggu otorisasi, disaring per maker (REQ_AUSY_00014). Kolom waktunya
+     * (max(adddt)) bisa datang sebagai java.sql.Timestamp tergantung driver, sedangkan
+     * #temporals di template hanya menerima LocalDateTime — diseragamkan di sini.
+     */
+    private List<Object[]> pendingUploads(AusyUserDetails me) {
+        List<Object[]> out = scope.filterArrays(me, gl.pendingPakets(), 1);
+        for (Object[] p : out)
+            if (p.length > 5 && p[5] instanceof java.sql.Timestamp ts) p[5] = ts.toLocalDateTime();
+        return out;
     }
 
     /**

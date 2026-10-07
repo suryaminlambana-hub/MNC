@@ -10,10 +10,8 @@
         nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <!--/* BUG_AUSY_00137: unduh daftar ini sebagai PDF. Isinya sama dengan yang tampil di tabel,
-             termasuk pembatasan per maker. */-->
-      <a class="btn btn-outline-secondary" th:href="@{/gl-legacy/pdf}">
-        <i class="fa-solid fa-file-pdf"></i> Download PDF</a>
+      <!--/* REQ_AUSY_00013: tombol Download PDF seluruh daftar dicabut. PDF kini per batch yang
+             menunggu otorisasi, di section "Upload Menunggu Otorisasi" (REQ_AUSY_00014). */-->
       <button th:if="${canExport}" type="button" class="btn btn-primary" id="btnAjukanExport">
         <i class="fa-solid fa-paper-plane"></i> Ajukan Export
         <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
@@ -154,6 +152,37 @@
   <p th:if="${canExport}" class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
      Export membuat file ACCTXT di server (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
      Hanya GL aktif yang belum di-export yang disertakan.</p>
+
+  <!--/* REQ_AUSY_00014: batch upload yang masih menunggu otorisasi checker, masing-masing dengan
+         PDF-nya sendiri supaya tidak tercampur. Baris-baris ini belum termasuk GL Aktif di tabel
+         bawah. Disaring per maker seperti tabel bawah. */-->
+  <div class="ausy-card mb-3" style="padding:0">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-hourglass-half text-warning"></i> Upload Menunggu Otorisasi
+      <span class="text-muted fw-normal small">— belum masuk GL Aktif</span></h2>
+    <div class="px-3 pb-3">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead><tr><th>Batch</th><th>Uploader</th><th class="text-end">Jml Baris</th>
+          <th class="text-end">Debit</th><th class="text-end">Credit</th><th>Diupload</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="p : ${pendingUploads}">
+          <td th:text="${p[0]}"></td>
+          <td th:text="${p[1]}"></td>
+          <td class="text-end" th:text="${p[2]}"></td>
+          <td class="text-end" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
+          <td class="text-end" th:text="${#numbers.formatDecimal(p[4],1,'POINT',2,'COMMA')}"></td>
+          <td class="text-nowrap" th:text="${p[5] != null ? #temporals.format(p[5],'dd-MM-yyyy HH:mm') : '-'}"></td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
+              <i class="fa-solid fa-file-pdf"></i> PDF</a></td>
+        </tr>
+        <tr th:if="${pendingUploads == null or pendingUploads.isEmpty()}">
+          <td colspan="7" class="text-center text-muted py-3">Tidak ada upload yang menunggu otorisasi.</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <!--/* Dipaginasi di server: 10 baris per halaman. Dulu seluruh baris (belasan ribu) dirender
          sekaligus dan halamannya blank saat di-scroll — BUG_AUSY_00147. Kelas "dt" sengaja

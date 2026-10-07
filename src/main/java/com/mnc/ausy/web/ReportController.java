@@ -65,27 +65,37 @@ public class ReportController {
     private static final DateTimeFormatter FOOT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /**
-     * BUG_AUSY_00137 — unduh isi halaman List GL Aktif sebagai PDF.
+     * REQ_AUSY_00014 — jurnal PDF SATU batch upload yang masih menunggu otorisasi checker.
      *
-     * Alamatnya sengaja berada di bawah {@code /gl-legacy} supaya hak aksesnya otomatis mengikuti
-     * menu List GL Aktif (AccessService memakai pemilik URL terpanjang); kalau diletakkan di
-     * {@code /report/...} endpoint ini tidak dimiliki menu mana pun dan akan terbuka untuk semua
-     * yang login. Isinya persis yang terlihat di layar, termasuk batasan per maker (BUG_AUSY_00138).
+     * Menggantikan tombol "Download PDF" seluruh List GL Aktif (dicabut di REQ_AUSY_00013): PDF
+     * dibuat per batch supaya isinya tidak tercampur dengan batch lain.
+     *
+     * Alamatnya sengaja di bawah {@code /gl-legacy} supaya hak aksesnya mengikuti menu List GL
+     * Aktif (AccessService memakai pemilik URL terpanjang). Batch dicari dari daftar pending yang
+     * sudah disaring per maker, jadi maker hanya bisa mengunduh batch miliknya sendiri; nomor
+     * batch lain menghasilkan 404, bukan isi batch orang lain.
      */
-    @GetMapping("/gl-legacy/pdf")
-    public void listGlAktif(@AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        // Definisi "GL Aktif" yang sama dengan halamannya, supaya PDF-nya tidak pernah berisi baris
-        // yang berbeda dari yang dilihat di layar (BUG_AUSY_00150). PDF memuat SEMUA baris, bukan
-        // hanya halaman yang sedang dibuka — itu memang gunanya diunduh.
-        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me));
-        String stamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+    @GetMapping("/gl-legacy/pending/{paket}/pdf")
+    public void pendingBatch(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
+                             HttpServletResponse resp) throws Exception {
+        String maker = null;
+        for (Object[] p : scope.filterArrays(me, gl.pendingPakets(), 1))
+            if (paket.equals(String.valueOf(p[0]))) { maker = String.valueOf(p[1]); break; }
+        if (maker == null) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND,
+                    "Batch " + paket + " tidak ada di daftar upload yang menunggu otorisasi Anda.");
+            return;
+        }
+        List<GlTabel> rows = gl.findBatchRows(paket, maker).stream()
+                .filter(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                .toList();
         resp.setContentType("application/pdf");
-        resp.setHeader("Content-Disposition", "attachment; filename=\"List_GL_Aktif_" + stamp + ".pdf\"");
+        resp.setHeader("Content-Disposition", "attachment; filename=\"Jurnal_Batch_" + paket + "_pending.pdf\"");
         writeJournals(resp, rows);
 
         if (me != null)
             audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
-                    "Unduh List GL Aktif sebagai PDF: " + rows.size() + " baris");
+                    "Unduh PDF Batch " + paket + " (menunggu otorisasi): " + rows.size() + " baris");
     }
 
     @GetMapping("/report/jurnal/{paket}")
