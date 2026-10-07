@@ -696,7 +696,15 @@ public class ConfigChangeService {
         u.setIdGroup(idGroup); u.setLevel(groupLevel(idGroup));
         u.setStatusAccount((short)1); u.setCreDate(LocalDateTime.now()); u.setAddby(maker);
         users.save(u);
-        seedAccessFromRole(uid, idGroup);       // hak awal = cetakan role (BUG_AUSY_00143)
+        // REQ_AUSY_00017: user baru dibuat TANPA satu pun hak. Dulu haknya diisi dari cetakan
+        // rolenya, sehingga halaman Access User untuk user yang baru dibuat sudah tercentang
+        // semua — admin tidak bisa membedakan mana yang memang diberikan dan mana yang hanya
+        // bawaan, dan user baru langsung memegang seluruh menu rolenya tanpa pernah diputuskan
+        // siapa pun. Sekarang admin membuka Access User dan mencentang sendiri.
+        //
+        // Ini membatalkan BUG_AUSY_00143 (hak awal = cetakan role) dan BUG_AUSY_00184 (Upload
+        // Excel menyala sejak awal untuk maker baru). Akibat yang disengaja: user yang baru
+        // dibuat login ke sidebar kosong sampai admin mengurus haknya.
         return null;
     }
     private String applyPasswordReset(String targetId, Map<String,String> a) {
@@ -829,9 +837,13 @@ public class ConfigChangeService {
     }
 
     /**
-     * Hak awal seorang user baru = cetakan role-nya. Tanpa ini user hasil "Tambah User" tidak
-     * memegang apa pun dan sidebar-nya kosong, karena yang dibaca saat runtime adalah
-     * {@code user_menu}, bukan {@code group_menu} (BUG_AUSY_00143).
+     * Susun hak seorang user dari cetakan role-nya.
+     *
+     * Sejak REQ_AUSY_00017 ini TIDAK lagi dipakai saat user dibuat — user baru sengaja kosong.
+     * Yang tersisa hanya saat user PINDAH role: haknya dibersihkan lalu disusun ulang dari
+     * cetakan role yang baru, karena membawa hak role lama ke pekerjaan yang berbeda lebih
+     * berbahaya daripada memberi bawaan. Kalau ini pun diminta kosong, hapus pemanggilnya di
+     * applyUserEdit dan user yang pindah role akan menunggu admin mencentang ulang.
      */
     private void seedAccessFromRole(String userId, Integer idGroup){
         if (userId == null || idGroup == null) return;
@@ -840,17 +852,9 @@ public class ConfigChangeService {
                 UserMenu um = new UserMenu(); um.setUserId(userId); um.setIdMenu(gm.getIdMenu());
                 userMenus.save(um);
             }
-        // Upload Excel menyala sejak awal untuk setiap maker (BUG_AUSY_00184), apa pun isi cetakan
-        // rolenya: cetakan yang pernah diubah dulu membuat maker baru tampil tanpa menu ini dan
-        // membingungkan. Maker = role yang memegang halaman pengisi data GL.
-        if (access.canSubmitGl(idGroup) && menuRepo.existsById(UPLOAD_EXCEL_MENU)
-                && !userMenus.existsByUserIdAndIdMenu(userId, UPLOAD_EXCEL_MENU)) {
-            UserMenu um = new UserMenu(); um.setUserId(userId); um.setIdMenu(UPLOAD_EXCEL_MENU);
-            userMenus.save(um);
-        }
+        // Pengecualian Upload Excel untuk maker (BUG_AUSY_00184) dicabut bersama REQ_AUSY_00017:
+        // tidak ada lagi menu yang menyala tanpa seseorang mencentangnya.
     }
-    /** id_menu "Upload Excel" (/upload). */
-    private static final Integer UPLOAD_EXCEL_MENU = 10;
     private String applyApproval(ConfigChangeRequest c){
         Map<String,String> a = parse(c.getAfterJson());
         switch (c.getOp()) {
