@@ -118,8 +118,7 @@ public class DashboardController {
             model.addAttribute("pendingPakets", pendingPaketList.size() + pendingExportList.size());
             model.addAttribute("pendingChanges", glChange.pendingVisibleCount(principal));
             model.addAttribute("pendingChangeList", glChange.pendingVisible(principal));
-            model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.BUSINESS), PageRequest.of(0, 10)));
+            model.addAttribute("recent", recentBusiness(principal, 10));
             return "dashboard-checker";
         }
 
@@ -151,13 +150,27 @@ public class DashboardController {
             model.addAttribute("pendingUserList", queue);
         }
         if (cards.contains("audit-recent"))
-            model.addAttribute("recent", tx.findByUserGroups(
-                    auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.BUSINESS), PageRequest.of(0, 8)));
+            model.addAttribute("recent", recentBusiness(principal, 8));
         else if (cards.contains("audit-recent-admin"))
             model.addAttribute("recent", tx.findByUserGroups(
                     auditScope.groupsVisibleTo(principal == null ? null : principal.getIdGroup(), AuditScopeService.CONFIG), PageRequest.of(0, 8)));
         model.addAttribute("noCards", cards.isEmpty());
         return "dashboard";
+    }
+
+    /**
+     * Aktivitas terakhir sisi operasional, dengan aturan yang SAMA dengan halaman Audit Trail
+     * (BUG_AUSY_00192): checker hanya melihat jejaknya sendiri dan maker pasangannya, maker hanya
+     * jejaknya sendiri. Dulu card ini menyaring per group, sehingga checker melihat semua maker
+     * dan checker lain, sementara halaman Audit Trail-nya sudah dibatasi (BUG_AUSY_00149).
+     */
+    private List<com.mnc.ausy.domain.TlogTransaction> recentBusiness(AusyUserDetails me, int n) {
+        java.util.Set<String> who = scope.visibleMakers(me);
+        if (who == null)                                   // admin / monitoring: per group seperti halamannya
+            return tx.findByUserGroups(auditScope.groupsVisibleTo(me == null ? null : me.getIdGroup(),
+                    AuditScopeService.BUSINESS), PageRequest.of(0, n));
+        if (who.isEmpty()) return List.of();               // tidak ada pasangan: kosong, bukan "semua"
+        return tx.findByUserIds(who, PageRequest.of(0, n));
     }
 
     private boolean hasGroup(Authentication auth, String authority) {

@@ -33,6 +33,13 @@ Tidak ada migrasi DB.
   - Batch milik maker lain menghasilkan 404.
 - **Judul "Tabel List GL Aktif"** di atas tabel GL Aktif (REQ_AUSY_00015), supaya tidak terbaca
   sebagai lanjutan section pending di atasnya.
+- **Card Aktivitas Terakhir checker disamakan dengan Audit Trail** (BUG_AUSY_00192).
+  - Checker hanya melihat jejaknya sendiri dan maker pasangannya.
+  - Dulu card ini menyaring per group, sehingga semua maker dan checker lain ikut terlihat.
+
+Operasional saat deploy:
+- **Audit log dibersihkan lagi** (BUG_AUSY_00191), supaya log berformat nominal lama hilang dan
+  log baru memakai format `5.000.000,00`.
 
 ---
 
