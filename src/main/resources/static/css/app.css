@@ -380,8 +380,8 @@ table.dataTable thead th{cursor:pointer}
    logo tetap jelas di atas latar navy; ukurannya proporsional dan tidak menutupi form. */
 .ausy-partner-logo{position:fixed;right:16px;bottom:12px;background:#FFFFFF;border-radius:12px;
   padding:8px 14px;box-shadow:0 6px 18px rgba(0,0,0,0.25);line-height:0}
-.ausy-partner-logo img{height:32px;width:auto;max-width:160px;object-fit:contain}
-.ausy-login-copyright{right:auto;max-width:min(560px,calc(100vw - 230px))}
+.ausy-partner-logo img{height:30px;width:auto;max-width:260px;object-fit:contain}
+.ausy-login-copyright{right:auto;max-width:min(560px,calc(100vw - 340px))}
 @media (max-width:600px){
   .ausy-partner-logo{position:static;margin-top:12px;align-self:center}
   .ausy-login-copyright{max-width:none}
