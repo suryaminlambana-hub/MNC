@@ -33,7 +33,7 @@
           th:attr="data-id=${r.id},data-gltrac=${r.gltrac},data-gltrcd=${r.gltrcd},data-gltram=${r.gltram},data-gltrds=${r.gltrds},data-nopaket=${r.noPaket}">
         <td th:text="${r.id}"></td>
         <td th:text="${r.gltrac}"></td>
-        <td><span class="badge" th:classappend="${r.gltrcd == 'D'} ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'" th:text="${r.gltrcd}"></span></td>
+        <td><span class="badge ausy-dc" th:classappend="${r.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${r.gltrcd}"></span></td>
         <td class="text-end" th:text="${r.gltram != null ? #numbers.formatDecimal(r.gltram,1,'POINT',2,'COMMA') : ''}"></td>
         <td th:text="${r.gltrds}"></td>
         <td th:text="${r.noPaket}"></td>

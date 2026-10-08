@@ -62,7 +62,7 @@
                 <tbody>
                 <tr th:each="g : ${glActiveList}">
                     <td class="text-nowrap" th:text="${g.gltrpd}"></td>
-                    <td><span class="badge" th:classappend="${g.gltrcd == 'D'} ? 'bg-info-subtle text-info' : 'bg-secondary-subtle text-secondary'" th:text="${g.gltrcd}"></span></td>
+                    <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${g.gltrcd}"></span></td>
                     <td th:text="${g.gltrac}"></td>
                     <td class="small" th:text="${g.glName}"></td>
                     <td class="small" th:text="${g.gltrds}"></td>

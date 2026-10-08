@@ -57,7 +57,29 @@ Tidak ada migrasi DB.
   - Ukuran font masih bisa diatur setelah ditinjau QA (konstanta `J_*` di `MncPdfService`).
     PDF Audit Trail tidak berubah.
 
+- **Palet warna MNC Bank** (REQ_AUSY_00027).
+  - Sidebar navy `#102D50` (gelap: `#0A1D36`) dengan item aktif emas `#B28628`.
+  - Garis emas di bawah header; badge role emas.
+  - Tombol utama emas (hover `#C99A33`); tombol outline navy; Hapus merah `#B91C1C`.
+  - Header tabel navy bertulisan putih kapital; hover baris `#E6EBF2` / `#1A3F6E`.
+  - Badge D navy, C emas. Badge Approved/Pending/Rejected sesuai spesifikasi; warna alert tidak
+    ikut diubah supaya paragrafnya tetap terbaca.
+  - Mode gelap: latar `#0B1727`, kartu `#112240`.
+  - Versi CSS dinaikkan (`app.css?v=17`) supaya browser tidak memakai warna lama dari cache.
+- **Logo MNC Bank di halaman login** (REQ_AUSY_00025, dibuka lagi). Logo tampil lebih besar di
+  kartu login berlatar putih.
+- **Nomor batch upload mulai dari 1 setiap hari** (REQ_AUSY_00031). Format `yyyyMMdd` + 3 digit
+  urut (contoh `20261008001`), sehingga tetap unik lintas hari. Batch lama ("01", "02", …) tidak
+  berubah.
+- **Latar halaman login bertema MNC** (REQ_AUSY_00032). Visual korporat MNC (navy dengan motif
+  belah ketupat emas, `static/img/login-bg.svg`) dengan overlay supaya form tetap terbaca,
+  penuh layar dan responsif. Belum ada foto resmi; bila tersedia, ganti berkas latar di
+  `app.css` (`.ausy-login-bg`).
+
 ### Catatan untuk developer
+- Nomor batch baru dibuat di satu tempat (`UploadService`) lewat `maxUrutBatchHarian`.
+  `maxPaket()` dihapus: cast seluruh `no_paket` ke int akan error begitu nomor 11 digit ada.
+  Nomor batch tidak boleh memuat `-`, karena referensi GLTRRF dipecah per `-` saat mencetak.
 - Format nominal Indonesia ditulis dan dibaca lewat satu kelas, `Nominal`.
 - `GlTabel.batchKey()` adalah kunci batch yang sama dengan rekap `approvedPakets()`.
 - PDFBox **tidak** ditambahkan ke project; hanya dipakai sekali untuk merender logo.

@@ -38,8 +38,15 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
 
     // Hanya cast baris yang no_paket-nya angka murni; hindari error "invalid input syntax
     // for type integer" saat ada no_paket kosong/non-numerik (BUG_00069).
-    @Query(value = "select coalesce(max(no_paket::int),0) from gl_tabel where no_paket ~ '^[0-9]+$'", nativeQuery = true)
-    int maxPaket();
+    /**
+     * Nomor urut batch terbesar HARI INI (REQ_AUSY_00031). Nomor batch = {@code yyyyMMdd} + 3 digit
+     * urut, mulai 001 setiap hari. Hanya nomor berpola tanggal itu yang dihitung, jadi nomor lama
+     * ("01", "02", …) tidak mengganggu dan tidak ada lagi cast seluruh no_paket ke int — cara
+     * lama itu akan error overflow begitu nomor 11 digit ada di tabel.
+     */
+    @Query(value = "select coalesce(max(cast(substring(no_paket from 9) as int)),0) from gl_tabel"
+                 + " where no_paket ~ ('^' || :tgl || '[0-9]{3,4}$')", nativeQuery = true)
+    int maxUrutBatchHarian(@Param("tgl") String tgl);
 
     @Query(value = "select coalesce(sum(gltram),0) from gl_tabel where no_paket=:p and gltrcd=:dc", nativeQuery = true)
     BigDecimal sumByPaketDc(@Param("p") String paket, @Param("dc") String dc);

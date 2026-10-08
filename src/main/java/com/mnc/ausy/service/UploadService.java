@@ -321,7 +321,12 @@ public class UploadService {
                 return res;
             }
 
-            String paket = String.format("%02d", gl.maxPaket() + 1);
+            // REQ_AUSY_00031: nomor batch mulai dari 1 setiap hari, digabung tanggal supaya tetap
+            // unik (20261008001). Tanpa pemisah "-": referensi GLTRRF berbentuk
+            // <batch>-<transmisi>-<urut> dan dipecah per "-" saat mencetak jurnal. Panjangnya
+            // 11 karakter, jadi referensi 19 karakter masih muat di kolom 20 karakter ACCTXT.
+            String tgl = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String paket = tgl + String.format("%03d", gl.maxUrutBatchHarian(tgl) + 1);
             int n = 0;
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);

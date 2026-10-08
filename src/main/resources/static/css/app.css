@@ -2,20 +2,27 @@
    AUSY — product UI: light/dark, glass chrome, slate-blue accent.
    ============================================================ */
 :root{
-  --accent:#ca9d33; --accent-hover:#bb8805;   /* MNC gold */
-  --accent-soft:#fbedcd; --accent-line:#e2cb99;
-  --on-accent:#271e0e;                                     /* near-black text on gold */
-  /* chrome (sidebar/topbar) — LIGHT here, dark values under [data-theme=dark] */
-  --chrome:#f9fafc; --chrome-line:#dbdee3; --chrome-hover:#edf0f6;
-  --chrome-ink:#282e38; --chrome-soft:#5e636d; --chrome-faint:#82868e;
-  --gold:#a97500;
+  /* Palet MNC Bank (REQ_AUSY_00027): navy #102D50 + emas #B28628. */
+  --accent:#B28628; --accent-hover:#C99A33;   /* MNC gold */
+  --accent-soft:#F5EBD6; --accent-line:#E2CFA3;
+  --on-accent:#FFFFFF;                                     /* teks putih di atas emas */
+  --navy:#102D50;
+  /* sidebar navy (REQ_AUSY_00027) */
+  --side-bg:#102D50; --side-ink:#FFFFFF; --side-soft:rgba(255,255,255,0.84);
+  --side-faint:rgba(255,255,255,0.6); --side-hover:rgba(255,255,255,0.10); --side-line:rgba(255,255,255,0.14);
+  /* chrome (topbar) — LIGHT here, dark values under [data-theme=dark] */
+  --chrome:#FFFFFF; --chrome-line:#E2E8F0; --chrome-hover:#E6EBF2;
+  --chrome-ink:#102D50; --chrome-soft:#475569; --chrome-faint:#64748B;
+  --gold:#B28628;
+  --link:#102D50; --outline:#102D50;
+  --thead-ink:#FFFFFF;
 
   --page-1:#f0f6fd; --page-2:#e5f0fc;
   --glass:rgba(250,252,254,0.72);          /* frosted chrome */
   --surface:#fdfdfe;           /* solid cards */
   --ink:#282e38; --ink-soft:#5e636d; --ink-faint:#82868e;
-  --border:#dbdee3; --line:#e5e8ec;
-  --hover:#edf0f6; --thead:#f1f4f8; --row-hover:#f4f7fb;
+  --border:#E2E8F0; --line:#E2E8F0;
+  --hover:#E6EBF2; --thead:#102D50; --row-hover:#E6EBF2;
   --btn2:#e2e5e9; --btn2-h:#d4d8dd;
 
   --ok-bg:#daf8df; --ok-fg:#1d6835;
@@ -29,21 +36,24 @@
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
 }
 [data-theme=dark]{
-  --accent:#e3b750; --accent-hover:#eec96c;    /* MNC gold (dark) */
-  --accent-soft:rgba(95,73,26,0.5); --accent-line:#7f652e;
-  --on-accent:#1d1406;
-  /* dark chrome */
-  --chrome:#181610; --chrome-line:#33302a; --chrome-hover:#29261e;
-  --chrome-ink:#f7f2e3; --chrome-soft:#cac4b2; --chrome-faint:#9a927e;
-  --gold:#e3b750;
+  --accent:#B28628; --accent-hover:#C99A33;    /* MNC gold (dark) */
+  --accent-soft:rgba(178,134,40,0.22); --accent-line:#7f652e;
+  --on-accent:#FFFFFF;
+  /* sidebar navy lebih gelap (REQ_AUSY_00027) */
+  --side-bg:#0A1D36;
+  /* dark chrome (topbar) */
+  --chrome:#112240; --chrome-line:#1E3A5F; --chrome-hover:#1A3F6E;
+  --chrome-ink:#FFFFFF; --chrome-soft:#C7D2E3; --chrome-faint:#93A4BF;
+  --gold:#C99A33;
+  --link:#E3B750; --outline:#9DB6D8;
 
-  --page-1:#111620; --page-2:#0b0f1a;
-  --glass:rgba(28,34,44,0.62);
-  --surface:#1e232d;
-  --ink:#e8ebf2; --ink-soft:#adb1b9; --ink-faint:#82868e;
-  --border:#383d47; --line:#2f333b;
-  --hover:#2b303b; --thead:#272b35; --row-hover:#292e38;
-  --btn2:#333842; --btn2-h:#424853;
+  --page-1:#0B1727; --page-2:#0B1727;          /* bukan near-black */
+  --glass:rgba(17,34,64,0.7);
+  --surface:#112240;                           /* kartu memberi kedalaman */
+  --ink:#e8ebf2; --ink-soft:#b6c0d0; --ink-faint:#8c9ab0;
+  --border:#1E3A5F; --line:#1E3A5F;
+  --hover:#1A3F6E; --thead:#102D50; --row-hover:#1A3F6E;
+  --btn2:#1E3A5F; --btn2-h:#25476F;
 
   --ok-bg:#1f4127; --ok-fg:#98e2a8;
   --wn-bg:#4e3914;  --wn-fg:#f5cf7d;
@@ -57,7 +67,7 @@ html,body{margin:0}
 body{min-height:100vh;color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;
   -webkit-font-smoothing:antialiased;
   background:linear-gradient(155deg,var(--page-1),var(--page-2));background-attachment:fixed}
-a{color:var(--accent);text-decoration:none}
+a{color:var(--link);text-decoration:none}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;color:var(--ink)}
 
 /* ---------- Shell ---------- */
@@ -307,3 +317,61 @@ table.dataTable thead th{cursor:pointer}
 .ausy-copyright{font-size:11px;line-height:1.45;color:var(--ink-faint);max-width:640px}
 .ausy-login-copyright{position:fixed;left:16px;bottom:12px;right:16px;max-width:560px}
 @media (max-width:600px){.ausy-login-bg{flex-direction:column}.ausy-login-copyright{position:static;margin-top:16px}}
+
+/* ============================================================
+   Palet MNC Bank (REQ_AUSY_00027) — navy #102D50 + emas #B28628.
+   Diletakkan terakhir supaya menimpa aturan chrome di atasnya.
+   ============================================================ */
+/* 1. Sidebar navy, item aktif emas */
+.ausy-sidebar{background:var(--side-bg);border-right-color:var(--side-bg)}
+.ausy-brand{color:var(--side-ink)}
+.ausy-nav a,.ausy-group ul a{color:var(--side-soft)}
+.ausy-nav a i,.ausy-group ul a i{color:var(--side-faint)}
+.ausy-nav a:hover,.ausy-group ul a:hover{background:var(--side-hover);color:var(--side-ink)}
+.ausy-nav a:hover i,.ausy-group ul a:hover i{color:var(--side-ink)}
+.ausy-nav a.active,.ausy-group ul a.active{background:var(--accent);color:#FFFFFF;font-weight:700}
+.ausy-nav a.active i,.ausy-group ul a.active i{color:#FFFFFF}
+.ausy-group{border-top-color:var(--side-line)}
+.ausy-group-title{color:var(--side-faint)}
+.ausy-group-title:hover{color:var(--side-ink);background:var(--side-hover)}
+
+/* 2. Header bar: garis emas tipis di bawahnya, badge role emas */
+.ausy-topbar{border-bottom:3px solid #B28628}
+.ausy-role{background:#B28628;color:#FFFFFF}
+
+/* 3. Tombol */
+.btn-primary{background:#B28628;border-color:#B28628;color:#FFFFFF}
+.btn-primary:hover,.btn-primary:active,.btn-primary:focus{background:#C99A33;border-color:#C99A33;color:#FFFFFF}
+.btn-primary:disabled{background:#B28628;border-color:#B28628;color:#FFFFFF}
+.btn-outline-secondary{border-color:var(--outline);color:var(--outline);background:transparent}
+.btn-outline-secondary:hover,.btn-outline-secondary:active{background:var(--hover);color:var(--outline);border-color:var(--outline)}
+.btn-outline-danger{border-color:#B91C1C;color:#B91C1C;background:transparent}
+.btn-outline-danger:hover,.btn-outline-danger:active{background:#FEE2E2;color:#B91C1C;border-color:#B91C1C}
+[data-theme=dark] .btn-outline-danger{border-color:#F87171;color:#F87171}
+[data-theme=dark] .btn-outline-danger:hover{background:rgba(185,28,28,0.18);color:#FCA5A5}
+
+/* 4. Tabel: header navy, teks putih tebal kapital */
+.table thead th{background:var(--thead);color:var(--thead-ink);font-weight:700;text-transform:uppercase;border-bottom-color:var(--thead)}
+.table-hover tbody tr:hover td{background:var(--row-hover)}
+.table tbody td{border-bottom-color:var(--line)}
+
+/* 5. Badge D/C */
+.ausy-dc{min-width:24px;text-align:center}
+.ausy-dc.dc-d{background:#102D50;color:#FFFFFF}
+.ausy-dc.dc-c{background:#B28628;color:#FFFFFF}
+[data-theme=dark] .ausy-dc.dc-d{background:#1E4A80}
+
+/* 6. Badge status — hanya badge; alert tetap memakai warnanya sendiri supaya paragraf terbaca */
+.badge.bg-success-subtle{background:#DCFCE7!important} .badge.text-success{color:#15803D!important}
+.badge.bg-warning-subtle{background:#F5EBD6!important} .badge.text-warning{color:#B28628!important}
+.badge.bg-danger-subtle{background:#FEE2E2!important}  .badge.text-danger{color:#B91C1C!important}
+
+/* Halaman login: latar visual korporat MNC (REQ_AUSY_00032) dengan overlay navy supaya form
+   tetap terbaca. Ganti berkas img/login-bg.svg dengan foto resmi MNC (WebP) bila tersedia. */
+.ausy-login-bg{background:
+    linear-gradient(135deg,rgba(16,45,80,0.55),rgba(10,29,54,0.75)),
+    url("../img/login-bg.svg") center/cover no-repeat,
+    #102D50}
+.ausy-login-card{border:none;box-shadow:0 20px 50px rgba(0,0,0,0.35)}
+.ausy-login-logo{height:44px}
+.ausy-login-copyright{color:rgba(255,255,255,0.82)}

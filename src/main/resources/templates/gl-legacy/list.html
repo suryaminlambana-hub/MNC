@@ -70,7 +70,7 @@
                 <td class="ps-3"><input type="checkbox" name="glIds" class="gl-cb" th:value="${g.id}"></td>
                 <td th:text="${g.id}"></td>
                 <td th:text="${g.gltrac}"></td>
-                <td><span class="badge" th:classappend="${g.gltrcd == 'D'} ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'"
+                <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'"
                           th:text="${g.gltrcd}"></span></td>
                 <td class="small" th:text="${g.gltrds}"></td>
                 <td class="text-end text-nowrap pe-3"
@@ -217,7 +217,7 @@
       <tr th:each="g : ${rows}">
         <td><code class="ausy-glid" th:text="${g.id}"></code></td>
         <td th:text="${g.noPaket}"></td><td><code th:text="${g.gltrac}"></code></td>
-        <td th:text="${g.gltrcd}"></td><td th:text="${g.glName}"></td><td th:text="${g.gltrds}"></td>
+        <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${g.gltrcd}"></span></td><td th:text="${g.glName}"></td><td th:text="${g.gltrds}"></td>
         <td class="text-end" th:text="${#numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA')}"></td>
         <td th:text="${g.gltrpd}"></td><td th:text="${g.gltrus}"></td><td><small th:text="${g.gltrrf}"></small></td>
         <td>
