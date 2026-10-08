@@ -705,6 +705,12 @@ public class ConfigChangeService {
         // Ini membatalkan BUG_AUSY_00143 (hak awal = cetakan role) dan BUG_AUSY_00184 (Upload
         // Excel menyala sejak awal untuk maker baru). Akibat yang disengaja: user yang baru
         // dibuat login ke sidebar kosong sampai admin mengurus haknya.
+        //
+        // Pengecualian: role EXECUTE. User-nya disembunyikan dari Access User (REQ_AUSY_00018)
+        // karena haknya memang datang dari cetakan rolenya. Kalau ikut dibuat kosong, tidak ada
+        // satu pun jalan untuk memberinya menu Generate File ACCTXT, dan berkas ACCTXT tidak
+        // pernah bisa diterbitkan.
+        if (access.isExecuteRole(idGroup)) seedAccessFromRole(uid, idGroup);
         return null;
     }
     private String applyPasswordReset(String targetId, Map<String,String> a) {

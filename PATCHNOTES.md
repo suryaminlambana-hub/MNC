@@ -29,10 +29,30 @@ Setiap entri memuat:
   - Role EXECUTE muncul di dropdown Role saat Tambah/Ubah User. User-nya tetap dibuat admin dan
     diotorisasi Admin Approval.
   - Jejak generate ACCTXT oleh user EXECUTE terlihat di Audit Trail sisi Admin Approval.
-  - Beranda user EXECUTE belum punya card ringkasan; menunya ada di sidebar, di bawah Master Data.
+- **Role EXECUTE dirapikan** (REQ_AUSY_00018, 00019, 00020).
+  - User EXECUTE tidak muncul di Access User, karena haknya datang dari cetakan role.
+  - Sesudah login, user EXECUTE langsung diantar ke Generate File ACCTXT, dan tautan Home
+    disembunyikan.
+  - Pilihan Generate File ACCTXT tidak lagi muncul di Access User role admin (section menu
+    dibetulkan jadi `EXECUTE`).
+- **Download Excel di menu User** (REQ_AUSY_00021). Kolom: Username, Nama, Role, Status, Email,
+  Dibuat Oleh. Unduhannya tercatat di audit trail.
+- **User baru dibuat tanpa hak akses** (REQ_AUSY_00017). Admin mencentang sendiri di Access
+  User. User yang pindah role tetap disusun dari cetakan role barunya.
+  - **Membatalkan** BUG_AUSY_00143 (hak awal = cetakan role) dan BUG_AUSY_00184 (Upload Excel
+    menyala untuk maker baru). Maker baru tanpa Upload Excel adalah perilaku yang disengaja.
+  - **Pengecualian: role EXECUTE.** User EXECUTE baru langsung mendapat Generate File ACCTXT
+    dari cetakan rolenya. Tanpa pengecualian ini ia tidak punya hak dan tidak tampil di Access
+    User, sehingga tidak ada yang bisa menerbitkan berkas ACCTXT.
 
 ### Migrasi DB
 - `V46__req_00016_role_execute.sql`. id role diambil dari sequence, bukan angka tetap.
+- `V47__req_00020_section_acctxt_execute.sql`. Section menu 43, 608, 610 jadi `EXECUTE`.
+
+### Setelah deploy
+- Belum ada user EXECUTE. Admin membuat user ber-role EXECUTE, lalu Admin Approval
+  mengotorisasinya. Sebelum itu tidak ada yang bisa generate file ACCTXT.
+- Migrasi berikutnya: **V48**.
 
 ---
 
