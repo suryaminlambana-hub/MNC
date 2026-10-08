@@ -18,9 +18,15 @@ Setiap entri memuat:
 
 ## Belum di-deploy
 
-> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
-> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+Belum ada.
 
+---
+
+## dev-20261008-1 — 08-10-2026 10:25
+
+Commit `a7f4d81`. DB naik dari v45 ke **v47**.
+
+### Perubahan
 - **Role baru EXECUTE untuk data center** (REQ_AUSY_00016).
   - Role `EXECUTE` (level `EXECUTE`, inisial `EXE`) memegang menu **Generate File ACCTXT**,
     beserta aksi Susun Ulang dan Hari Ini.
