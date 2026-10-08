@@ -297,3 +297,13 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;col
 .dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current){background:var(--hover)!important;color:var(--ink)!important}
 table.dataTable{width:100%!important;border-collapse:collapse!important}
 table.dataTable thead th{cursor:pointer}
+
+/* ---------- Logo & copyright MNC Bank (REQ_AUSY_00025, 00026) ---------- */
+.ausy-brand-logo{height:30px;width:auto;display:block}
+.ausy-brand-icon{display:none!important}
+.nav-collapsed .ausy-brand-logo{display:none}
+.nav-collapsed .ausy-brand-icon{display:flex!important}
+.ausy-login-logo{height:36px;width:auto}
+.ausy-copyright{font-size:11px;line-height:1.45;color:var(--ink-faint);max-width:640px}
+.ausy-login-copyright{position:fixed;left:16px;bottom:12px;right:16px;max-width:560px}
+@media (max-width:600px){.ausy-login-bg{flex-direction:column}.ausy-login-copyright{position:static;margin-top:16px}}

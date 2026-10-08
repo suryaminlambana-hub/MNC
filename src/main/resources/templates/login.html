@@ -11,7 +11,8 @@
 </head>
 <body class="ausy-login-bg">
 <div class="ausy-login-card">
-    <div class="ausy-login-brand"><i class="fa-solid fa-building-columns"></i> MNC <b>AUSY</b></div>
+    <!--/* REQ_AUSY_00025: logo MNC Bank di halaman login. */-->
+    <div class="ausy-login-brand"><img class="ausy-login-logo" th:src="@{/img/mnc-logo.png}" alt="MNC Bank"> <b>AUSY</b></div>
     <p class="text-muted">Accounting Upload System</p>
 
     <div th:if="${param.error}" class="alert alert-danger py-2">Username atau password salah.</div>
@@ -43,6 +44,10 @@
     </form>
 
 </div>
+<!--/* REQ_AUSY_00026: copyright MNC Bank di kiri bawah, juga di halaman login. */-->
+<div class="ausy-copyright ausy-login-copyright">Copyright &copy; Hak Cipta <span th:text="${#dates.year(#dates.createNow())}">2026</span>
+    PT. Bank MNC Internasional Tbk. Berizin dan Diawasi oleh Otoritas Jasa Keuangan serta
+    merupakan peserta penjaminan Lembaga Penjamin Simpanan.</div>
 <script>
     (function(){
         var pw=document.getElementById('password'), tg=document.getElementById('pwToggle');

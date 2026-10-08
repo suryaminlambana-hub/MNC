@@ -172,9 +172,15 @@
           <td class="text-end" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
           <td class="text-end" th:text="${#numbers.formatDecimal(p[4],1,'POINT',2,'COMMA')}"></td>
           <td class="text-nowrap" th:text="${p[5] != null ? #temporals.format(p[5],'dd-MM-yyyy HH:mm') : '-'}"></td>
-          <td class="text-end">
+          <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
-              <i class="fa-solid fa-file-pdf"></i> PDF</a></td>
+              <i class="fa-solid fa-file-pdf"></i> PDF</a>
+            <!--/* REQ_AUSY_00022: hanya pengunggahnya sendiri yang bisa menghapus. */-->
+            <form th:if="${currentUser != null and currentUser.username == p[1]}" method="post" class="d-inline"
+                  th:action="@{'/gl-legacy/pending/' + ${p[0]} + '/delete'}" th:attr="data-batch=${p[0]}"
+                  onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + '? Batch ini belum diotorisasi dan akan dibuang dari antrian checker.');">
+              <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus</button>
+            </form></td>
         </tr>
         <tr th:if="${pendingUploads == null or pendingUploads.isEmpty()}">
           <td colspan="7" class="text-center text-muted py-3">Tidak ada upload yang menunggu otorisasi.</td>
@@ -190,9 +196,20 @@
   <!--/* REQ_AUSY_00015: judul tabel, supaya tidak terbaca sebagai lanjutan section
          "Upload Menunggu Otorisasi" di atasnya ketika daftar pending-nya panjang. */-->
   <div class="ausy-card" style="padding:0">
-    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-      <i class="fa-solid fa-table-list text-success"></i> Tabel List GL Aktif
-      <span class="text-muted fw-normal small">— sudah diotorisasi checker</span></h2>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 pt-3 pb-2">
+      <h2 class="h6 mb-0 d-flex align-items-center gap-2">
+        <i class="fa-solid fa-table-list text-success"></i> Tabel List GL Aktif
+        <span class="text-muted fw-normal small">— sudah diotorisasi checker</span></h2>
+      <!--/* REQ_AUSY_00023: PDF jurnal per batch GL Aktif, dibuka di tab baru. */-->
+      <form th:if="${activeBatches != null and not activeBatches.isEmpty()}" method="get"
+            th:action="@{/gl-legacy/batch-pdf}" target="_blank" class="d-flex gap-2 align-items-center">
+        <select name="batch" class="form-select form-select-sm" style="min-width:220px" required>
+          <option th:each="b : ${activeBatches}" th:value="${b[0] + '::' + b[1]}"
+                  th:text="|Batch ${b[0]} · ${b[1]} · ${b[2]} baris|"></option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary text-nowrap"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+      </form>
+    </div>
     <div class="px-3 pb-3">
     <table class="table table-sm table-hover align-middle mb-0">
       <thead><tr><th>ID</th><th>Batch</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>

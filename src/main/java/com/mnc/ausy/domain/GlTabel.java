@@ -65,4 +65,14 @@ public class GlTabel {
     public String getGltrrf(){return gltrrf;} public void setGltrrf(String v){gltrrf=v;}
     public String getStatusDual(){return statusDual;} public void setStatusDual(String v){statusDual=v;}
     public Long getExportReqId(){return exportReqId;} public void setExportReqId(Long v){exportReqId=v;}
+
+    /**
+     * Kunci batch seperti rekap {@code approvedPakets()}: data tambahan manual (atau tanpa nomor
+     * batch) dikelompokkan sebagai {@code (manual)} (BUG_AUSY_00126). Dipakai unduhan per batch
+     * (REQ_AUSY_00023, 00029) supaya isinya sama dengan daftar batch yang ditawarkan.
+     */
+    public String batchKey() {
+        boolean manual = "m".equals(glsrc) || noPaket == null || noPaket.isBlank();
+        return manual ? "(manual)" : noPaket;
+    }
 }

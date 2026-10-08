@@ -7,8 +7,16 @@
       <h1 class="ausy-page-title">Kelola Data GL</h1>
       <p class="text-muted mb-0">Tambah / ubah / hapus baris GL. Setiap perubahan menunggu approval Checker (dual control) sebelum berlaku — Workflow 8.3.</p>
     </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" th:href="@{/gl-data/bulk-export}"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <!--/* REQ_AUSY_00029: ekspor bulk edit per batch; Amount berformat 1.000.000,50. */-->
+      <form method="get" th:action="@{/gl-data/bulk-export}" class="d-flex gap-2 align-items-center">
+        <select name="batch" class="form-select" style="min-width:220px">
+          <option value="">Semua batch</option>
+          <option th:each="b : ${activeBatches}" th:value="${b[0] + '::' + b[1]}"
+                  th:text="|Batch ${b[0]} · ${b[1]} · ${b[2]} baris|"></option>
+        </select>
+        <button class="btn btn-outline-secondary text-nowrap"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+      </form>
       <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkModal"><i class="fa-solid fa-file-import"></i> Bulk Edit (Upload)</button>
       <button class="btn btn-primary" id="btnAdd"><i class="fa-solid fa-plus"></i> Tambah Data GL</button>
     </div>

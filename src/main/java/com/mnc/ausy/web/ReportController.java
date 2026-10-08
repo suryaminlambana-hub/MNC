@@ -52,12 +52,14 @@ public class ReportController {
 
     /** Judul kolom jurnal MNC — dua baris persis seperti berkas acuan. */
     private static final String[][] COLS = {
-            {"Posting", "Date"}, {"D/C", ""}, {"Tr.", "Account"}, {"GL Name", ""},
+            {"Posting", "Date"}, {"D/C", ""}, {"GL", "Number"}, {"GL Name", ""},   // REQ_AUSY_00030: dulu "Tr. Account"
             {"Flag", ""}, {"Branch", ""}, {"Branch Name", ""}, {"Product", ""},
             {"Product Name", ""}, {"Cost", "Centre"}, {"Cost Centre", "Name"},
             {"Curren", "cy"}, {"Transaction", "Amount"}, {"Transaction Description", ""}
     };
-    private static final float[] WIDTHS = {1.5f, .5f, 1.3f, 3.2f, .6f, .8f, 2.6f, .9f, 1.4f, .9f, 1.3f, .8f, 1.6f, 4.2f};
+    // REQ_AUSY_00030: Branch, Product dan Currency dilebarkan (diambil dari Description) supaya
+    // judul kolomnya tidak terpotong di tengah kata dengan font jurnal yang lebih besar.
+    private static final float[] WIDTHS = {1.5f, .5f, 1.3f, 2.8f, .6f, 1.0f, 2.5f, 1.0f, 1.4f, .9f, 1.3f, 1.0f, 1.6f, 4.2f};
 
     /** Tanggal di kolom pertama: 29-May-23, seperti jurnal acuan. */
     private static final DateTimeFormatter ROW_DATE  = DateTimeFormatter.ofPattern("dd-MMM-yy", Locale.ENGLISH);
@@ -96,6 +98,39 @@ public class ReportController {
         if (me != null)
             audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
                     "Unduh PDF Batch " + paket + " (menunggu otorisasi): " + rows.size() + " baris");
+    }
+
+    /**
+     * REQ_AUSY_00023 — jurnal PDF satu batch GL Aktif (sudah diotorisasi).
+     *
+     * {@code batch} berbentuk {@code <no batch>::<uploader>}, persis seperti baris rekap
+     * {@code approvedPakets()}; data tambahan manual dikelompokkan sebagai {@code (manual)} per
+     * maker. Barisnya diambil dari definisi GL Aktif yang sama dengan tabel di layar, dibatasi
+     * per maker (BUG_AUSY_00138), jadi batch maker lain tidak bisa diunduh lewat URL.
+     */
+    @GetMapping("/gl-legacy/batch-pdf")
+    public void activeBatch(@RequestParam String batch, @AuthenticationPrincipal AusyUserDetails me,
+                            HttpServletResponse resp) throws Exception {
+        int sep = batch.lastIndexOf("::");
+        String paket = sep < 0 ? batch : batch.substring(0, sep);
+        String maker = sep < 0 ? null : batch.substring(sep + 2);
+        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me)).stream()
+                .filter(g -> paket.equals(g.batchKey()) && (maker == null || maker.equals(g.getGltrus())))
+                .sorted(java.util.Comparator.comparing(GlTabel::getId))
+                .toList();
+        if (rows.isEmpty()) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + paket + " tidak ada di GL Aktif yang bisa Anda lihat.");
+            return;
+        }
+        String nama = "(manual)".equals(paket) ? "manual" : paket;
+        resp.setContentType("application/pdf");
+        resp.setHeader("Content-Disposition", "inline; filename=\"Jurnal_GL_Aktif_Batch_" + nama + ".pdf\"");
+        writeJournals(resp, rows);
+
+        if (me != null)
+            audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
+                    "Unduh PDF GL Aktif Batch " + paket + (maker == null ? "" : " (uploader " + maker + ")")
+                    + ": " + rows.size() + " baris");
     }
 
     @GetMapping("/report/jurnal/{paket}")
@@ -146,37 +181,43 @@ public class ReportController {
         mnc.title(doc, "JURNAL \" AUSY \" ( ACCOUNTING UPLOAD SYSTEM )",
                 "Di Proses pada No. Transmisi : " + transmisi(rows) + ", No Paket : " + paket);
 
+        // REQ_AUSY_00030: font jurnal sendiri (sedikit lebih besar) dan jarak antara judul,
+        // tabel, dan kaki diperlebar supaya tidak terlalu rapat.
         PdfPTable t = new PdfPTable(WIDTHS);
         t.setWidthPercentage(100);
         t.setHeaderRows(1);
-        for (String[] c : COLS) {
-            PdfPCell cell = mnc.head(c[0] + (c[1].isEmpty() ? "" : "\n" + c[1]));
-            t.addCell(cell);
-        }
+        t.setSpacingBefore(4f);
+        for (String[] c : COLS)
+            t.addCell(mnc.cell(c[0] + (c[1].isEmpty() ? "" : "\n" + c[1]), MncPdfService.J_HEAD));
 
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : rows) {
-            t.addCell(mnc.cell(postingDate(g)));
-            t.addCell(mnc.cell(nz(g.getGltrcd())));
-            t.addCell(mnc.cell(nz(g.getGltrac())));
-            t.addCell(mnc.cell(nz(g.getGlName())));
-            t.addCell(mnc.cell(nz(g.getGlflag())));
-            t.addCell(mnc.cell(nz(g.getGltrbr())));
-            t.addCell(mnc.cell(nz(g.getBrName())));
-            t.addCell(mnc.cell(nz(g.getGlprdc())));
-            t.addCell(mnc.cell(""));                      // Product Name: tidak ada di data, kosong seperti acuan
-            t.addCell(mnc.cell(nz(g.getGltrcc())));
-            t.addCell(mnc.cell(nz(g.getCsName())));
-            t.addCell(mnc.cell(nz(g.getGltrcy())));
-            t.addCell(mnc.cellRight(MncPdfService.amount(g.getGltram())));
-            t.addCell(mnc.cell(nz(g.getGltrds())));
+            t.addCell(body(postingDate(g)));
+            t.addCell(body(nz(g.getGltrcd())));
+            t.addCell(body(nz(g.getGltrac())));
+            t.addCell(body(nz(g.getGlName())));
+            t.addCell(body(nz(g.getGlflag())));
+            t.addCell(body(nz(g.getGltrbr())));
+            t.addCell(body(nz(g.getBrName())));
+            t.addCell(body(nz(g.getGlprdc())));
+            t.addCell(body(""));                          // Product Name: tidak ada di data, kosong seperti acuan
+            t.addCell(body(nz(g.getGltrcc())));
+            t.addCell(body(nz(g.getCsName())));
+            t.addCell(body(nz(g.getGltrcy())));
+            PdfPCell amt = body(MncPdfService.amount(g.getGltram()));
+            amt.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            t.addCell(amt);
+            t.addCell(body(nz(g.getGltrds())));
             if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nzv(g.getGltram()));
             else c = c.add(nzv(g.getGltram()));
         }
         doc.add(t);
-        doc.add(new Paragraph(" "));
-        doc.add(footer(rows, d, c));
+        PdfPTable foot = footer(rows, d, c);
+        foot.setSpacingBefore(14f);
+        doc.add(foot);
     }
+
+    private PdfPCell body(String text) { return mnc.cell(text, MncPdfService.J_BODY); }
 
     /**
      * Kaki halaman "Paket 01    Halaman 1 / 3" di kanan bawah, seperti jurnal acuan.
@@ -188,18 +229,23 @@ public class ReportController {
         String paket = "";
         private PdfTemplate total;
 
+        /** Nomor paket & halaman tebal dan lebih besar (REQ_AUSY_00030); cadangan: font biasa. */
+        private static com.lowagie.text.pdf.BaseFont font() {
+            return MncPdfService.J_PAGE_BASE != null ? MncPdfService.J_PAGE_BASE : MncPdfService.FOOT_BASE;
+        }
+
         @Override public void onOpenDocument(PdfWriter writer, Document doc) {
-            total = writer.getDirectContent().createTemplate(30, 10);
+            total = writer.getDirectContent().createTemplate(30, 12);
         }
 
         @Override public void onEndPage(PdfWriter writer, Document doc) {
-            if (MncPdfService.FOOT_BASE == null) return;
+            if (font() == null) return;
             PdfContentByte cb = writer.getDirectContent();
             String text = "Paket " + paket + "    Halaman " + writer.getPageNumber() + " / ";
             float y = doc.bottom() - 12f;
             float right = doc.right();
             cb.beginText();
-            cb.setFontAndSize(MncPdfService.FOOT_BASE, MncPdfService.FOOT_SIZE);
+            cb.setFontAndSize(font(), MncPdfService.J_PAGE_SIZE);
             // Tempat untuk total digeser ke kiri sebanyak lebarnya supaya seluruh baris rata kanan.
             cb.showTextAligned(Element.ALIGN_RIGHT, text, right - 16f, y, 0);
             cb.endText();
@@ -207,9 +253,9 @@ public class ReportController {
         }
 
         @Override public void onCloseDocument(PdfWriter writer, Document doc) {
-            if (MncPdfService.FOOT_BASE == null) return;
+            if (font() == null) return;
             total.beginText();
-            total.setFontAndSize(MncPdfService.FOOT_BASE, MncPdfService.FOOT_SIZE);
+            total.setFontAndSize(font(), MncPdfService.J_PAGE_SIZE);
             // Saat dokumen ditutup, penghitungnya sudah maju ke halaman BERIKUTNYA yang tidak
             // pernah jadi — jumlah halaman sebenarnya satu kurangnya.
             total.showText(String.valueOf(writer.getPageNumber() - 1));
@@ -225,27 +271,45 @@ public class ReportController {
         PdfPTable f = new PdfPTable(new float[]{2.2f, 2f, 2f, 2f, 2.4f});
         f.setWidthPercentage(100);
 
-        PdfPCell who = new PdfPCell();
+        // REQ_AUSY_00030: "User Input" dan "Tanggal" tebal & lebih besar, label dan isinya sejajar
+        // sebagai tabel dua kolom (dulu disejajarkan dengan spasi, yang meleset di font proporsional).
+        PdfPTable whoT = new PdfPTable(new float[]{1f, 1.6f});
+        whoT.setWidthPercentage(100);
+        whoT.addCell(plain("User Input", MncPdfService.J_FOOT_B, Element.ALIGN_LEFT));
+        whoT.addCell(plain(": " + nz(rows.isEmpty() ? "" : rows.get(0).getGltrus()), MncPdfService.J_FOOT_B, Element.ALIGN_LEFT));
+        whoT.addCell(plain("Tanggal", MncPdfService.J_FOOT_B, Element.ALIGN_LEFT));
+        whoT.addCell(plain(": " + footDate(rows), MncPdfService.J_FOOT_B, Element.ALIGN_LEFT));
+        PdfPCell who = new PdfPCell(whoT);
         who.setBorder(Rectangle.NO_BORDER);
-        who.addElement(new Paragraph("User Input : " + nz(rows.isEmpty() ? "" : rows.get(0).getGltrus()), MncPdfService.FOOT));
-        who.addElement(new Paragraph("Tanggal     : " + footDate(rows), MncPdfService.FOOT));
         f.addCell(who);
 
-        for (String s : new String[]{"Dibuat :", "Diperiksa :", "Disetujui :"}) f.addCell(mnc.signBox(s));
+        // Kotak tanda tangan dengan garis di bawah labelnya, supaya tampak seperti tabel.
+        for (String s : new String[]{"Dibuat :", "Diperiksa :", "Disetujui :"}) f.addCell(mnc.signTable(s));
 
-        PdfPCell tot = new PdfPCell();
+        // TOTAL Dr / TOTAL Cr / SELISIH sebagai tabel dua kolom: labelnya sejajar, angkanya
+        // rata kanan di satu kolom. Dulu SELISIH disejajarkan dengan spasi dan meleset.
+        PdfPTable totT = new PdfPTable(new float[]{1f, 1.4f});
+        totT.setWidthPercentage(100);
+        totalRow(totT, "TOTAL Dr", d);
+        totalRow(totT, "TOTAL Cr", c);
+        totalRow(totT, "SELISIH", d.subtract(c));
+        PdfPCell tot = new PdfPCell(totT);
         tot.setBorder(Rectangle.NO_BORDER);
-        tot.addElement(totalLine("TOTAL Dr :", d));
-        tot.addElement(totalLine("TOTAL Cr :", c));
-        tot.addElement(totalLine("SELISIH    :", d.subtract(c)));
         f.addCell(tot);
         return f;
     }
 
-    private static Paragraph totalLine(String label, BigDecimal v) {
-        Paragraph p = new Paragraph(label + "  " + MncPdfService.amount(v), MncPdfService.FOOT_B);
-        p.setAlignment(Element.ALIGN_RIGHT);
-        return p;
+    private static PdfPCell plain(String text, Font font, int align) {
+        PdfPCell c = new PdfPCell(new Phrase(text, font));
+        c.setBorder(Rectangle.NO_BORDER);
+        c.setHorizontalAlignment(align);
+        c.setPadding(1.5f);
+        return c;
+    }
+
+    private static void totalRow(PdfPTable t, String label, BigDecimal v) {
+        t.addCell(plain(label + " :", MncPdfService.J_FOOT_B, Element.ALIGN_LEFT));
+        t.addCell(plain(MncPdfService.amount(v), MncPdfService.J_FOOT_B, Element.ALIGN_RIGHT));
     }
 
     /**

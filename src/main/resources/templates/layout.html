@@ -19,7 +19,9 @@
 <body>
 <div class="ausy-shell">
     <aside class="ausy-sidebar">
-        <div class="ausy-brand"><i class="fa-solid fa-building-columns"></i> <span>MNC <b>AUSY</b></span></div>
+        <!--/* REQ_AUSY_00025: logo MNC Bank (dirender dari logo jurnal resmi). Saat sidebar diciutkan
+               logo lebar diganti ikon, supaya rail tetap 68px. */-->
+        <div class="ausy-brand"><img class="ausy-brand-logo" th:src="@{/img/mnc-logo.png}" alt="MNC Bank"><i class="fa-solid fa-building-columns ausy-brand-icon"></i> <span><b>AUSY</b></span></div>
         <ul class="ausy-nav">
             <li th:if="${showHome}"><a th:href="@{/dashboard}" title="Home" th:classappend="${currentPath == '/dashboard' or currentPath == '/'} ? 'active'"><i class="fa-solid fa-house"></i> <span>Home</span></a></li>
         </ul>
@@ -66,8 +68,14 @@
                target\classes basi, atau belum restart. Dengan waktu build tertulis di layar, hal
                itu bisa dibaca sekilas dan tidak perlu ditebak lagi dari gejala. Sengaja di layout
                supaya ada di semua halaman, dan kecil supaya tidak mengganggu. */-->
-        <div class="text-muted small text-end px-3 pb-2" style="opacity:.6">
-            build <span th:text="${@environment.getProperty('ausy.build-time')}">-</span>
+        <!--/* REQ_AUSY_00026: copyright MNC Bank di kiri bawah, tahunnya otomatis. */-->
+        <div class="ausy-footer d-flex justify-content-between align-items-end gap-3 px-3 pb-2">
+            <div class="ausy-copyright">Copyright &copy; Hak Cipta <span th:text="${#dates.year(#dates.createNow())}">2026</span>
+                PT. Bank MNC Internasional Tbk. Berizin dan Diawasi oleh Otoritas Jasa Keuangan serta
+                merupakan peserta penjaminan Lembaga Penjamin Simpanan.</div>
+            <div class="text-muted small text-nowrap" style="opacity:.6">
+                build <span th:text="${@environment.getProperty('ausy.build-time')}">-</span>
+            </div>
         </div>
     </div>
     <div class="ausy-overlay" id="navOverlay"></div>

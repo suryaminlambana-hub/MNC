@@ -400,6 +400,16 @@ public class AcctxtGenerateService {
         return min == null ? "-" : rangeText(min, max);
     }
 
+    /**
+     * REQ_AUSY_00028 — pratinjau isi ACCTXT untuk SATU export, disusun dengan formatter yang sama
+     * persis seperti saat Generate. Tidak ditulis ke folder export, tidak dikirim ke FTP, dan
+     * tidak menandai export itu sebagai sudah dibuatkan berkas: alur Generate milik role EXECUTE
+     * tidak tersentuh sama sekali.
+     */
+    public String previewOf(GlExportRequest req) {
+        return contentOf(List.of(req));
+    }
+
     /** Isi berkas ACCTXT untuk sekumpulan export, urut seperti yang diberikan. */
     private String contentOf(List<GlExportRequest> reqs) {
         StringBuilder content = new StringBuilder();

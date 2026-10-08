@@ -56,6 +56,27 @@ public class MncPdfService {
     }
     public static final Font FOOT_B  = new Font(Font.HELVETICA, 7, Font.BOLD);
 
+    // ---- Jurnal AUSY (REQ_AUSY_00030) --------------------------------------------------------
+    // Sedikit lebih besar dari gaya umum di atas, yang juga dipakai PDF Audit Trail. Dipisah
+    // supaya penyesuaian jurnal tidak ikut mengubah cetakan lain. Ukurannya masih bisa diatur
+    // lagi setelah ditinjau QA; cukup ubah angka di bagian ini.
+    public static final Font J_HEAD   = new Font(Font.HELVETICA, 7f, Font.BOLD);
+    public static final Font J_BODY   = new Font(Font.HELVETICA, 7f);
+    public static final Font J_FOOT   = new Font(Font.HELVETICA, 8.5f);
+    public static final Font J_FOOT_B = new Font(Font.HELVETICA, 8.5f, Font.BOLD);
+    /** Nomor paket & halaman di pojok kanan bawah: tebal dan lebih besar. */
+    public static final BaseFont J_PAGE_BASE = baseHelveticaBold();
+    public static final float J_PAGE_SIZE = 9f;
+
+    private static BaseFont baseHelveticaBold() {
+        try {
+            return BaseFont.createFont(BaseFont.HELVETICA_BOLD, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+        } catch (Exception e) {
+            LoggerFactory.getLogger(MncPdfService.class).warn("Font tebal kaki halaman gagal dibuat: {}", e.getMessage());
+            return null;
+        }
+    }
+
     /**
      * Angka seperti di jurnal MNC: {@code 1,642,798,00}.
      *
@@ -130,6 +151,33 @@ public class MncPdfService {
         PdfPCell c = cell(text);
         c.setHorizontalAlignment(Element.ALIGN_RIGHT);
         return c;
+    }
+
+    /** Sel dengan font tertentu — dipakai jurnal yang punya gaya sendiri (REQ_AUSY_00030). */
+    public PdfPCell cell(String text, Font font) {
+        PdfPCell c = new PdfPCell(new Phrase(text == null ? "" : text, font));
+        c.setPadding(2.5f);
+        return c;
+    }
+
+    /**
+     * Kotak tanda tangan jurnal dengan garis di bawah labelnya, supaya terbaca sebagai tabel
+     * (REQ_AUSY_00030): baris label di atas, ruang tanda tangan kosong di bawahnya.
+     */
+    public PdfPCell signTable(String label) {
+        PdfPTable t = new PdfPTable(1);
+        t.setWidthPercentage(100);
+        PdfPCell head = new PdfPCell(new Phrase(label, J_FOOT_B));
+        head.setPadding(3f);
+        t.addCell(head);
+        PdfPCell space = new PdfPCell();
+        space.setFixedHeight(44f);
+        t.addCell(space);
+        PdfPCell wrap = new PdfPCell(t);
+        wrap.setBorder(com.lowagie.text.Rectangle.NO_BORDER);
+        wrap.setPaddingLeft(4f);
+        wrap.setPaddingRight(4f);
+        return wrap;
     }
 
     /** Kotak tanda tangan kosong seperti "Dibuat / Diperiksa / Disetujui" di jurnal. */

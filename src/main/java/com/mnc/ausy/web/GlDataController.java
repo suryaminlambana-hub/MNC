@@ -10,6 +10,7 @@ import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
+import com.mnc.ausy.service.OtorisasiService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,12 +34,13 @@ public class GlDataController {
     private final GlChangeService changes;
     private final ApprovalService approval;
     private final DataScopeService scope;
+    private final OtorisasiService otorisasi;
 
     public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport,
                             AuditService audit, GlChangeService changes, ApprovalService approval,
-                            DataScopeService scope) {
+                            DataScopeService scope, OtorisasiService otorisasi) {
         this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
-        this.changes = changes; this.approval = approval; this.scope = scope;
+        this.changes = changes; this.approval = approval; this.scope = scope; this.otorisasi = otorisasi;
     }
 
     /**
@@ -112,6 +114,7 @@ public class GlDataController {
         model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
         model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
         model.addAttribute("pendingUploads", pendingUploads(me));   // REQ_AUSY_00014
+        model.addAttribute("activeBatches", scope.filterArrays(me, gl.approvedPakets(), 1));   // REQ_AUSY_00023
         return "gl-legacy/list";
     }
 
@@ -125,6 +128,15 @@ public class GlDataController {
         for (Object[] p : out)
             if (p.length > 5 && p[5] instanceof java.sql.Timestamp ts) p[5] = ts.toLocalDateTime();
         return out;
+    }
+
+    /** REQ_AUSY_00022 — maker menghapus batch upload miliknya yang belum diotorisasi checker. */
+    @PostMapping("/gl-legacy/pending/{paket}/delete")
+    public String withdrawPending(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
+                                  RedirectAttributes ra) {
+        OtorisasiService.ExportResult r = otorisasi.withdraw(paket, me);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        return "redirect:/gl-legacy";
     }
 
     /**

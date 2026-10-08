@@ -18,7 +18,46 @@ Setiap entri memuat:
 
 ## Belum di-deploy
 
-Belum ada.
+> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
+> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+
+Tidak ada migrasi DB.
+
+- **Maker bisa menghapus batch upload yang belum di-approve** (REQ_AUSY_00022).
+  - Tombol Hapus ada di section "Upload Menunggu Otorisasi" di List GL Aktif.
+  - Hanya muncul untuk pengunggahnya sendiri, dan langsung terhapus tanpa approval checker.
+  - Tercatat di audit trail sebagai `UPLOAD_DELETE`. Batch yang sudah diproses checker tidak
+    bisa dihapus dari sini; untuk itu pakai menu Hapus Batch.
+- **PDF per batch GL Aktif** (REQ_AUSY_00023). Di judul "Tabel List GL Aktif" ada pilihan batch
+  dan tombol PDF; PDF dibuka di tab baru. Batch yang ditawarkan disaring per maker.
+- **Upload Excel menolak nominal minus, nominal bukan angka, dan total tidak balance**
+  (REQ_AUSY_00024). Seluruh berkas ditolak, dengan baris dan nilainya disebut. Dulu berkas tidak
+  balance tetap masuk dengan sekadar peringatan, dan nominal yang tidak terbaca menjadi 0.
+- **Logo MNC Bank** di sidebar dan halaman login (REQ_AUSY_00025). Dirender dari logo PDF jurnal
+  (`static/img/mnc-logo.png`, PNG transparan), karena file SVG/PNG resmi belum ada. Saat sidebar
+  diciutkan, logo diganti ikon.
+- **Copyright MNC Bank** di kiri bawah semua halaman, termasuk login (REQ_AUSY_00026). Tahunnya
+  otomatis.
+- **Download ACCTXT di Return Export GL** (REQ_AUSY_00028). Pratinjau isi ACCTXT satu export,
+  disusun dengan formatter yang sama seperti Generate, tetapi **tidak** ditulis ke server, tidak
+  dikirim ke FTP, dan tidak menandai export sebagai sudah digenerate.
+- **Export bulk edit per batch dengan Amount berformat `1.000.000,50`** (REQ_AUSY_00029).
+  - Kelola Data GL punya pilihan batch (atau "Semua batch").
+  - Saat diunggah ulang, Amount dibaca dalam format Indonesia maupun angka biasa.
+  - Amount yang tidak terbaca menolak seluruh berkas. Dulu nilai seperti itu diam-diam menjadi 0.
+- **Format PDF jurnal** (REQ_AUSY_00030).
+  - "Tr. Account" menjadi "GL Number".
+  - Kotak Dibuat/Diperiksa/Disetujui bergaris seperti tabel.
+  - SELISIH sejajar dengan TOTAL Dr/Cr.
+  - Font sedikit lebih besar.
+  - Paket/halaman serta User Input/Tanggal tebal dan lebih besar, dan jarak diperlebar.
+  - Ukuran font masih bisa diatur setelah ditinjau QA (konstanta `J_*` di `MncPdfService`).
+    PDF Audit Trail tidak berubah.
+
+### Catatan untuk developer
+- Format nominal Indonesia ditulis dan dibaca lewat satu kelas, `Nominal`.
+- `GlTabel.batchKey()` adalah kunci batch yang sama dengan rekap `approvedPakets()`.
+- PDFBox **tidak** ditambahkan ke project; hanya dipakai sekali untuk merender logo.
 
 ---
 

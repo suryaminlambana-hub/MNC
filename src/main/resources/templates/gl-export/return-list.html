@@ -27,7 +27,11 @@
         <td class="text-end" th:text="${r.rowsCount}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA')}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.credit,1,'POINT',2,'COMMA')}"></td>
-        <td>
+        <td class="text-nowrap">
+          <!--/* REQ_AUSY_00028: pratinjau isi ACCTXT export ini — tidak ditulis ke server/FTP. */-->
+          <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-export/return-list/' + ${r.id} + '/acctxt'}"
+             title="Pratinjau isi ACCTXT export ini. Tidak dikirim ke FTP.">
+            <i class="fa-solid fa-file-arrow-down"></i> Download ACCTXT</a>
           <button type="button" class="btn btn-sm btn-outline-danger"
                   data-bs-toggle="modal" th:attr="data-bs-target='#ret' + ${r.id}">
             <i class="fa-solid fa-rotate-left"></i> Return

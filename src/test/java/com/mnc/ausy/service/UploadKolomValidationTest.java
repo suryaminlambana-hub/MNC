@@ -275,6 +275,32 @@ class UploadKolomValidationTest {
      * pasti ditolak. Tanpa baris pasangan itu berkasnya lolos seluruhnya dan {@code process}
      * meneruskan ke penyimpanan — yang repository-nya null di tes ini.
      */
+    // ---- REQ_AUSY_00024: nominal minus & tidak balance ditolak ----
+
+    @Test
+    void nominalMinusDitolak() throws Exception {
+        String[] b = barisSah(); b[13] = "-500000";
+        assertTrue(pesanBaris(currencyAtauKolomLain(b), 2).contains("tidak boleh minus"));
+    }
+
+    @Test
+    void nominalBukanAngkaDitolak() throws Exception {
+        String[] b = barisSah(); b[13] = "lima ratus";
+        assertTrue(pesanBaris(currencyAtauKolomLain(b), 2).contains("bukan angka"));
+    }
+
+    @Test
+    void totalTidakBalanceDitolak() throws Exception {
+        String[] debit = barisSah();                         // D 1.000.000
+        String[] credit = barisSah(); credit[1] = "C"; credit[13] = "900000";
+        UploadResult res = proses(debit, credit);
+        assertFalse(res.success);
+        String total = pesanBaris(res, -1) + res.errors.stream()
+                .filter(e -> e[0].equals("Total")).map(e -> e[1]).findFirst().orElse("");
+        assertTrue(total.contains("tidak sama dengan total Credit"), "pesan: " + total);
+        assertTrue(total.contains("selisih 100.000,00"), "pesan: " + total);
+    }
+
     private static UploadResult currencyAtauKolomLain(String[] barisUji) throws Exception {
         String[] rusak = barisSah(); rusak[2] = "XX";       // Product Code jelas bukan angka
         return proses(barisUji, rusak);

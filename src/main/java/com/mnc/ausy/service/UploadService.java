@@ -103,17 +103,25 @@ public class UploadService {
         try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
     }
 
+    /** Kolom N — Transaction_Amount. */
+    private static final int KOLOM_NOMINAL = 13;
+
+    /**
+     * Nominal seperti dibaca {@link #amount}, tetapi null bila teksnya tidak bisa dibaca sebagai
+     * angka — supaya pemeriksaan bisa MENOLAK, bukan diam-diam menganggapnya 0 (REQ_AUSY_00024).
+     * Sel kosong tetap 0, sama seperti sebelumnya.
+     */
+    static BigDecimal nominalAtauNull(String s) {
+        if (s == null || s.isBlank()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return null; }
+    }
+
     /**
      * Nominal untuk teks audit trail: {@code 5.000.000,00} (REQ_AUSY_00012), format yang sama
      * dengan kolom Amount di layar. Teks audit dibaca di Audit Trail dan card Aktivitas Terakhir,
      * dan angka mentah {@code 5000000} sulit dibaca sekilas.
      */
-    static String nominal(BigDecimal v) {
-        java.text.DecimalFormatSymbols s = new java.text.DecimalFormatSymbols(Locale.ROOT);
-        s.setGroupingSeparator('.');
-        s.setDecimalSeparator(',');
-        return new java.text.DecimalFormat("#,##0.00", s).format(v == null ? BigDecimal.ZERO : v);
-    }
+    static String nominal(BigDecimal v) { return Nominal.format(v); }
 
     /** Kolom currency — wajib berisi IDR (BUG_AUSY_00190). */
     private static final int KOLOM_CURRENCY = 11;
@@ -237,10 +245,24 @@ public class UploadService {
             //
             // Berkasnya ditolak UTUH, bukan separuh masuk lalu ketahuan saat Checker sudah
             // menyetujui, dan tiap pelanggaran disebut lengkap dengan baris serta kolomnya.
+            BigDecimal cekDebit = BigDecimal.ZERO, cekCredit = BigDecimal.ZERO;
             for (int r = 1; r <= last; r++) {
                 Row row = sh.getRow(r);
                 if (cell(row, KEY_COLUMN).isBlank()) continue;
                 String baris = String.valueOf(r + 1);
+
+                // REQ_AUSY_00024 — nominal harus angka dan tidak boleh minus. Dulu nilai yang
+                // tidak terbaca diam-diam menjadi 0 dan nominal minus masuk begitu saja.
+                String nomTeks = cell(row, KOLOM_NOMINAL);
+                BigDecimal nom = nominalAtauNull(nomTeks);
+                if (nom == null)
+                    res.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] bukan angka — saat ini \""
+                            + nomTeks + "\"." });
+                else if (nom.signum() < 0)
+                    res.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] tidak boleh minus — saat ini "
+                            + nominal(nom) + "." });
+                else if (cell(row, 1).equalsIgnoreCase("D")) cekDebit = cekDebit.add(nom);
+                else cekCredit = cekCredit.add(nom);
 
                 // Sel bernilai galat Excel — hampir selalu VLOOKUP yang tidak menemukan padanan.
                 //
@@ -286,6 +308,13 @@ public class UploadService {
                                 + v + "\"." });
                 }
             }
+            // REQ_AUSY_00024 — total Debit harus sama dengan total Credit. Dulu berkas yang tidak
+            // balance tetap masuk dengan sekadar peringatan, lalu baru tertahan di checker.
+            // Diperiksa hanya bila semua nominal terbaca, supaya angkanya tidak menyesatkan.
+            if (res.errors.isEmpty() && cekDebit.compareTo(cekCredit) != 0)
+                res.errors.add(new String[]{ "Total", "Total Debit " + nominal(cekDebit)
+                        + " tidak sama dengan total Credit " + nominal(cekCredit) + " (selisih "
+                        + nominal(cekDebit.subtract(cekCredit).abs()) + ")." });
             if (!res.errors.isEmpty()) {
                 res.message = "Upload gagal: ada isian yang tidak sesuai ketentuan kolom. "
                         + "Perbaiki di file Excel lalu unggah ulang.";
@@ -364,8 +393,9 @@ public class UploadService {
             res.success = true;
             // Keterangan "N isian dirapikan" dilepas atas permintaan pengguna (BUG_AUSY_00180):
             // pembersihan karakter dianggap urusan internal, tidak perlu diumumkan tiap unggahan.
-            res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). " +
-                          (res.balanced ? "Debit = Credit (balance)." : "PERINGATAN: Debit dan Credit tidak balance!");
+            // Berkas yang tidak balance sudah ditolak di pemeriksaan (REQ_AUSY_00024).
+            res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). "
+                          + "Debit = Credit (balance).";
             return res;
         }
     }

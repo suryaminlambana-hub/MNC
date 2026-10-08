@@ -108,5 +108,33 @@ public class OtorisasiService {
         return new ExportResult(true, "Batch " + paket + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
     }
 
+    /**
+     * REQ_AUSY_00022 — maker menghapus batch upload MILIKNYA SENDIRI yang belum diotorisasi.
+     *
+     * Tanpa persetujuan checker: datanya belum pernah disetujui, jadi tidak ada yang perlu dijaga
+     * dua orang — sama seperti batch yang ditolak checker, barisnya dibuang dari gl_tabel. Hanya
+     * batch yang SELURUH barisnya masih menunggu otorisasi yang bisa dihapus, dan hanya oleh
+     * pengunggahnya; checker pasangannya pun tidak bisa.
+     */
+    @Transactional
+    public ExportResult withdraw(String paket, AusyUserDetails me) {
+        if (me == null) return new ExportResult(false, "Sesi tidak valid.", 0, null);
+        String maker = me.getUsername();
+        List<GlTabel> rows = gl.findBatchRows(paket, maker);
+        if (rows.isEmpty())
+            return new ExportResult(false, "Batch " + paket + " tidak ditemukan di upload milik Anda.", 0, null);
+        boolean semuaPending = rows.stream().allMatch(g ->
+                "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
+        if (!semuaPending)
+            return new ExportResult(false, "Batch " + paket + " sudah diproses checker dan tidak bisa dihapus dari sini."
+                    + " Gunakan menu Hapus Batch.", 0, null);
+
+        gl.deletePaket(paket, maker);
+        audit.transaction(maker, "UPLOAD_DELETE",
+                "Batch " + paket + " dihapus pengunggahnya sebelum diotorisasi, " + rows.size() + " baris dibuang.");
+        return new ExportResult(true, "Batch " + paket + " dihapus (" + rows.size()
+                + " baris). Batch ini tidak lagi menunggu otorisasi checker.", rows.size(), null);
+    }
+
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 }
