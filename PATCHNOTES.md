@@ -52,6 +52,8 @@ Tidak ada migrasi DB.
   - Font sedikit lebih besar.
   - Paket/halaman serta User Input/Tanggal tebal dan lebih besar, dan jarak diperlebar.
   - Judul jurnal (13pt, dulu 10pt) dan logo MNC (1,5×) diperbesar.
+  - Jarak antarbaris di semua sel tabel diperlebar (1,8× ukuran font), supaya teks yang turun
+    ke baris berikutnya tidak mepet.
   - Ukuran font masih bisa diatur setelah ditinjau QA (konstanta `J_*` di `MncPdfService`).
     PDF Audit Trail tidak berubah.
 

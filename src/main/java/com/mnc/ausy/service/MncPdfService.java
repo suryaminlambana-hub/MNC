@@ -172,9 +172,19 @@ public class MncPdfService {
     /** Sel dengan font tertentu — dipakai jurnal yang punya gaya sendiri (REQ_AUSY_00030). */
     public PdfPCell cell(String text, Font font) {
         PdfPCell c = new PdfPCell(new Phrase(text == null ? "" : text, font));
-        c.setPadding(2.5f);
+        // Teks yang turun ke baris berikutnya dulu mepet antarbaris dan sulit dibaca. Spasi
+        // baris diperlebar di SEMUA sel tabel jurnal (REQ_AUSY_00030, permintaan user).
+        c.setLeading(0f, J_LINE_SPACING);
+        c.setUseAscender(true);
+        c.setPaddingTop(3f);
+        c.setPaddingBottom(5f);
+        c.setPaddingLeft(2.5f);
+        c.setPaddingRight(2.5f);
         return c;
     }
+
+    /** Jarak antarbaris di sel tabel jurnal, kelipatan ukuran font (REQ_AUSY_00030). */
+    public static final float J_LINE_SPACING = 1.8f;
 
     /**
      * Kotak tanda tangan jurnal dengan garis di bawah labelnya, supaya terbaca sebagai tabel
