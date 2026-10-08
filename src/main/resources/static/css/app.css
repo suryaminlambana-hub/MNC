@@ -366,23 +366,43 @@ table.dataTable thead th{cursor:pointer}
 .badge.bg-warning-subtle{background:#F5EBD6!important} .badge.text-warning{color:#B28628!important}
 .badge.bg-danger-subtle{background:#FEE2E2!important}  .badge.text-danger{color:#B91C1C!important}
 
-/* Halaman login: latar visual korporat MNC (REQ_AUSY_00032) dengan overlay navy supaya form
-   tetap terbaca. Ganti berkas img/login-bg.svg dengan foto resmi MNC (WebP) bila tersedia. */
-.ausy-login-bg{background:
-    linear-gradient(135deg,rgba(16,45,80,0.55),rgba(10,29,54,0.75)),
-    url("../img/login-bg.svg") center/cover no-repeat,
-    #102D50}
+/* Halaman login: latar foto gedung MNC (REQ_AUSY_00032) dengan overlay navy supaya form
+   tetap terbaca. Untuk mengganti foto, timpa img/login-bg.jpg. */
+/* Foto gedung MNC (REQ_AUSY_00032). Fotonya potret dan resolusinya kecil, jadi di layar lebar
+   foto ditampilkan utuh setinggi layar di sisi kiri (nyaris ukuran asli, tetap tajam) lalu
+   memudar ke navy, dan kartu login berada di kanan. Di layar sempit foto memenuhi layar dengan
+   overlay lebih gelap supaya form tetap terbaca. */
+.ausy-login-bg{background:linear-gradient(120deg,#102D50 0%,#0A1D36 100%)}
+/* Foto di elemen sendiri seukuran fotonya, tepi kanannya dipudarkan dengan mask — pudarnya
+   selalu tepat di ujung foto, berapa pun rasio layarnya (tanpa garis batas). */
+.ausy-login-bg::before{content:"";position:fixed;left:0;top:0;bottom:0;height:100vh;aspect-ratio:584/684;
+  background:linear-gradient(180deg,rgba(10,29,54,0) 70%,rgba(10,29,54,0.55) 100%),
+             url("../img/login-bg.jpg") center/cover no-repeat;
+  -webkit-mask-image:linear-gradient(90deg,#000 55%,transparent 100%);
+          mask-image:linear-gradient(90deg,#000 55%,transparent 100%);
+  z-index:0;pointer-events:none}
+.ausy-login-card,.ausy-login-copyright,.ausy-partner-logo{position:relative;z-index:1}
+.ausy-login-copyright,.ausy-partner-logo{position:fixed}
+@media (min-width:901px){
+  .ausy-login-bg{justify-content:flex-end;padding-right:9vw}
+}
+@media (max-width:900px){
+  .ausy-login-bg::before{display:none}
+  .ausy-login-bg{background:
+      linear-gradient(180deg,rgba(16,45,80,0.45),rgba(10,29,54,0.8)),
+      url("../img/login-bg.jpg") center 35%/cover no-repeat,
+      #102D50}
+}
 .ausy-login-card{border:none;box-shadow:0 20px 50px rgba(0,0,0,0.35)}
 .ausy-login-logo{height:44px}
 .ausy-login-copyright{color:rgba(255,255,255,0.82)}
 
-/* Logo NALA di pojok kanan bawah halaman login (REQ_AUSY_00033): latar putih membulat supaya
-   logo tetap jelas di atas latar navy; ukurannya proporsional dan tidak menutupi form. */
-.ausy-partner-logo{position:fixed;right:16px;bottom:12px;background:#FFFFFF;border-radius:12px;
-  padding:8px 14px;box-shadow:0 6px 18px rgba(0,0,0,0.25);line-height:0}
-.ausy-partner-logo img{height:30px;width:auto;max-width:260px;object-fit:contain}
-.ausy-login-copyright{right:auto;max-width:min(560px,calc(100vw - 340px))}
+/* Logo NALA di pojok kanan bawah halaman login (REQ_AUSY_00033). Tanpa kotak putih (permintaan
+   tim): transparan langsung di atas latar, sedikit lebih besar supaya teks birunya terbaca. */
+.ausy-partner-logo{position:fixed;right:16px;bottom:12px;line-height:0}
+.ausy-partner-logo img{height:34px;width:auto;max-width:300px;object-fit:contain}
+.ausy-login-copyright{right:auto;max-width:min(560px,calc(100vw - 360px))}
 @media (max-width:600px){
   .ausy-partner-logo{position:static;margin-top:12px;align-self:center}
-  .ausy-login-copyright{max-width:none}
+  .ausy-login-copyright{position:static;max-width:none;margin-top:16px}
 }

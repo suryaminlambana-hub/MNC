@@ -71,13 +71,15 @@ Tidak ada migrasi DB.
 - **Nomor batch upload mulai dari 1 setiap hari** (REQ_AUSY_00031). Format `yyyyMMdd` + 3 digit
   urut (contoh `20261008001`), sehingga tetap unik lintas hari. Batch lama ("01", "02", …) tidak
   berubah.
-- **Latar halaman login bertema MNC** (REQ_AUSY_00032). Visual korporat MNC (navy dengan motif
-  belah ketupat emas, `static/img/login-bg.svg`) dengan overlay supaya form tetap terbaca,
-  penuh layar dan responsif. Belum ada foto resmi; bila tersedia, ganti berkas latar di
-  `app.css` (`.ausy-login-bg`).
+- **Latar halaman login: foto gedung MNC** (REQ_AUSY_00032), `static/img/login-bg.jpg`.
+  - Desktop: foto utuh setinggi layar di kiri, memudar halus ke navy; kartu login di kanan.
+  - Layar kecil: foto memenuhi layar dengan overlay gelap; kartu di tengah.
+  - Fotonya kecil (584×684, dari tim; bingkai tangkapan layar dibuang). Bila ada foto
+    beresolusi lebih tinggi, timpa berkas itu.
 
-- **Logo NALA di pojok kanan bawah halaman login** (REQ_AUSY_00033). Kotak berlatar putih
-  supaya logo jelas di atas latar navy; di layar kecil pindah ke bawah form.
+- **Logo NALA di pojok kanan bawah halaman login** (REQ_AUSY_00033). Transparan tanpa kotak
+  putih (permintaan tim); di layar kecil pindah ke bawah form. Teks logonya biru tua, jadi
+  kontrasnya rendah di atas navy; versi logo bertulisan putih dari NALA akan lebih terbaca.
   - Berkas `static/img/nala-logo.png` dibuat dari logo yang dikirim tim (JPG dengan pola
     kotak-kotak tercetak): latarnya dibuang menjadi transparan, dipotong rapat, diperkecil ke
     1356×160 px. Untuk mengganti dengan file resmi, timpa berkas itu.
