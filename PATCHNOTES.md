@@ -51,6 +51,7 @@ Tidak ada migrasi DB.
   - SELISIH sejajar dengan TOTAL Dr/Cr.
   - Font sedikit lebih besar.
   - Paket/halaman serta User Input/Tanggal tebal dan lebih besar, dan jarak diperlebar.
+  - Judul jurnal (13pt, dulu 10pt) dan logo MNC (1,5×) diperbesar.
   - Ukuran font masih bisa diatur setelah ditinjau QA (konstanta `J_*` di `MncPdfService`).
     PDF Audit Trail tidak berubah.
 

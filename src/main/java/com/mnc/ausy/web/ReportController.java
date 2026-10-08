@@ -156,8 +156,8 @@ public class ReportController {
 
         if (byPaket.isEmpty()) {
             footer.paket = "-";
-            mnc.stampLogo(writer, doc);
-            mnc.title(doc, "JURNAL \" AUSY \" ( ACCOUNTING UPLOAD SYSTEM )", null);
+            mnc.stampLogo(writer, doc, MncPdfService.J_LOGO_SCALE);
+            mnc.title(doc, "JURNAL \" AUSY \" ( ACCOUNTING UPLOAD SYSTEM )", null, MncPdfService.J_TITLE);
             doc.add(new Paragraph("Tidak ada data GL aktif untuk dicetak.", MncPdfService.FOOT));
             doc.close();
             return;
@@ -177,9 +177,10 @@ public class ReportController {
     }
 
     private void journal(PdfWriter writer, Document doc, String paket, List<GlTabel> rows) throws DocumentException {
-        mnc.stampLogo(writer, doc);
+        mnc.stampLogo(writer, doc, MncPdfService.J_LOGO_SCALE);
         mnc.title(doc, "JURNAL \" AUSY \" ( ACCOUNTING UPLOAD SYSTEM )",
-                "Di Proses pada No. Transmisi : " + transmisi(rows) + ", No Paket : " + paket);
+                "Di Proses pada No. Transmisi : " + transmisi(rows) + ", No Paket : " + paket,
+                MncPdfService.J_TITLE);
 
         // REQ_AUSY_00030: font jurnal sendiri (sedikit lebih besar) dan jarak antara judul,
         // tabel, dan kaki diperlebar supaya tidak terlalu rapat.

@@ -60,6 +60,9 @@ public class MncPdfService {
     // Sedikit lebih besar dari gaya umum di atas, yang juga dipakai PDF Audit Trail. Dipisah
     // supaya penyesuaian jurnal tidak ikut mengubah cetakan lain. Ukurannya masih bisa diatur
     // lagi setelah ditinjau QA; cukup ubah angka di bagian ini.
+    /** Judul jurnal dan skala logo MNC — diperbesar atas permintaan QA (REQ_AUSY_00030). */
+    public static final Font J_TITLE  = new Font(Font.HELVETICA, 13f, Font.BOLD);
+    public static final float J_LOGO_SCALE = 1.5f;
     public static final Font J_HEAD   = new Font(Font.HELVETICA, 7f, Font.BOLD);
     public static final Font J_BODY   = new Font(Font.HELVETICA, 7f);
     public static final Font J_FOOT   = new Font(Font.HELVETICA, 8.5f);
@@ -94,18 +97,26 @@ public class MncPdfService {
 
     /** Logo MNC bank di kiri atas halaman yang sedang terbuka. */
     public void stampLogo(PdfWriter writer, Document doc) {
+        stampLogo(writer, doc, 1f);
+    }
+
+    /**
+     * Idem dengan skala tertentu — jurnal memakai logo lebih besar (REQ_AUSY_00030). Kotak clip
+     * dan geseran template ikut diskalakan, jadi bagian yang terlihat tetap hanya "MNC bank".
+     */
+    public void stampLogo(PdfWriter writer, Document doc, float scale) {
         try (InputStream in = new ClassPathResource(LOGO).getInputStream()) {
             PdfReader reader = new PdfReader(in.readAllBytes());
             PdfImportedPage logo = writer.getImportedPage(reader, 1);
             PdfContentByte cb = writer.getDirectContent();
             float x = doc.leftMargin();
-            float y = doc.top() - LOGO_H + 6f;
+            float y = doc.top() - LOGO_H * scale + 6f;
             cb.saveState();
-            cb.rectangle(x, y, LOGO_W, LOGO_H);
+            cb.rectangle(x, y, LOGO_W * scale, LOGO_H * scale);
             cb.clip();
             cb.newPath();
             // Geser template supaya bagian yang dipilih jatuh tepat di dalam kotak clip.
-            cb.addTemplate(logo, 1f, 0, 0, 1f, x - LOGO_X, y - LOGO_Y);
+            cb.addTemplate(logo, scale, 0, 0, scale, x - LOGO_X * scale, y - LOGO_Y * scale);
             cb.restoreState();
         } catch (Exception e) {
             // Logo hilang tidak boleh menggagalkan cetakan — isinya yang penting.
@@ -118,14 +129,19 @@ public class MncPdfService {
      * {@code line3} boleh null untuk cetakan yang tidak punya baris keterangan.
      */
     public void title(Document doc, String line2, String line3) throws DocumentException {
-        Paragraph p1 = new Paragraph(BANK_NAME, TITLE);
+        title(doc, line2, line3, TITLE);
+    }
+
+    /** Idem dengan font judul tertentu — jurnal memakai judul lebih besar (REQ_AUSY_00030). */
+    public void title(Document doc, String line2, String line3, Font font) throws DocumentException {
+        Paragraph p1 = new Paragraph(BANK_NAME, font);
         p1.setAlignment(Element.ALIGN_CENTER);
         doc.add(p1);
-        Paragraph p2 = new Paragraph(line2, TITLE);
+        Paragraph p2 = new Paragraph(line2, font);
         p2.setAlignment(Element.ALIGN_CENTER);
         doc.add(p2);
         if (line3 != null) {
-            Paragraph p3 = new Paragraph(line3, TITLE);
+            Paragraph p3 = new Paragraph(line3, font);
             p3.setAlignment(Element.ALIGN_CENTER);
             doc.add(p3);
         }
