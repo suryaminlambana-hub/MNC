@@ -44,6 +44,12 @@
     </form>
 
 </div>
+<!--/* REQ_AUSY_00033: logo NALA di pojok kanan bawah, di atas latar putih supaya tetap jelas di
+       atas latar navy. Berkasnya img/nala-logo.png; selama belum ada, kotaknya disembunyikan
+       supaya halaman login tidak menampilkan gambar rusak. */-->
+<div class="ausy-partner-logo" id="nalaLogo">
+    <img th:src="@{/img/nala-logo.png}" alt="NALA" onerror="document.getElementById('nalaLogo').style.display='none'">
+</div>
 <!--/* REQ_AUSY_00026: copyright MNC Bank di kiri bawah, juga di halaman login. */-->
 <div class="ausy-copyright ausy-login-copyright">Copyright &copy; Hak Cipta <span th:text="${#dates.year(#dates.createNow())}">2026</span>
     PT. Bank MNC Internasional Tbk. Berizin dan Diawasi oleh Otoritas Jasa Keuangan serta

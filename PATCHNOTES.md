@@ -76,6 +76,11 @@ Tidak ada migrasi DB.
   penuh layar dan responsif. Belum ada foto resmi; bila tersedia, ganti berkas latar di
   `app.css` (`.ausy-login-bg`).
 
+- **Tempat logo NALA di pojok kanan bawah halaman login** (REQ_AUSY_00033). Kotak berlatar
+  putih supaya logo jelas di atas latar navy; di layar kecil pindah ke bawah form.
+  - **File logo NALA belum ada.** Simpan sebagai `src/main/resources/static/img/nala-logo.png`
+    (PNG/SVG transparan). Selama belum ada, kotaknya otomatis tersembunyi.
+
 ### Catatan untuk developer
 - Nomor batch baru dibuat di satu tempat (`UploadService`) lewat `maxUrutBatchHarian`.
   `maxPaket()` dihapus: cast seluruh `no_paket` ke int akan error begitu nomor 11 digit ada.
