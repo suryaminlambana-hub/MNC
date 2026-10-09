@@ -163,6 +163,15 @@ Tidak ada migrasi DB.
       (6 kolom dengan ID) ditolak.
     - Sheet referensi template: kode angka tanpa nol di depan (COA, Product Code) kini ditulis
       sebagai angka seperti di AUSY.xls, supaya VLOOKUP Gl_Name tidak #N/A saat kode GL diketik.
+  - **Nama user, bukan username** (REQ_AUSY_00055). Berlaku di:
+    - kolom User di Audit Trail dan Riwayat/Aktivitas di semua beranda;
+    - Uploader, Maker, Checker, dan "Oleh" di List Data GL, Manajemen Otorisasi GL, Rekapitulasi,
+      Return Data, Generate File ACCTXT, serta antrian otorisasi config;
+    - catatan "Dikembalikan/Rejected oleh …", Target User, Pasangan Checker - Maker, Access User;
+    - kolom "Dibuat Oleh" di Excel User dan kolom Maker di Excel Rekapitulasi.
+    Yang disimpan di database tetap username. User tanpa nama tampil dengan username-nya. Halaman
+    Manajemen User tetap menampilkan kolom Username, karena itu memang data akunnya. Teks keterangan
+    audit trail yang sudah tercatat tidak diubah.
   - **Checker: alasan Approve terkunci ditampilkan** (REQ_AUSY_00056). Tidak ada batasan tanggal:
     batch hari sebelumnya bisa di-approve (sudah diuji). Approve hanya terkunci bila batch tidak
     balance, dan kini selisihnya serta saran "minta maker memperbaiki lewat Bulk Edit" tampil di

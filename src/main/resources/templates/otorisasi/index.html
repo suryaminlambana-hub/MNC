@@ -14,7 +14,7 @@
       <tr th:each="p,i : ${pakets}">
         <td th:text="${i.count}"></td>
         <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${@batchLabel.of(p.paket)}"></span></span></td>
-        <td th:text="${p.inputer}"></td>
+        <td th:text="${@nama.of(p.inputer)}"></td>
         <td class="text-end" th:text="${p.jml}"></td>
         <td class="text-end" th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></td>
         <td class="text-end" th:text="${#numbers.formatDecimal(p.credit,1,'POINT',2,'COMMA')}"></td>

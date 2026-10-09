@@ -625,15 +625,25 @@ public class ConfigChangeService {
         return switch (n(c.getEntity())) {
             case "GROUP"    -> ref!=null && ref.get("namaGroup")!=null ? ref.get("namaGroup") : ("Group #"+n(c.getTargetId()));
             case "MENU"     -> ref!=null && ref.get("namaMenu")!=null ? ref.get("namaMenu") : ("Menu #"+n(c.getTargetId()));
-            case "ACCESS"   -> ref!=null && ref.get("user")!=null ? ref.get("user") : n(c.getTargetId());
-            case "PAIRING"  -> ref!=null && ref.get("checker")!=null ? ref.get("checker") : n(c.getTargetId());
+            // REQ_AUSY_00055: user disebut dengan namanya, bukan username.
+            case "ACCESS"   -> namaUser(ref!=null && ref.get("user")!=null ? ref.get("user") : n(c.getTargetId()));
+            case "PAIRING"  -> namaUser(ref!=null && ref.get("checker")!=null ? ref.get("checker") : n(c.getTargetId()));
             case "APPROVAL" -> ref!=null ? n(ref.get("approver"))+" → "+n(ref.get("target")) : "Aturan #"+n(c.getTargetId());
             default -> {
+                // User baru belum ada di tabel users: namanya diambil dari isi pengajuan.
                 String t=c.getTargetId();
+                if (ref!=null && ref.get("nama")!=null && !ref.get("nama").isBlank()) yield ref.get("nama");
                 if(t==null||t.isBlank()) yield (a!=null && a.get("userId")!=null)? a.get("userId") : "(baru)";
-                yield t;
+                yield namaUser(t);
             }
         };
+    }
+
+    /** Nama user untuk ditampilkan (REQ_AUSY_00055); username bila nama tidak ada. */
+    private String namaUser(String userId){
+        if (userId == null || userId.isBlank()) return n(userId);
+        return users.findByUserId(userId.trim()).map(User::getNama)
+                .filter(s -> s != null && !s.isBlank()).orElse(userId);
     }
 
     @Transactional

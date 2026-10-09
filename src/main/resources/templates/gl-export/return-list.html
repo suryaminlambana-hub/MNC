@@ -27,7 +27,7 @@
       <tr th:each="r : ${items}">
         <td><span class="badge bg-primary-subtle text-primary">#<span th:text="${r.id}"></span></span></td>
         <td class="small" th:text="${r.noteMaker}"></td>
-        <td th:text="${r.requestedBy}"></td>
+        <td th:text="${@nama.of(r.requestedBy)}"></td>
         <td class="text-nowrap" th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt,'dd-MM-yyyy HH:mm') : ''}"></td>
         <td class="text-end" th:text="${r.rowsCount}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA')}"></td>

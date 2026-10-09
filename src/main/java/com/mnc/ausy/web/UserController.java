@@ -5,6 +5,7 @@ import com.mnc.ausy.domain.User;
 import com.mnc.ausy.repo.GroupUserRepository;
 import com.mnc.ausy.repo.UserRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.NamaUserService;
 import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.ConfigChangeService;
 import com.mnc.ausy.service.ExcelExportService;
@@ -34,11 +35,13 @@ public class UserController {
     private final PasswordPolicyService passwordPolicy;
     private final ExcelExportService excel;
     private final AuditService audit;
+    private final NamaUserService nama;
 
     public UserController(UserRepository users, GroupUserRepository groups, ConfigChangeService configChange,
-                          PasswordPolicyService passwordPolicy, ExcelExportService excel, AuditService audit) {
+                          PasswordPolicyService passwordPolicy, ExcelExportService excel, AuditService audit,
+                          NamaUserService nama) {
         this.users = users; this.groups = groups; this.configChange = configChange;
-        this.passwordPolicy = passwordPolicy; this.excel = excel; this.audit = audit;
+        this.passwordPolicy = passwordPolicy; this.excel = excel; this.audit = audit; this.nama = nama;
     }
 
     @GetMapping
@@ -145,7 +148,7 @@ public class UserController {
                     nz(groupNames.get(u.getIdGroup())),
                     u.getStatusAccount() != null && u.getStatusAccount() == 1 ? "Aktif" : "Non-Aktif",
                     nz(u.getEmail()),
-                    nz(u.getAddby())));
+                    nama.of(u.getAddby())));
         }
         excel.download(resp, "User", "Daftar_User",
                 List.of("Username", "Nama", "Role", "Status", "Email", "Dibuat Oleh"), rows, false);

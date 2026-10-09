@@ -20,7 +20,7 @@
               th:text="${it.cr.op == 'BULK_EDIT' ? 'BULK EDIT' : it.cr.op}">EDIT</span>
         <span class="badge bg-secondary-subtle text-secondary" th:text="${it.targetLabel}">Data GL</span>
         <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
-        <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
+        <span class="text-muted">· maker <b th:text="${@nama.of(it.cr.maker)}"></b></span>
         <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
         <span class="text-muted" th:if="${it.cr.target == 'PAKET'}">· batch <b th:text="${@batchLabel.of(it.cr.noPaket)}"></b></span>
       </div>

@@ -33,14 +33,14 @@
             <tbody>
             <tr th:each="p : ${pendingPaketList}">
                 <td class="ps-3"><span class="badge bg-warning-subtle text-warning" th:text="'Batch ' + ${@batchLabel.of(p[0])}"></span></td>
-                <td th:text="${p[1]}"></td>
+                <td th:text="${@nama.of(p[1])}"></td>
                 <td class="text-end" th:text="${p[2]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(p[3],1,'POINT')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatInteger(p[4],1,'POINT')}"></td>
             </tr>
             <tr th:each="e : ${pendingExportList}">
                 <td class="ps-3"><span class="badge bg-info-subtle text-info" th:text="'Export #' + ${e.id}"></span></td>
-                <td th:text="${e.requestedBy}"></td>
+                <td th:text="${@nama.of(e.requestedBy)}"></td>
                 <td class="text-end" th:text="${e.rowsCount}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(e.debit,1,'POINT',2,'COMMA')}"></td>
                 <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(e.credit,1,'POINT',2,'COMMA')}"></td>
@@ -75,7 +75,7 @@
                         <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Batch ' + ${@batchLabel.of(c.noPaket)}"></span>
                     </span>
                 </td>
-                <td th:text="${c.maker}"></td>
+                <td th:text="${@nama.of(c.maker)}"></td>
                 <td class="small text-muted pe-3" th:text="${c.noteMaker}"></td>
             </tr>
             <tr th:if="${pendingChangeList.isEmpty()}"><td colspan="5" class="text-center text-muted py-4">Tidak ada perubahan GL yang menunggu persetujuan.</td></tr>
@@ -92,7 +92,7 @@
             <tbody>
             <tr th:each="t : ${recent}">
                 <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
-                <td th:text="${t.userId}"></td>
+                <td th:text="${@nama.of(t.userId)}"></td>
                 <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
                 <td class="pe-3 small" th:text="${t.tinfo}"></td>
             </tr>

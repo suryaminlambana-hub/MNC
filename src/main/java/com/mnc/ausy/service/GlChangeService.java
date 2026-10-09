@@ -99,11 +99,13 @@ public class GlChangeService {
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
                            AuditService audit, GlCodeService glCodeService,
                            GlExportRequestRepository exportRequests, SequenceService seq,
-                           DataScopeService scope, StagingService staging) {
+                           DataScopeService scope, StagingService staging, NamaUserService nama) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
         this.exportRequests = exportRequests; this.seq = seq; this.scope = scope; this.staging = staging;
+        this.nama = nama;
     }
     private final StagingService staging;
+    private final NamaUserService nama;
 
     // ---- maps & json helpers ----
     private Map<String,String> rowMap(GlTabel g) {
@@ -390,7 +392,7 @@ public class GlChangeService {
             m.put("jenis", "ADD".equals(c.getOp()) ? "Tambah" : "Ubah");
             m.put("status", "Rejected");
             m.put("diajukan", c.getCreatedAt() == null ? "" : c.getCreatedAt().format(TAMPIL));
-            m.put("catatan", n(c.getChecker()) + ": " + n(c.getNoteChecker()));
+            m.put("catatan", nama.of(c.getChecker()) + ": " + n(c.getNoteChecker()));
             m.put("amountTampil", Nominal.format(amt(a.get("gltram"))));
             out.add(m);
         }
@@ -415,7 +417,7 @@ public class GlChangeService {
         c.setMaker(g.getGltrus()); c.setMakerGroup(approval.groupOf(g.getGltrus()));
         c.setNoPaket(g.getNoPaket());
         c.setBeforeJson(toJson(isi)); c.setAfterJson(toJson(isi));
-        c.setNoteMaker(RETURN_NOTE + " oleh " + checker + ": " + n(alasan));
+        c.setNoteMaker(RETURN_NOTE + " oleh " + nama.of(checker) + ": " + n(alasan));
         c.setStatus("PENDING");
         cr.save(c);
     }

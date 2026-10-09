@@ -32,7 +32,7 @@
                      ditolak=${st != null and st.status == 'REJECTED'}">
           <td class="text-nowrap" th:text="${@batchLabel.of(p[0])}"></td>
           <td class="small" th:text="${uploadFiles.containsKey(p[0]) ? uploadFiles.get(p[0]) : '-'}"></td>
-          <td th:text="${p[1]}"></td>
+          <td th:text="${@nama.of(p[1])}"></td>
           <td class="text-nowrap" th:text="${p[5] != null ? #temporals.format(p[5],'dd-MM-yyyy HH:mm') : '-'}"></td>
           <td class="text-end" th:text="${p[2]}"></td>
           <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
@@ -45,7 +45,7 @@
               <i class="fa-solid fa-xmark"></i> Rejected</span>
             <span th:if="${st != null and !ditolak}" class="badge bg-info-subtle text-info text-nowrap">
               <i class="fa-solid fa-rotate-left"></i> Dikembalikan</span>
-            <div th:if="${st != null}" class="small text-muted" th:text="|${st.decidedBy}: ${st.note}|"></div>
+            <div th:if="${st != null}" class="small text-muted" th:text="|${@nama.of(st.decidedBy)}: ${st.note}|"></div>
           </td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">

@@ -16,7 +16,7 @@
         <select class="form-select" name="user" onchange="this.form.submit()">
           <option value="">Pilih user…</option>
           <option th:each="u : ${users}" th:value="${u.userId}"
-                  th:text="${u.userId} + ' — ' + ${roleName.getOrDefault(u.idGroup, '-')}"
+                  th:text="${@nama.of(u.userId)} + ' (' + ${u.userId} + ') — ' + ${roleName.getOrDefault(u.idGroup, '-')}"
                   th:selected="${selectedUser != null and selectedUser == u.userId}"></option>
         </select></div>
     </form>
@@ -33,7 +33,7 @@
   <div class="ausy-card" th:if="${targetUser != null and (pendingIds == null or !pendingIds.contains(selectedUser))}"
        style="padding:18px">
     <p class="text-muted small mb-3"><i class="fa-solid fa-user-shield"></i>
-      Hak akses untuk <b th:text="${targetUser.userId}">user</b> (role <b th:text="${targetRole}">-</b>).
+      Hak akses untuk <b th:text="${@nama.of(targetUser.userId)}">user</b> (role <b th:text="${targetRole}">-</b>).
       <span th:unless="${allSections}">Yang ditampilkan hanya bagian yang relevan dengan role tersebut;
         hak di luar bagian ini tidak ikut berubah.</span>
       <span th:if="${allSections}">Role ini belum memegang menu apa pun, jadi seluruh bagian ditampilkan

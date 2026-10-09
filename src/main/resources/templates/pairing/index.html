@@ -13,7 +13,7 @@
   <div th:if="${not #lists.isEmpty(unpairedMakers)}" class="alert alert-warning py-2">
     <i class="fa-solid fa-triangle-exclamation"></i>
     Maker berikut belum dipegang checker mana pun, sehingga pengajuannya tidak akan terlihat siapa pun:
-    <b><span th:each="u,i : ${unpairedMakers}"><span th:text="${u.userId}"></span><span th:if="${!i.last}">, </span></span></b>
+    <b><span th:each="u,i : ${unpairedMakers}"><span th:text="${@nama.of(u.userId)}"></span><span th:if="${!i.last}">, </span></span></b>
   </div>
 
   <div class="ausy-card mb-3" style="padding:0">
@@ -26,7 +26,7 @@
         <td>
           <span th:if="${#lists.isEmpty(r.makers)}" class="badge bg-danger-subtle text-danger">
             <i class="fa-solid fa-circle-exclamation"></i> Belum dipasangkan</span>
-          <span th:each="m : ${r.makers}" class="badge bg-primary-subtle text-primary me-1" th:text="${m}"></span>
+          <span th:each="m : ${r.makers}" class="badge bg-primary-subtle text-primary me-1" th:text="${@nama.of(m)}" th:title="${m}"></span>
         </td>
         <td class="pe-3">
           <span th:if="${pendingIds != null and pendingIds.contains(r.checker)}" class="badge bg-warning-subtle text-warning">

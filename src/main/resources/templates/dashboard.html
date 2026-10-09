@@ -59,7 +59,7 @@
                 <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(p.cr.createdAt,'dd-MM-yyyy HH:mm')}"></td>
                 <td><span class="badge bg-warning-subtle text-warning" th:text="${p.opLabel}"></span></td>
                 <td th:text="${p.targetLabel}"></td>
-                <td th:text="${p.cr.maker}"></td>
+                <td th:text="${@nama.of(p.cr.maker)}"></td>
                 <td class="small text-muted pe-3" th:text="${p.cr.noteMaker}"></td>
             </tr>
             <tr th:if="${pendingUserList == null or pendingUserList.isEmpty()}">
@@ -77,7 +77,7 @@
             <tbody>
             <tr th:each="t : ${recent}">
                 <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
-                <td th:text="${t.userId}"></td>
+                <td th:text="${@nama.of(t.userId)}"></td>
                 <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
                 <td class="pe-3 small" th:text="${t.tinfo}"></td>
             </tr>

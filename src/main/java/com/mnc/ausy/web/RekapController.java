@@ -11,6 +11,7 @@ import com.mnc.ausy.service.BatchStatusService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.GlChangeService;
+import com.mnc.ausy.service.NamaUserService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -38,12 +39,13 @@ public class RekapController {
     private final GlChangeService changes;
     private final BatchStatusService batchStatus;
     private final TUploadRepository uploads;
+    private final NamaUserService nama;
 
     public RekapController(GlTabelRepository gl, ExcelExportService excel, AuditService audit,
                            DataScopeService scope, GlChangeService changes, BatchStatusService batchStatus,
-                           TUploadRepository uploads) {
+                           TUploadRepository uploads, NamaUserService nama) {
         this.gl = gl; this.excel = excel; this.audit = audit; this.scope = scope;
-        this.changes = changes; this.batchStatus = batchStatus; this.uploads = uploads;
+        this.changes = changes; this.batchStatus = batchStatus; this.uploads = uploads; this.nama = nama;
     }
 
     private static boolean isMaker(AusyUserDetails me) {
@@ -81,7 +83,7 @@ public class RekapController {
                     : (GlBatchStatus.REJECTED.equals(s.getStatus()) ? REJECTED : DIKEMBALIKAN);
             out.add(new Item(SUMBER_BATCH, "Batch " + BatchLabel.label(paket), files.getOrDefault(paket, ""), maker,
                     waktu(p[5]), ((Number) p[2]).longValue(), (BigDecimal) p[3], (BigDecimal) p[4], stat,
-                    s == null ? "" : s.getDecidedBy() + ": " + s.getNote()));
+                    s == null ? "" : nama.of(s.getDecidedBy()) + ": " + s.getNote()));
         }
 
         // Kelola Data GL: pengajuan yang menunggu (termasuk Dikembalikan dari penampungan) + Rejected.
@@ -142,7 +144,7 @@ public class RekapController {
                     "Debit", "Credit", "Status", "Catatan Checker");
             List<List<Object>> data = new ArrayList<>();
             for (Item i : itemsMaker(me, sumber, status))
-                data.add(Arrays.asList(i.sumber(), i.data(), i.detail(), i.maker(), i.waktu(), i.jml(),
+                data.add(Arrays.asList(i.sumber(), i.data(), i.detail(), nama.of(i.maker()), i.waktu(), i.jml(),
                         i.debit(), i.credit(), i.status(), i.catatan()));
             excel.download(resp, "Rekapitulasi", "Rekap_Belum_Approve", head, data, true);
             audit.transaction(me.getUsername(), "EXPORT_REKAP", "Export rekapitulasi data belum di-approve ke Excel"

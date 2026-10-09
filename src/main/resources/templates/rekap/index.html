@@ -20,7 +20,7 @@
             <i class="fa-solid fa-pen"></i> Data Tambahan Manual</span>
           <span th:case="*" class="badge bg-primary-subtle text-primary">BATCH <span th:text="${@batchLabel.of(r.paket)}"></span></span>
         </td>
-        <td th:text="${r.uploader}"></td>
+        <td th:text="${@nama.of(r.uploader)}"></td>
         <td style="min-width:160px">
           <div class="progress" style="height:8px"><div class="progress-bar" th:style="'width:' + ${#numbers.formatDecimal(r.jml * 100.0 / maxJml,1,2)} + '%'"></div></div>
         </td>

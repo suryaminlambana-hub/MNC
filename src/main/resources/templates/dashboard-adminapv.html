@@ -37,7 +37,7 @@
                               th:classappend="${p.cr.op == 'ADD'} ? 'bg-success-subtle text-success' : (${p.cr.op == 'DELETE'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
                               th:text="${p.opLabel}"></span></td>
                     <td th:text="${p.targetLabel}"></td>
-                    <td th:text="${p.cr.maker}"></td>
+                    <td th:text="${@nama.of(p.cr.maker)}"></td>
                     <td class="small text-muted pe-3" th:text="${p.cr.noteMaker}"></td>
                 </tr>
                 <tr th:if="${pendingUserList.isEmpty()}">
@@ -61,7 +61,7 @@
                     <td class="text-nowrap text-muted small"
                         th:attr="data-order=${#temporals.format(t.timeActivity,'yyyyMMddHHmm')}"
                         th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
-                    <td th:text="${t.userId}"></td>
+                    <td th:text="${@nama.of(t.userId)}"></td>
                     <td><span class="badge"
                               th:classappend="${#strings.contains(t.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(t.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
                               th:text="${t.nameActivity}"></span></td>

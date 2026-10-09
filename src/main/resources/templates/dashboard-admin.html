@@ -103,7 +103,7 @@
                     <td class="text-nowrap text-muted small"
                         th:attr="data-order=${#temporals.format(h.timeActivity,'yyyyMMddHHmm')}"
                         th:text="${#temporals.format(h.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
-                    <td th:text="${h.userId}"></td>
+                    <td th:text="${@nama.of(h.userId)}"></td>
                     <td><span class="badge"
                               th:classappend="${#strings.contains(h.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(h.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
                               th:text="${h.nameActivity}"></span></td>
