@@ -16,13 +16,11 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261009-1 — 09-10-2026 16:43
 
-> **Belum bisa dites di DEV.** Perubahan di bagian ini baru ada di `main`. Server DEV belum
-> berubah sampai bagian ini dipindah menjadi entri `dev-YYYYMMDD-N`.
+Commit `c553944`. DB naik dari v47 ke **v49**.
 
-Tidak ada migrasi DB.
-
+### Perubahan
 - **Maker bisa menghapus batch upload yang belum di-approve** (REQ_AUSY_00022).
   - Tombol Hapus ada di section "Upload Menunggu Otorisasi" di List GL Aktif.
   - Hanya muncul untuk pengunggahnya sendiri, dan langsung terhapus tanpa approval checker.
@@ -211,12 +209,17 @@ Tidak ada migrasi DB.
   dimasukkan per batch (data manual per maker).
 - `V49__req_00053_status_batch.sql`: tabel `gl_batch_status` (status Dikembalikan/Rejected per
   batch upload, berikut catatan checker). Tabel baru saja; data lama tidak diubah. Batch yang sudah
-  ditolak sebelum rilis ini tidak muncul sebagai Rejected (datanya sudah terhapus). Baris batch yang ditolak sesudah
-  rilis ini: `gl_tabel.status_dual = 'REJECTED'`, `active = 0`.
+  ditolak sebelum rilis ini tidak muncul sebagai Rejected (datanya sudah terhapus). Baris batch
+  yang ditolak sesudah rilis ini: `gl_tabel.status_dual = 'REJECTED'`, `active = 0`.
 
 ### Setelah deploy
 - Semua GL lama yang sudah diotorisasi dan belum digenerate muncul di "Menunggu digenerate" hari
   itu juga untuk role EXECUTE.
+- Batch upload yang masih menunggu otorisasi dari hari sebelumnya kini tidak bisa di-approve
+  (REQ_AUSY_00056). Batch itu perlu ditolak, diperbarui maker lewat Bulk Edit, atau dihapus.
+- JAR versi sebelumnya disimpan di `/opt/ausy/backup/ausy-2.0.0.jar.dev-20261008-1`.
+  Mengembalikan JAR saja tidak membatalkan V48/V49.
+- Migrasi berikutnya: **V50**.
 
 ### Catatan untuk developer
 - Penampungan = `gl_export_request` APPROVED tanpa `file_name`, dibuat oleh `StagingService`.
