@@ -129,7 +129,17 @@ Tidak ada migrasi DB.
     - hasil akhirnya tidak balance (pesan menyebut Debit, Credit, dan selisihnya).
     Pesan kesalahan dibatasi 5 baris pertama + jumlah sisanya; dulu file yang salah menghasilkan
     pesan yang memenuhi layar.
-  - **Tombol Export Excel per batch** di List Data GL (REQ_AUSY_00037), sebagai acuan Bulk Edit.
+  - **Unduh Excel batch ada di dalam popup Bulk Edit** (REQ_AUSY_00037, 00052): tombol kecil
+    "Download" di langkah 1. Teks "Unduh Excel batch" hanya panduan, tidak bisa diklik. Tombol
+    Export Excel di baris tabel dicabut.
+  - **Kolom Status di List Data GL** (REQ_AUSY_00053):
+    - **Menunggu Otorisasi**: batch menunggu checker.
+    - **Dikembalikan**: batch di-Return Data checker dari penampungan, menunggu otorisasi lagi;
+      nama checker dan alasannya tampil di bawah status.
+    - **Rejected**: batch ditolak checker. Datanya tetap dibuang dari antrian seperti dulu, tapi
+      ringkasannya (jumlah, debit, credit, alasan) tampil untuk maker sampai ia menekan Hapus
+      (`UPLOAD_REJECTED_DISMISS`).
+    - Nomor batch yang ditolak/dihapus tidak dipakai ulang di hari yang sama.
   - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
     dihapus:
     - Data manual yang di-Return Data langsung diajukan ulang. Data itu muncul di tabel Pengajuan
@@ -154,6 +164,9 @@ Tidak ada migrasi DB.
   (604) nonaktif, kolom `t_upload.no_paket`, dan **data lama masuk penampungan**: pengajuan
   export yang masih PENDING disetujui sistem, GL yang sudah diotorisasi tapi belum diajukan
   dimasukkan per batch (data manual per maker).
+- `V49__req_00053_status_batch.sql`: tabel `gl_batch_status` (status Dikembalikan/Rejected per
+  batch upload). Tabel baru saja; data lama tidak diubah. Batch yang sudah ditolak sebelum rilis
+  ini tidak muncul sebagai Rejected (datanya sudah terhapus).
 
 ### Setelah deploy
 - Semua GL lama yang sudah diotorisasi dan belum digenerate muncul di "Menunggu digenerate" hari

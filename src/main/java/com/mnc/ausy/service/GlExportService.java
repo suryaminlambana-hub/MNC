@@ -35,13 +35,14 @@ public class GlExportService {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(GlExportService.class);
     /** Semua penulisan & pembacaan file hasil export lewat sini. */
     private final ExportFileStore files;
+    private final BatchStatusService batchStatus;
 
     public GlExportService(GlTabelRepository gl, GlExportRequestRepository requests, ExportTransferRepository transfers,
                            ApprovalService approval, AuditService audit, GlChangeService changes,
-                           DataScopeService scope, ExportFileStore files) {
+                           DataScopeService scope, ExportFileStore files, BatchStatusService batchStatus) {
         this.gl = gl; this.requests = requests; this.transfers = transfers;
         this.approval = approval; this.audit = audit; this.changes = changes; this.scope = scope;
-        this.files = files;
+        this.files = files; this.batchStatus = batchStatus;
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
@@ -318,14 +319,18 @@ public class GlExportService {
         //     atau dihapus selama menunggu — dan di antrian Otorisasi Kelola Data GL checker.
         // Asalnya dibaca dari kolom glsrc, yang memang menyimpan dari mana baris itu dibuat.
         List<GlTabel> rows = gl.findByExportReqIdOrderById(reqId);
-        Set<String> batchUpload = new TreeSet<>();
+        Set<String> batchUpload = new TreeSet<>(), kunciBatch = new HashSet<>();
         List<GlTabel> barisManual = new ArrayList<>();
         for (GlTabel g : rows) {
             boolean dariManual = "m".equals(g.getGlsrc());
             g.setExportReqId(null);
             g.setStatusPrint("BELUM UPLOAD");
             g.setStatusDual(dariManual ? "RETURNED" : "PENDING");
-            if (dariManual) barisManual.add(g); else batchUpload.add(String.valueOf(g.getNoPaket()));
+            if (dariManual) { barisManual.add(g); continue; }
+            batchUpload.add(String.valueOf(g.getNoPaket()));
+            // REQ_AUSY_00053: batch ini tampil berstatus Dikembalikan di List Data GL maker.
+            if (kunciBatch.add(g.getNoPaket() + "|" + g.getGltrus()))
+                batchStatus.returned(g.getNoPaket(), g.getGltrus(), checker, note);
         }
         gl.saveAll(rows);
         for (GlTabel g : barisManual) changes.returnToPengajuan(g, checker, note);

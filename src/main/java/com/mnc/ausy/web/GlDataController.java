@@ -1,11 +1,13 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.service.BatchLabel;
+import com.mnc.ausy.domain.GlBatchStatus;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.domain.TUpload;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.repo.TUploadRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.BatchStatusService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.Nominal;
@@ -29,11 +31,12 @@ public class GlDataController {
     private final OtorisasiService otorisasi;
     private final TUploadRepository uploads;
     private final ExcelExportService excel;
+    private final BatchStatusService batchStatus;
 
     public GlDataController(GlTabelRepository gl, DataScopeService scope, OtorisasiService otorisasi,
-                            TUploadRepository uploads, ExcelExportService excel) {
+                            TUploadRepository uploads, ExcelExportService excel, BatchStatusService batchStatus) {
         this.gl = gl; this.scope = scope; this.otorisasi = otorisasi;
-        this.uploads = uploads; this.excel = excel;
+        this.uploads = uploads; this.excel = excel; this.batchStatus = batchStatus;
     }
 
     /** Maker (GROUP_3): pemilik batch upload — hanya ia yang mendapat tombol Bulk Edit/Hapus. */
@@ -56,8 +59,26 @@ public class GlDataController {
         model.addAttribute("isMaker", isMaker(me));
         List<Object[]> pending = pendingUploads(me);
         model.addAttribute("pendingUploads", pending);
-        model.addAttribute("uploadFiles", uploadFiles(pending));
+        // REQ_AUSY_00053: kolom Status — Dikembalikan (dari Return Data) per batch yang menunggu, dan
+        // batch Rejected milik maker ini (barisnya sudah dihapus, ringkasannya dari gl_batch_status).
+        List<GlBatchStatus> rejected = isMaker(me) ? batchStatus.rejectedOf(me) : List.of();
+        model.addAttribute("returned", batchStatus.returnedMap());
+        model.addAttribute("rejected", rejected);
+        Set<String> pakets = new HashSet<>();
+        pending.forEach(p -> pakets.add(String.valueOf(p[0])));
+        rejected.forEach(r -> pakets.add(r.getNoPaket()));
+        model.addAttribute("uploadFiles", uploadFiles(pakets));
         return "gl-legacy/list";
+    }
+
+    /** REQ_AUSY_00053: maker menghapus batch Rejected miliknya dari daftar. */
+    @PostMapping("/gl-legacy/rejected/{paket}/delete")
+    public String dismissRejected(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
+                                  RedirectAttributes ra) {
+        String err = batchStatus.dismissRejected(paket, me);
+        ra.addFlashAttribute(err == null ? "ok" : "warn",
+                err == null ? "Batch " + BatchLabel.label(paket) + " (Rejected) dihapus dari daftar." : err);
+        return "redirect:/gl-legacy";
     }
 
     /**
@@ -73,9 +94,8 @@ public class GlDataController {
     }
 
     /** Nama file Excel per nomor batch (REQ_AUSY_00036); upload lama tanpa tautan tidak muncul. */
-    private Map<String, String> uploadFiles(List<Object[]> pending) {
+    private Map<String, String> uploadFiles(Collection<String> pakets) {
         Map<String, String> out = new HashMap<>();
-        List<String> pakets = pending.stream().map(p -> String.valueOf(p[0])).toList();
         if (pakets.isEmpty()) return out;
         for (TUpload t : uploads.findByNoPaketIn(pakets))
             if (t.getNoPaket() != null && t.getFileName() != null) out.put(t.getNoPaket(), t.getFileName());

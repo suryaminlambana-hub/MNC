@@ -23,11 +23,13 @@ public class OtorisasiService {
     private final DataScopeService scope;
     private final StagingService staging;
     private final GlCodeService glCodes;
+    private final BatchStatusService batchStatus;
 
     public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit,
-                            DataScopeService scope, StagingService staging, GlCodeService glCodes) {
+                            DataScopeService scope, StagingService staging, GlCodeService glCodes,
+                            BatchStatusService batchStatus) {
         this.gl = gl; this.approval = approval; this.audit = audit; this.scope = scope; this.staging = staging;
-        this.glCodes = glCodes;
+        this.glCodes = glCodes; this.batchStatus = batchStatus;
     }
 
     public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced,
@@ -88,6 +90,7 @@ public class OtorisasiService {
         }
         gl.saveAll(rows);
         staging.stage(rows, inputer, checker, "Batch " + BatchLabel.label(paket));
+        batchStatus.clear(paket, inputer);                 // REQ_AUSY_00053: tidak lagi Dikembalikan
         audit.transaction(checker, "OTORISASI_APPROVE",
                 "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") di-approve, " + rows.size()
                 + " baris masuk penampungan Generate File ACCTXT.");
@@ -108,10 +111,12 @@ public class OtorisasiService {
         List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
 
+        // REQ_AUSY_00053: ringkasan batch disimpan dulu supaya maker masih melihatnya berstatus Rejected.
+        batchStatus.rejected(paket, inputer, checker, note, rows);
         gl.deletePaket(paket, inputer);   // reject -> removed from temp table (gl_tabel)
         audit.transaction(checker, "OTORISASI_REJECT",
                 "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
-        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
+        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak. Data dihapus dari antrian; maker melihat batch ini berstatus Rejected di List Data GL. Alasan tercatat di audit trail.", rows.size(), null);
     }
 
     /**
@@ -136,6 +141,7 @@ public class OtorisasiService {
                     + " Gunakan menu Hapus Batch.", 0, null);
 
         gl.deletePaket(paket, maker);
+        batchStatus.clear(paket, maker);
         audit.transaction(maker, "UPLOAD_DELETE",
                 "Batch " + BatchLabel.label(paket) + " dihapus pengunggahnya sebelum diotorisasi, " + rows.size() + " baris dibuang.");
         return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " dihapus (" + rows.size()

@@ -44,7 +44,12 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
      * ("01", "02", …) tidak mengganggu dan tidak ada lagi cast seluruh no_paket ke int — cara
      * lama itu akan error overflow begitu nomor 11 digit ada di tabel.
      */
-    @Query(value = "select coalesce(max(cast(substring(no_paket from 9) as int)),0) from gl_tabel"
+    // Nomor batch yang ditolak/dihapus tidak dipakai ulang (REQ_AUSY_00053): barisnya sudah hilang
+    // dari gl_tabel, tapi nomornya masih tercatat di t_upload / gl_batch_status — kalau dipakai lagi,
+    // status Rejected batch lama akan menempel ke batch baru.
+    @Query(value = "select coalesce(max(cast(substring(no_paket from 9) as int)),0) from ("
+                 + " select no_paket from gl_tabel union all select no_paket from t_upload"
+                 + " union all select no_paket from gl_batch_status) p"
                  + " where no_paket ~ ('^' || :tgl || '[0-9]{3,4}$')", nativeQuery = true)
     int maxUrutBatchHarian(@Param("tgl") String tgl);
 
