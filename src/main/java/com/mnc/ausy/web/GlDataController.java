@@ -55,6 +55,7 @@ public class GlDataController {
         model.addAttribute("pendingUploads", pending);
         // REQ_AUSY_00053: kolom Status — Dikembalikan / Rejected (beserta catatan checker) per batch.
         model.addAttribute("statusBatch", batchStatus.statusMap());
+        model.addAttribute("hariIni", java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("ddMMyy")));
         Set<String> pakets = new HashSet<>();
         pending.forEach(p -> pakets.add(String.valueOf(p[0])));
         model.addAttribute("uploadFiles", uploadFiles(pakets));

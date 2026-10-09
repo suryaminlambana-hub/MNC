@@ -46,6 +46,9 @@
             <span th:if="${st != null and !ditolak}" class="badge bg-info-subtle text-info text-nowrap">
               <i class="fa-solid fa-rotate-left"></i> Dikembalikan</span>
             <div th:if="${st != null}" class="small text-muted" th:text="|${@nama.of(st.decidedBy)}: ${st.note}|"></div>
+            <!--/* REQ_AUSY_00056: batch bertanggal posting hari sebelumnya tidak bisa di-approve. */-->
+            <div th:if="${p[6] != null and p[6] != hariIni}" class="small text-danger">Lewat hari: tidak bisa di-approve.
+              Perbarui lewat Bulk Edit (tanggal posting jadi hari ini) atau hapus.</div>
           </td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
@@ -87,9 +90,9 @@
             <li class="mb-1">Unduh Excel batch
               <a id="bulkDownload" href="#" class="btn btn-sm btn-outline-success py-0 px-2 ms-1">
                 <i class="fa-solid fa-file-excel"></i> Download</a></li>
-            <!--/* REQ_AUSY_00057: file-nya template MNC yang sama dengan Upload Excel, sudah terisi batch ini. */-->
-            <li>Ubah isi <b>Sheet1</b> (template MNC, sama dengan Upload Excel). Baris boleh diubah, ditambah,
-              atau dihapus; kolom A [Posting_Date] jangan diubah.</li>
+            <!--/* REQ_AUSY_00057: file-nya Sheet1 saja (kolom template MNC), berisi teks tanpa rumus, terisi batch ini. */-->
+            <li>Ubah isi <b>Sheet1</b> (kolom sama dengan template Upload Excel). Baris boleh diubah, ditambah,
+              atau dihapus; kolom A [Posting_Date] berisi tanggal hari ini.</li>
             <li>Unggah file hasil edit di sini. Diperiksa sama seperti Upload Excel (termasuk Debit = Credit),
               lalu isi batch ini <b>diganti</b> dengan isi file; checker tetap meng-approve batch-nya sesudah itu.</li>
           </ol>

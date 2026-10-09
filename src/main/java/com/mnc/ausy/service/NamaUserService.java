@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * REQ_AUSY_00055 — pencatatan yang menyebut user menampilkan NAMA, bukan username (audit trail,
@@ -37,6 +39,23 @@ public class NamaUserService {
         if (u.isEmpty()) return "";
         String n = peta().get(u);
         return n == null || n.isBlank() ? u : n;
+    }
+
+    /** Rujukan user di teks audit trail, mis. "(maker=user)" atau "(uploader=user)". */
+    private static final Pattern RUJUKAN = Pattern.compile("\\b(maker|checker|uploader|inputer)=([A-Za-z0-9_.@-]+)");
+
+    /**
+     * Teks keterangan audit trail dengan username di dalamnya diganti nama: "(maker=user)" tampil
+     * "(maker=Nama User)". Yang tersimpan tetap username — filter riwayat mencari pola
+     * {@code maker=<username>} di teks itu — jadi penggantiannya hanya saat ditampilkan.
+     */
+    public String teks(Object teks) {
+        if (teks == null) return "";
+        Matcher m = RUJUKAN.matcher(teks.toString());
+        StringBuilder out = new StringBuilder();
+        while (m.find()) m.appendReplacement(out, Matcher.quoteReplacement(m.group(1) + "=" + of(m.group(2))));
+        m.appendTail(out);
+        return out.toString();
     }
 
     private Map<String, String> peta() {

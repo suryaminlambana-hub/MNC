@@ -79,7 +79,7 @@
                 <td class="ps-3 text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm')}"></td>
                 <td th:text="${@nama.of(t.userId)}"></td>
                 <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
-                <td class="pe-3 small" th:text="${t.tinfo}"></td>
+                <td class="pe-3 small" th:text="${@nama.teks(t.tinfo)}"></td>
             </tr>
             <tr th:if="${recent.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada transaksi.</td></tr>
             </tbody>

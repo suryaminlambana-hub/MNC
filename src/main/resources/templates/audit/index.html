@@ -26,7 +26,7 @@
             <td class="text-muted small text-nowrap" th:text="${#temporals.format(t.timeActivity,'dd-MM-yyyy HH:mm:ss')}"></td>
             <td th:text="${@nama.of(t.userId)}"></td>
             <td><span class="badge bg-secondary-subtle text-secondary" th:text="${t.nameActivity}"></span></td>
-            <td class="small" th:text="${t.tinfo}"></td>
+            <td class="small" th:text="${@nama.teks(t.tinfo)}"></td>
           </tr>
           <tr th:if="${transactions.isEmpty()}"><td colspan="4" class="text-center text-muted py-3">Belum ada transaksi.</td></tr>
           </tbody>

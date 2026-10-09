@@ -39,7 +39,7 @@ public class OtorisasiService {
     }
 
     public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced,
-                        LocalDateTime uploadedAt) {}
+                        LocalDateTime uploadedAt, LocalDate tanggalPosting, boolean hariIni) {}
 
     /**
      * Pending pakets this checker may authorize: role-nya berwenang (matriks approval_group) DAN
@@ -54,7 +54,9 @@ public class OtorisasiService {
             if (!scope.canSee(me, inputer)) continue;
             long jml = ((Number) r[2]).longValue();
             BigDecimal d = (BigDecimal) r[3], c = (BigDecimal) r[4];
-            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, toLocalDateTime(r[5])));
+            LocalDate tgl = r.length > 6 ? tanggalPosting((String) r[6]) : null;
+            out.add(new Paket(paket, inputer, jml, d, c, d.compareTo(c) == 0, toLocalDateTime(r[5]),
+                    tgl, LocalDate.now().equals(tgl)));
         }
         return out;
     }
@@ -81,6 +83,14 @@ public class OtorisasiService {
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
         if (!menunggu(rows))
             return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak sedang menunggu otorisasi.", 0, null);
+        // REQ_AUSY_00056: batch hanya bisa di-approve pada hari tanggal posting-nya. Batch hari
+        // sebelumnya hanya bisa ditolak; maker memperbaruinya lewat Bulk Edit (tanggal posting
+        // menjadi hari ini) atau menghapusnya.
+        String hariIni = LocalDate.now().format(DDMMYY);
+        if (!rows.stream().allMatch(g -> hariIni.equals(g.getGltrpd())))
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " bertanggal posting "
+                    + tanggalTampil(rows.get(0).getGltrpd()) + ", bukan hari ini — tidak bisa di-approve."
+                    + " Tolak batch ini, atau minta maker memperbaruinya lewat Bulk Edit.", 0, null);
 
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : rows) {
@@ -180,7 +190,7 @@ public class OtorisasiService {
      * REQ_AUSY_00037, 00047 &amp; 00057 — Bulk Edit per batch upload MILIK maker sendiri yang belum
      * diotorisasi atau ditolak checker. Berkasnya template MNC yang sama dengan Upload Excel (unduhan
      * Bulk Edit sudah terisi baris batch itu) dan dibaca dengan aturan yang SAMA
-     * ({@link UploadService#baca}): kolom A wajib tanggal posting batch itu, nominal angka &amp; tidak
+     * ({@link UploadService#baca}): kolom A wajib tanggal hari ini (REQ_AUSY_00056), nominal angka &amp; tidak
      * minus, kode angka, IDR, tanpa sel #N/A, dan total Debit = Credit.
      *
      * Template MNC tidak punya kolom ID, jadi isi batch DIGANTI seluruhnya oleh isi berkas (baris
@@ -202,11 +212,13 @@ public class OtorisasiService {
             return new ExportResult(false, label + " sudah diproses checker; Bulk Edit hanya untuk batch"
                     + " yang belum diotorisasi atau ditolak checker.", 0, null);
 
-        LocalDate tanggal = lama.stream().map(g -> tanggalPosting(g.getGltrpd())).filter(Objects::nonNull)
-                .findFirst().orElse(LocalDate.now());
+        // REQ_AUSY_00056: Bulk Edit = unggah ulang, jadi tanggal posting wajib hari ini (sama seperti
+        // Upload Excel). Batch hari sebelumnya yang diperbarui ikut bertanggal hari ini, sehingga bisa
+        // di-approve lagi.
+        LocalDate tanggal = LocalDate.now();
         UploadService.Bacaan b;
         try (Workbook wb = WorkbookFactory.create(berkas)) {
-            b = uploads.baca(wb, tanggal, "tanggal posting " + label + " ("
+            b = uploads.baca(wb, tanggal, "hari ini (" 
                     + tanggal.format(DateTimeFormatter.ofPattern("d-MMM-yy", Locale.ENGLISH)).toLowerCase() + ")");
         } catch (Exception e) {
             return new ExportResult(false, "File tidak terbaca sebagai Excel. " + PAKAI_TEMPLATE, 0, null);
@@ -253,6 +265,14 @@ public class OtorisasiService {
                 n(g.getGltrds()), n(g.getGltrbr()), n(g.getBrName()), n(g.getGltrcc()), n(g.getCsName()),
                 n(g.getGltrcy()), n(g.getGltrfy()), nz(g.getGltram()).stripTrailingZeros().toPlainString(),
                 n(g.getGlflag()), n(g.getGlresp()), n(g.getGltrpd()));
+    }
+
+    private static final DateTimeFormatter DDMMYY = DateTimeFormatter.ofPattern("ddMMyy");
+
+    /** Tanggal posting baris GL ({@code ddMMyy}) sebagai dd-MM-yyyy untuk pesan. */
+    private static String tanggalTampil(String ddmmyy) {
+        LocalDate t = tanggalPosting(ddmmyy);
+        return t == null ? "-" : t.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
     }
 
     private static LocalDate tanggalPosting(String ddmmyy) {

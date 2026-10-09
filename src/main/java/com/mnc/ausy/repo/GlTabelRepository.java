@@ -59,7 +59,7 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query(value = "select no_paket, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0), " +
-                   "max(adddt) " +
+                   "max(adddt), max(gltrpd) " +
                    "from gl_tabel where status_print='BELUM UPLOAD' and status_dual='PENDING' " +
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> pendingPakets();
@@ -68,7 +68,7 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query(value = "select no_paket, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0), " +
-                   "max(adddt) " +
+                   "max(adddt), max(gltrpd) " +
                    "from gl_tabel where status_dual='REJECTED' and gltrus=:u and coalesce(glsrc,'p') <> 'm' " +
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> rejectedPakets(@Param("u") String maker);

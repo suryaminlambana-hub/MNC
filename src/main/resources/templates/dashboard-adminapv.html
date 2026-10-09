@@ -65,7 +65,7 @@
                     <td><span class="badge"
                               th:classappend="${#strings.contains(t.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(t.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
                               th:text="${t.nameActivity}"></span></td>
-                    <td class="small" th:text="${t.tinfo}"></td>
+                    <td class="small" th:text="${@nama.teks(t.tinfo)}"></td>
                 </tr>
                 <tr th:if="${recent.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada aktivitas.</td></tr>
                 </tbody>

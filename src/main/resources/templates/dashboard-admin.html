@@ -107,7 +107,7 @@
                     <td><span class="badge"
                               th:classappend="${#strings.contains(h.nameActivity,'APPROVE')} ? 'bg-success-subtle text-success' : (${#strings.contains(h.nameActivity,'REJECT')} ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary')"
                               th:text="${h.nameActivity}"></span></td>
-                    <td class="small" th:text="${h.tinfo}"></td>
+                    <td class="small" th:text="${@nama.teks(h.tinfo)}"></td>
                 </tr>
                 <tr th:if="${userHistory.isEmpty()}"><td colspan="4" class="text-center text-muted py-4">Belum ada riwayat perubahan user.</td></tr>
                 </tbody>

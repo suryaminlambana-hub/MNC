@@ -5,6 +5,7 @@ import com.mnc.ausy.domain.TlogTransaction;
 import com.mnc.ausy.repo.TlogActivityRepository;
 import com.mnc.ausy.repo.TlogTransactionRepository;
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.service.NamaUserService;
 import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.AuditService;
@@ -37,6 +38,7 @@ import java.util.Set;
 @Controller
 public class AuditController {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private final NamaUserService nama;
     private final TlogTransactionRepository tx;
     private final TlogActivityRepository act;
     private final AuditScopeService scope;
@@ -46,8 +48,8 @@ public class AuditController {
 
     public AuditController(TlogTransactionRepository tx, TlogActivityRepository act,
                            AuditScopeService scope, DataScopeService dataScope,
-                           MncPdfService mnc, AuditService audit) {
-        this.dataScope = dataScope;
+                           MncPdfService mnc, AuditService audit, NamaUserService nama) {
+        this.dataScope = dataScope; this.nama = nama;
         this.tx = tx; this.act = act; this.scope = scope;
         this.mnc = mnc; this.audit = audit;
     }
@@ -130,7 +132,7 @@ public class AuditController {
         doc.open();
         mnc.stampLogo(writer, doc);
         mnc.title(doc, judul, "Dicetak " + LocalDateTime.now().format(PRINTED)
-                + " oleh " + (me == null ? "-" : me.getUsername()));
+                + " oleh " + (me == null ? "-" : nama.of(me.getUsername())));
 
         // Dua bagian, judulnya sama dengan nama tab di layar (BUG_AUSY_00144) supaya yang
         // membaca cetakan ini tahu bagian mana yang sedang dilihatnya.
@@ -138,9 +140,9 @@ public class AuditController {
         PdfPTable t1 = table(new float[]{1.6f, 1.2f, 2f, 6f}, "Waktu", "User", "Aksi", "Detail");
         for (TlogTransaction t : txRows) {
             t1.addCell(mnc.cell(t.getTimeActivity() == null ? "" : t.getTimeActivity().format(TS)));
-            t1.addCell(mnc.cell(t.getUserId()));
+            t1.addCell(mnc.cell(nama.of(t.getUserId())));
             t1.addCell(mnc.cell(t.getNameActivity()));
-            t1.addCell(mnc.cell(t.getTinfo()));
+            t1.addCell(mnc.cell(nama.teks(t.getTinfo())));
         }
         if (txRows.isEmpty()) t1.addCell(empty(4));
         doc.add(t1);
@@ -150,7 +152,7 @@ public class AuditController {
         PdfPTable t2 = table(new float[]{1.6f, 1.2f, 1.6f, 2f, 5f}, "Waktu", "User", "IP", "Aktivitas", "Info");
         for (TlogActivity a : actRows) {
             t2.addCell(mnc.cell(a.getTimeActivity() == null ? "" : a.getTimeActivity().format(TS)));
-            t2.addCell(mnc.cell(a.getUserId()));
+            t2.addCell(mnc.cell(nama.of(a.getUserId())));
             t2.addCell(mnc.cell(a.getIp()));
             t2.addCell(mnc.cell(a.getNameActivity()));
             t2.addCell(mnc.cell(a.getInfo()));
