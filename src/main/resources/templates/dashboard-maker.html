@@ -49,31 +49,8 @@
         </div>
     </div>
 
-    <!--/* Data GL yang sudah diotorisasi (REQ_AUSY_00035: nama menu lama tidak ditampilkan lagi) */-->
-    <div th:if="${cards.contains('gl-active')}" class="ausy-card">
-        <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-            <i class="fa-solid fa-table-list text-muted"></i> Data GL Sudah Diotorisasi</h2>
-        <div class="px-3 pb-3">
-            <table class="table table-sm table-hover align-middle mb-0 dt">
-                <thead><tr>
-                    <th>Tgl Posting</th><th>D/C</th><th>Kode GL</th><th>Nama GL</th>
-                    <th>Deskripsi</th><th>Cabang</th><th class="text-end">Nominal</th><th>Batch</th>
-                </tr></thead>
-                <tbody>
-                <tr th:each="g : ${glActiveList}">
-                    <td class="text-nowrap" th:text="${g.gltrpd}"></td>
-                    <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${g.gltrcd}"></span></td>
-                    <td th:text="${g.gltrac}"></td>
-                    <td class="small" th:text="${g.glName}"></td>
-                    <td class="small" th:text="${g.gltrds}"></td>
-                    <td class="small" th:text="${g.gltrbr}"></td>
-                    <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(g.gltram,1,'POINT')}"></td>
-                    <td class="text-nowrap" th:text="${@batchLabel.of(g.noPaket)}"></td>
-                </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <!--/* REQ_AUSY_00051: section "Data GL Sudah Diotorisasi" dihapus dari beranda maker — data yang
+           sudah diotorisasi tidak lagi dilihat maker (sejalan dengan List Data GL, REQ_AUSY_00044). */-->
 
     <!-- Riwayat GL: request maker + keputusan checker -->
     <div th:if="${cards.contains('gl-history')}" class="ausy-card">

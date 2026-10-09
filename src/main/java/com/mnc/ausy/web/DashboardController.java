@@ -89,12 +89,11 @@ public class DashboardController {
         if (hasGroup(auth, "GROUP_3")) {
             // Semua angka & daftar GL di beranda dibatasi ke data maker ini sendiri (BUG_AUSY_00138),
             // dan memakai definisi "GL Aktif" yang sama dengan halaman-halamannya (BUG_AUSY_00150).
-            // Angkanya dari getTotalElements() — bukan ukuran daftar, yang sengaja dipotong karena
-            // ini cuma pratinjau beranda.
+            // Angkanya dari getTotalElements(). Daftar barisnya tidak diambil lagi: section
+            // "Data GL Sudah Diotorisasi" dihapus dari beranda maker (REQ_AUSY_00051).
             Page<com.mnc.ausy.domain.GlTabel> aktif = gl.pageGlAktif(scope.visibleMakers(principal),
-                    PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "id")));
+                    PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id")));
             model.addAttribute("activeGl", aktif.getTotalElements());
-            model.addAttribute("glActiveList", aktif.getContent());
             // "Perubahan GL Pending" = upload paket + change request (add/edit/delete) + export GL, menunggu otorisasi
             List<Object[]> pendingPaketList = scope.filterArrays(principal, gl.pendingPakets(), 1);
             normalizeUploadedAt(pendingPaketList);

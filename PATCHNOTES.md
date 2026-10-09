@@ -129,6 +129,8 @@ Tidak ada migrasi DB.
   - **Manajemen Otorisasi GL** (REQ_AUSY_00048, 00049): tab berganti nama menjadi "Otorisasi
     Upload Excel" dan "Otorisasi Kelola Data GL". Tab baru **"Otorisasi Manajemen Kode GL"** berisi
     otorisasi Kode GL, yang tidak lagi tercampur dengan Kelola Data GL.
+  - **Section "Data GL Sudah Diotorisasi" dihapus dari beranda maker** (REQ_AUSY_00051). Data yang
+    sudah diotorisasi tidak lagi dilihat maker. Kartu angka "Baris GL Aktif" tetap ada.
   - REQ_AUSY_00050 (tanggal & jam di kanan atas): sudah ada, lihat poin di bawah.
 - **Tanggal & jam berjalan di header** (permintaan tim accounting): ikon kalender +
   `09-10-2026 09:07:13 WIB`, berjalan tiap detik di semua halaman. Berpatokan pada jam server
