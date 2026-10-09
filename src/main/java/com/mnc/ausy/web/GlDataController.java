@@ -1,28 +1,18 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.service.BatchLabel;
-import com.mnc.ausy.domain.GlCode;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.domain.TUpload;
-import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.repo.TUploadRepository;
 import com.mnc.ausy.security.AusyUserDetails;
-import com.mnc.ausy.service.ApprovalService;
-import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.DataScopeService;
-import com.mnc.ausy.service.GlChangeService;
-import com.mnc.ausy.service.GlExportService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.Nominal;
 import com.mnc.ausy.service.OtorisasiService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -31,103 +21,42 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Controller
 public class GlDataController {
     private final GlTabelRepository gl;
-    private final GlCodeRepository glCode;
-    private final GlExportService glExport;
-    private final AuditService audit;
-    private final GlChangeService changes;
-    private final ApprovalService approval;
     private final DataScopeService scope;
     private final OtorisasiService otorisasi;
     private final TUploadRepository uploads;
     private final ExcelExportService excel;
 
-    public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport,
-                            AuditService audit, GlChangeService changes, ApprovalService approval,
-                            DataScopeService scope, OtorisasiService otorisasi,
+    public GlDataController(GlTabelRepository gl, DataScopeService scope, OtorisasiService otorisasi,
                             TUploadRepository uploads, ExcelExportService excel) {
-        this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
-        this.changes = changes; this.approval = approval; this.scope = scope; this.otorisasi = otorisasi;
+        this.gl = gl; this.scope = scope; this.otorisasi = otorisasi;
         this.uploads = uploads; this.excel = excel;
     }
 
-    /**
-     * A GL row is "registered" when its NoGL exists in the GL Code master.
-     *
-     * Sisi D/C tidak ikut dicocokkan sejak BUG_AUSY_00170: master Kode GL hanya memuat nomor
-     * akun, jadi satu kode yang terdaftar berlaku untuk baris debit maupun credit.
-     */
-    private Set<String> registeredKeys() {
-        return glCode.findAll().stream().map(GlCode::getCode).collect(Collectors.toSet());
-    }
-    private static boolean isRegistered(Set<String> reg, GlTabel g) {
-        return reg.contains(n(g.getGltrac()));
-    }
-    private static String n(String s) { return s == null ? "" : s; }
-
-    /** Hasil agregat multi-kolom kadang dibungkus Object[1][] oleh JPA. */
-    private static Object[] unwrapRow(Object[] row) {
-        return (row != null && row.length == 1 && row[0] instanceof Object[] inner) ? inner : row;
-    }
-
-    /**
-     * Pemilik batch upload (maker). Dipakai untuk memisahkan tampilan List Data GL: maker hanya
-     * melihat batch yang masih perlu ia tangani (REQ_AUSY_00044), checker melihat data yang sudah
-     * diotorisasi untuk keperluan tracking.
-     */
+    /** Maker (GROUP_3): pemilik batch upload — hanya ia yang mendapat tombol Bulk Edit/Hapus. */
     private static boolean isMaker(AusyUserDetails me) {
         return me != null && me.getAuthorities().stream()
                 .anyMatch(a -> "GROUP_3".equals(a.getAuthority()));
     }
 
-    /** Baris per halaman di tabel data terotorisasi — datanya bisa belasan ribu (BUG_AUSY_00147). */
-    private static final int PAGE_SIZE = 10;
-
     /** Kolom Excel Bulk Edit per batch — sama dengan format Bulk Edit sebelumnya. */
     private static final List<String> BULK_HEAD = List.of("ID", "GL Code", "D/C", "Amount", "Description", "Batch");
 
+    /**
+     * List Data GL: batch upload yang BELUM diotorisasi (REQ_AUSY_00036 &amp; 00044). Batch yang sudah
+     * di-approve pindah ke penampungan EXECUTE dan hilang dari sini. Tabel "Data GL Sudah
+     * Diotorisasi" untuk checker dicabut (REQ_AUSY_00036 feedback), jadi maker dan checker melihat
+     * tabel yang sama — masing-masing dibatasi per pasangan maker (BUG_AUSY_00138 / 00139).
+     */
     @GetMapping("/gl-legacy")
-    public String list(@AuthenticationPrincipal AusyUserDetails me, Model model,
-                       @RequestParam(defaultValue = "0") int page) {
-        boolean maker = isMaker(me);
-        model.addAttribute("isMaker", maker);
-
-        // REQ_AUSY_00036 & 00044: batch upload yang BELUM diotorisasi — inilah isi List Data GL
-        // bagi maker. Batch yang sudah di-approve pindah ke penampungan EXECUTE dan hilang dari sini.
+    public String list(@AuthenticationPrincipal AusyUserDetails me, Model model) {
+        model.addAttribute("isMaker", isMaker(me));
         List<Object[]> pending = pendingUploads(me);
         model.addAttribute("pendingUploads", pending);
         model.addAttribute("uploadFiles", uploadFiles(pending));
-
-        // Tabel data yang sudah diotorisasi hanya untuk non-maker (checker/monitoring), untuk
-        // keperluan tracking. Tetap dipaginasi di database (BUG_AUSY_00147) dan dibatasi per
-        // pasangan maker (BUG_AUSY_00138 / 00139).
-        if (!maker) {
-            Set<String> makers = scope.visibleMakers(me);
-            Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
-            Page<GlTabel> result;
-            Object[] sum;
-            if (makers == null) {
-                result = gl.pageActive(req);
-                sum = unwrapRow(gl.activeSummary());
-            } else if (makers.isEmpty()) {
-                result = Page.empty(req);
-                sum = new Object[]{0L, BigDecimal.ZERO, 0L};
-            } else {
-                result = gl.pageActiveByMakers(makers, req);
-                sum = unwrapRow(gl.activeSummaryByMakers(makers));
-            }
-            model.addAttribute("rows", result.getContent());
-            model.addAttribute("registered", registeredKeys());
-            model.addAttribute("total", ((Number) sum[0]).longValue());
-            model.addAttribute("totalAmount", sum[1] == null ? BigDecimal.ZERO : (BigDecimal) sum[1]);
-            model.addAttribute("page", result.getNumber());
-            model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
-            model.addAttribute("activeBatches", scope.filterArrays(me, gl.approvedPakets(), 1));   // REQ_AUSY_00023
-        }
         return "gl-legacy/list";
     }
 
@@ -179,7 +108,7 @@ public class GlDataController {
         List<List<Object>> data = new ArrayList<>();
         for (GlTabel g : rows) data.add(Arrays.asList(g.getId(), nz(g.getGltrac()), nz(g.getGltrcd()),
                 Nominal.format(g.getGltram()), nz(g.getGltrds()), BatchLabel.label(g.getNoPaket())));
-        excel.download(resp, "Batch " + BatchLabel.label(paket), "BulkEdit_Batch_" + BatchLabel.label(paket).replace(" (", "_").replace(")", ""), BULK_HEAD, data, false);
+        excel.download(resp, "Batch " + BatchLabel.label(paket), "BulkEdit_Batch_" + BatchLabel.label(paket), BULK_HEAD, data, false);
     }
 
     /**
@@ -192,6 +121,13 @@ public class GlDataController {
         if (file == null || file.isEmpty()) { ra.addFlashAttribute("warn", "File belum dipilih."); return "redirect:/gl-legacy"; }
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
             Sheet sh = wb.getSheetAt(0);
+            // REQ_AUSY_00037 (feedback): berkas yang bukan template Bulk Edit ditolak dengan satu
+            // kalimat — dulu diproses per baris dan pesannya memenuhi layar.
+            if (!sesuaiTemplate(sh.getRow(0))) {
+                ra.addFlashAttribute("warn", "File tidak sesuai template Bulk Edit (kolom harus "
+                        + String.join(", ", BULK_HEAD) + "). " + OtorisasiService.PAKAI_TEMPLATE);
+                return "redirect:/gl-legacy";
+            }
             List<Map<String, String>> isi = new ArrayList<>();
             List<String> amountSalah = new ArrayList<>();
             for (int r = 1; r <= sh.getLastRowNum(); r++) {
@@ -210,8 +146,9 @@ public class GlDataController {
                 isi.add(m);
             }
             if (!amountSalah.isEmpty()) {
-                ra.addFlashAttribute("warn", "Bulk Edit tidak diterapkan: kolom Amount tidak terbaca sebagai angka pada "
-                        + String.join(", ", amountSalah) + ". Gunakan format 1.000.000,50.");
+                ra.addFlashAttribute("warn", "Bulk Edit ditolak, tidak ada data yang diubah: kolom Amount tidak terbaca"
+                        + " sebagai angka pada " + OtorisasiService.ringkasSalah(amountSalah)
+                        + ". Gunakan format 1.000.000,50.");
                 return "redirect:/gl-legacy";
             }
             OtorisasiService.ExportResult r = otorisasi.bulkEditPending(paket, me, isi);
@@ -223,6 +160,14 @@ public class GlDataController {
     }
 
     private static String nz(String s) { return s == null ? "" : s; }
+
+    /** Baris judul berkas = kolom hasil Export Excel Bulk Edit (huruf besar/kecil dan spasi diabaikan). */
+    private static boolean sesuaiTemplate(Row judul) {
+        if (judul == null) return false;
+        for (int i = 0; i < BULK_HEAD.size(); i++)
+            if (!BULK_HEAD.get(i).replace(" ", "").equalsIgnoreCase(cell(judul, i).replace(" ", ""))) return false;
+        return true;
+    }
 
     private static String cell(Row r, int i) {
         Cell c = r.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);

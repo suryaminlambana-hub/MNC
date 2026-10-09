@@ -8,10 +8,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class BatchLabelTest {
 
     @Test
-    void nomorHarian() {
-        assertEquals("1 (09-10-2026)", BatchLabel.label("20261009001"));
-        assertEquals("12 (09-10-2026)", BatchLabel.label("20261009012"));
-        assertEquals("1 (10-10-2026)", BatchLabel.label("20261010001"));
+    void nomorHarianTanpaTanggal() {
+        assertEquals("1", BatchLabel.label("20261009001"));
+        assertEquals("12", BatchLabel.label("20261009012"));
+        assertEquals("1", BatchLabel.label("20261010001"));
     }
 
     @Test

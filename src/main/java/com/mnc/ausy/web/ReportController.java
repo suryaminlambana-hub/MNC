@@ -101,38 +101,8 @@ public class ReportController {
                     "Unduh PDF Batch " + BatchLabel.label(paket) + " (menunggu otorisasi): " + rows.size() + " baris");
     }
 
-    /**
-     * REQ_AUSY_00023 — jurnal PDF satu batch GL Aktif (sudah diotorisasi).
-     *
-     * {@code batch} berbentuk {@code <no batch>::<uploader>}, persis seperti baris rekap
-     * {@code approvedPakets()}; data tambahan manual dikelompokkan sebagai {@code (manual)} per
-     * maker. Barisnya diambil dari definisi GL Aktif yang sama dengan tabel di layar, dibatasi
-     * per maker (BUG_AUSY_00138), jadi batch maker lain tidak bisa diunduh lewat URL.
-     */
-    @GetMapping("/gl-legacy/batch-pdf")
-    public void activeBatch(@RequestParam String batch, @AuthenticationPrincipal AusyUserDetails me,
-                            HttpServletResponse resp) throws Exception {
-        int sep = batch.lastIndexOf("::");
-        String paket = sep < 0 ? batch : batch.substring(0, sep);
-        String maker = sep < 0 ? null : batch.substring(sep + 2);
-        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me)).stream()
-                .filter(g -> paket.equals(g.batchKey()) && (maker == null || maker.equals(g.getGltrus())))
-                .sorted(java.util.Comparator.comparing(GlTabel::getId))
-                .toList();
-        if (rows.isEmpty()) {
-            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + BatchLabel.label(paket) + " tidak ada di GL Aktif yang bisa Anda lihat.");
-            return;
-        }
-        String nama = "(manual)".equals(paket) ? "manual" : paket;
-        resp.setContentType("application/pdf");
-        resp.setHeader("Content-Disposition", "inline; filename=\"Jurnal_GL_Aktif_Batch_" + nama + ".pdf\"");
-        writeJournals(resp, rows);
-
-        if (me != null)
-            audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
-                    "Unduh PDF GL Aktif Batch " + BatchLabel.label(paket) + (maker == null ? "" : " (uploader " + maker + ")")
-                    + ": " + rows.size() + " baris");
-    }
+    // REQ_AUSY_00023 PDF batch GL Aktif (/gl-legacy/batch-pdf) dicabut bersama tabel "Data GL Sudah
+    // Diotorisasi" di List Data GL (REQ_AUSY_00036 feedback): tidak ada lagi yang memakainya.
 
     @GetMapping("/report/jurnal/{paket}")
     public void jurnal(@PathVariable String paket, HttpServletResponse resp) throws Exception {

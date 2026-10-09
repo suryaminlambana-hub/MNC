@@ -9,8 +9,8 @@
     <h1 class="ausy-page-title">List Data GL</h1>
     <p class="text-muted mb-0" th:if="${isMaker}">Batch hasil upload yang belum diotorisasi checker. Setelah
       di-approve, batch pindah ke penampungan untuk digenerate menjadi file ACCTXT oleh role EXECUTE.</p>
-    <p class="text-muted mb-0" th:unless="${isMaker}">Batch upload yang menunggu otorisasi, dan data GL yang
-      sudah diotorisasi (untuk penelusuran).</p>
+    <p class="text-muted mb-0" th:unless="${isMaker}">Batch upload yang menunggu otorisasi. Setelah di-approve,
+      batch pindah ke penampungan untuk digenerate menjadi file ACCTXT oleh role EXECUTE.</p>
   </div>
   <div th:if="${ok}" class="alert alert-success py-2 mt-3" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2 mt-3" th:text="${warn}"></div>
@@ -105,66 +105,7 @@
     })();
   </script>
 
-  <!--/* Data yang sudah diotorisasi — hanya untuk non-maker (checker/monitoring) sebagai penelusuran
-         (REQ_AUSY_00044). Dipaginasi di server (BUG_AUSY_00147). */-->
-  <th:block th:unless="${isMaker}">
-  <div class="ausy-card" style="padding:0">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 pt-3 pb-2">
-      <h2 class="h6 mb-0 d-flex align-items-center gap-2">
-        <i class="fa-solid fa-table-list text-success"></i> Data GL Sudah Diotorisasi
-        <span class="text-muted fw-normal small">— <b th:text="${total}">0</b> baris, nilai
-          <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></span></h2>
-      <!--/* REQ_AUSY_00023: PDF jurnal per batch, dibuka di tab baru. */-->
-      <form th:if="${activeBatches != null and not activeBatches.isEmpty()}" method="get"
-            th:action="@{/gl-legacy/batch-pdf}" target="_blank" class="d-flex gap-2 align-items-center">
-        <select name="batch" class="form-select form-select-sm" style="min-width:220px" required>
-          <option th:each="b : ${activeBatches}" th:value="${b[0] + '::' + b[1]}"
-                  th:text="|Batch ${@batchLabel.of(b[0])} · ${b[1]} · ${b[2]} baris|"></option>
-        </select>
-        <button class="btn btn-sm btn-outline-secondary text-nowrap"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-      </form>
-    </div>
-    <div class="px-3 pb-3">
-    <table class="table table-sm table-hover align-middle mb-0">
-      <thead><tr><th>ID</th><th>Batch</th><th>NoGL</th><th>D/C</th><th>GL Name</th><th>Description</th><th class="text-end">Amount</th><th>Tgl</th><th>Uploader</th><th>GLTRRF</th><th>Registered</th></tr></thead>
-      <tbody>
-      <tr th:each="g : ${rows}">
-        <td><code class="ausy-glid" th:text="${g.id}"></code></td>
-        <td class="text-nowrap" th:text="${@batchLabel.of(g.noPaket)}"></td><td><code th:text="${g.gltrac}"></code></td>
-        <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${g.gltrcd}"></span></td><td th:text="${g.glName}"></td><td th:text="${g.gltrds}"></td>
-        <td class="text-end" th:text="${#numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA')}"></td>
-        <td th:text="${g.gltrpd}"></td><td th:text="${g.gltrus}"></td><td><small th:text="${g.gltrrf}"></small></td>
-        <td>
-          <!--/* BUG_AUSY_00170: dicocokkan dari NoGL saja — master Kode GL tidak lagi memisah D/C. */-->
-          <span th:if="${registered.contains(g.gltrac)}" class="badge bg-success-subtle text-success">Terdaftar</span>
-          <span th:unless="${registered.contains(g.gltrac)}" class="badge bg-secondary-subtle text-secondary">Tidak Terdaftar</span>
-        </td>
-      </tr>
-      <tr th:if="${rows == null or rows.isEmpty()}">
-        <td colspan="11" class="text-center text-muted py-4">Belum ada data GL yang diotorisasi.</td>
-      </tr>
-      </tbody>
-    </table>
-    </div>
-  </div>
-
-  <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2"
-       th:if="${totalPages > 1}">
-    <span class="text-muted small">
-      Halaman <b th:text="${page + 1}">1</b> dari <b th:text="${totalPages}">1</b>
-      · <b th:text="${total}">0</b> baris
-    </span>
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
-         th:href="@{/gl-legacy(page=0)}">&laquo; Awal</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
-         th:href="@{/gl-legacy(page=${page - 1})}">Sebelumnya</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
-         th:href="@{/gl-legacy(page=${page + 1})}">Berikutnya</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
-         th:href="@{/gl-legacy(page=${totalPages - 1})}">Akhir &raquo;</a>
-    </div>
-  </div>
-  </th:block>
+  <!--/* REQ_AUSY_00036 (feedback): tabel "Data GL Sudah Diotorisasi" untuk checker dicabut — List Data
+         GL hanya berisi batch upload yang belum diotorisasi, untuk maker maupun checker. */-->
 </main>
 </html>

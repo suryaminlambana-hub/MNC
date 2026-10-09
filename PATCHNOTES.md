@@ -111,12 +111,24 @@ Tidak ada migrasi DB.
   dipakai berkas ACCTXT. Dulu hanya `gltram` yang berubah.
 - **Feedback QA atas alur baru (09-10-2026):**
   - **Nomor batch tampil 1, 2, 3 setiap hari** (REQ_AUSY_00031). Di layar, PDF jurnal, Excel, pesan,
-    dan audit trail, `20261009001` tampil sebagai **`1 (09-10-2026)`**. Nomor di database tidak
-    berubah (tetap unik), tidak ada data yang dihapus. Batch format lama tampil apa adanya.
+    dan audit trail, `20261009001` tampil sebagai **`1`**, tanpa tanggal karena tanggal upload sudah
+    tampil di kolomnya sendiri. Nomor di database tidak berubah (tetap unik), tidak ada data yang
+    dihapus. Batch format lama tampil apa adanya.
   - **Judul tabel "Upload Menunggu Otorisasi" dihapus** dari List Data GL (REQ_AUSY_00036).
+  - **Tabel "Data GL Sudah Diotorisasi" juga dihapus untuk checker** di List Data GL (REQ_AUSY_00036).
+    Maker dan checker kini sama-sama hanya melihat batch yang belum diotorisasi. PDF batch GL Aktif
+    (`/gl-legacy/batch-pdf`) yang hanya dipakai tabel itu ikut dicabut.
   - **Perbaikan: upload Bulk Edit melempar ke halaman login** (REQ_AUSY_00037, 00047). Form unggahnya
     tidak membawa token CSRF sehingga ditolak Spring Security. Sekarang hasil edit langsung
     terlihat di antrian checker dan tercatat di audit trail (`BULK_EDIT_PENDING`).
+  - **Validasi Bulk Edit sebelum diterapkan** (REQ_AUSY_00037). File ditolak utuh, tidak ada data
+    yang berubah dan tidak ada yang sampai ke checker, bila:
+    - bukan template Bulk Edit (kolom harus ID, GL Code, D/C, Amount, Description, Batch) atau
+      bukan hasil Export Excel batch itu;
+    - ada Amount minus, GL Code bukan angka, D/C salah, atau ID dobel/bukan milik batch;
+    - hasil akhirnya tidak balance (pesan menyebut Debit, Credit, dan selisihnya).
+    Pesan kesalahan dibatasi 5 baris pertama + jumlah sisanya; dulu file yang salah menghasilkan
+    pesan yang memenuhi layar.
   - **Tombol Export Excel per batch** di List Data GL (REQ_AUSY_00037), sebagai acuan Bulk Edit.
   - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
     dihapus:

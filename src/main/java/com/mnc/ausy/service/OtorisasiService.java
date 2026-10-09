@@ -149,69 +149,110 @@ public class OtorisasiService {
      * pending, REQ_AUSY_00022). Karena langsung tersimpan, PDF batch ikut berubah.
      *
      * Baris dari berkas: id, gltrac, gltrcd, gltram (sudah berupa angka), gltrds. Berkas ditolak
-     * UTUH bila ada satu pun baris yang tidak valid atau bukan milik batch ini.
+     * UTUH bila ada satu pun baris yang tidak valid, Amount minus, atau hasil akhirnya tidak balance
+     * (REQ_AUSY_00037 feedback) — dalam hal itu tidak ada yang tersimpan dan tidak sampai ke checker.
      */
     @Transactional
     public ExportResult bulkEditPending(String paket, AusyUserDetails me, List<Map<String, String>> isi) {
         if (me == null) return new ExportResult(false, "Sesi tidak valid.", 0, null);
         String maker = me.getUsername();
+        String label = "Batch " + BatchLabel.label(paket);
         Map<Long, GlTabel> batch = new LinkedHashMap<>();
         for (GlTabel g : gl.findBatchRows(paket, maker)) batch.put(g.getId(), g);
         if (batch.isEmpty())
-            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak ditemukan di upload milik Anda.", 0, null);
+            return new ExportResult(false, label + " tidak ditemukan di upload milik Anda.", 0, null);
         boolean semuaPending = batch.values().stream().allMatch(g ->
                 "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
         if (!semuaPending)
-            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " sudah diproses checker; Bulk Edit hanya untuk batch"
+            return new ExportResult(false, label + " sudah diproses checker; Bulk Edit hanya untuk batch"
                     + " yang belum diotorisasi.", 0, null);
+        if (isi == null || isi.isEmpty())
+            return new ExportResult(false, "File tidak berisi baris data. " + PAKAI_TEMPLATE, 0, null);
 
+        // Berkas batch lain / berkas lain sama sekali: tidak ada satu ID pun yang milik batch ini.
+        // Ditolak dengan satu kalimat, bukan daftar kesalahan per baris (REQ_AUSY_00037 feedback).
+        boolean adaMilikBatch = isi.stream().anyMatch(m -> {
+            try { return batch.containsKey(Long.valueOf(n(m.get("id")).trim())); } catch (Exception e) { return false; }
+        });
+        if (!adaMilikBatch)
+            return new ExportResult(false, "File ini bukan hasil Export Excel " + label + ". " + PAKAI_TEMPLATE, 0, null);
+
+        // Semua baris divalidasi dan direncanakan DULU tanpa menyentuh entitas — kalau ditolak
+        // (tidak valid / minus / tidak balance), tidak ada satu pun perubahan yang tersimpan dan
+        // tidak ada yang sampai ke antrian checker.
+        record Ubah(GlTabel g, String acc, String dc, String ds, BigDecimal amt) {}
         List<String> salah = new ArrayList<>();
-        List<GlTabel> berubah = new ArrayList<>();
+        Map<Long, Ubah> rencana = new LinkedHashMap<>();
         for (Map<String, String> m : isi) {
             String baris = m.getOrDefault("baris", "?");
             Long id;
-            try { id = Long.valueOf(m.get("id").trim()); } catch (Exception e) { salah.add("baris " + baris + ": ID tidak valid"); continue; }
+            try { id = Long.valueOf(n(m.get("id")).trim()); } catch (Exception e) { salah.add("baris " + baris + ": ID tidak valid"); continue; }
             GlTabel g = batch.get(id);
-            if (g == null) { salah.add("baris " + baris + ": ID " + id + " bukan milik Batch " + BatchLabel.label(paket)); continue; }
+            if (g == null) { salah.add("baris " + baris + ": ID " + id + " bukan milik " + label); continue; }
+            if (rencana.containsKey(id)) { salah.add("baris " + baris + ": ID " + id + " muncul lebih dari sekali"); continue; }
             String acc = n(m.get("gltrac")).trim(), dc = n(m.get("gltrcd")).trim().toUpperCase();
             String ds = GlTextRule.trim(n(m.get("gltrds")));
             BigDecimal amt;
             try { amt = new BigDecimal(n(m.get("gltram")).trim()); } catch (Exception e) { amt = null; }
-            if (!acc.matches("[0-9]{1,50}")) salah.add("baris " + baris + ": GL Code hanya boleh angka");
-            if (!dc.equals("D") && !dc.equals("C")) salah.add("baris " + baris + ": D/C harus D atau C");
-            if (amt == null) salah.add("baris " + baris + ": Amount tidak terbaca");
-            else if (amt.signum() < 0) salah.add("baris " + baris + ": Amount tidak boleh minus");
+            boolean ok = true;
+            if (!acc.matches("[0-9]{1,50}")) { salah.add("baris " + baris + ": GL Code hanya boleh angka"); ok = false; }
+            if (!dc.equals("D") && !dc.equals("C")) { salah.add("baris " + baris + ": D/C harus D atau C"); ok = false; }
+            if (amt == null) { salah.add("baris " + baris + ": Amount tidak terbaca"); ok = false; }
+            else if (amt.signum() < 0) { salah.add("baris " + baris + ": Amount minus (" + Nominal.format(amt) + ")"); ok = false; }
+            if (!ok) continue;
             if (ds.length() > 40) ds = ds.substring(0, 40);                    // lebar kolom ACCTXT
-            if (amt == null || amt.signum() < 0 || !acc.matches("[0-9]{1,50}") || !(dc.equals("D") || dc.equals("C")))
-                continue;
-            boolean sama = acc.equals(n(g.getGltrac())) && dc.equalsIgnoreCase(n(g.getGltrcd()))
-                    && g.getGltram() != null && amt.compareTo(g.getGltram()) == 0 && ds.equals(n(g.getGltrds()));
-            if (sama) continue;
-            if (!acc.equals(n(g.getGltrac()))) {
-                String nama = glCodes.descriptionOf(acc);
-                if (!nama.isEmpty()) g.setGlName(nama);
-            }
-            g.setGltrac(acc); g.setGltrcd(dc); g.setGltrds(ds);
-            // Ketiga kolom nominal dipakai berkas ACCTXT; diisi sama seperti saat upload.
-            g.setGltram(amt); g.setGleqam(amt); g.setGlotam(amt);
-            berubah.add(g);
+            rencana.put(id, new Ubah(g, acc, dc, ds, amt));
         }
         if (!salah.isEmpty())
-            return new ExportResult(false, "Bulk Edit tidak diterapkan: " + String.join("; ", salah) + ".", 0, null);
+            return new ExportResult(false, "Bulk Edit ditolak, tidak ada data yang diubah: " + ringkasSalah(salah)
+                    + ". Perbaiki file lalu unggah lagi.", 0, null);
+
+        // Balance dihitung dari hasil akhir batch (baris yang tidak ada di file tetap nilai lamanya).
+        BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
+        for (GlTabel g : batch.values()) {
+            Ubah u = rencana.get(g.getId());
+            String dc = u != null ? u.dc() : n(g.getGltrcd());
+            BigDecimal amt = u != null ? u.amt() : nz(g.getGltram());
+            if ("D".equalsIgnoreCase(dc)) d = d.add(amt); else c = c.add(amt);
+        }
+        if (d.compareTo(c) != 0)
+            return new ExportResult(false, "Bulk Edit ditolak, tidak ada data yang diubah: hasil edit " + label
+                    + " tidak balance (Debit " + Nominal.format(d) + ", Credit " + Nominal.format(c) + ", selisih "
+                    + Nominal.format(d.subtract(c).abs()) + "). Perbaiki file lalu unggah lagi.", 0, null);
+
+        List<GlTabel> berubah = new ArrayList<>();
+        for (Ubah u : rencana.values()) {
+            GlTabel g = u.g();
+            boolean sama = u.acc().equals(n(g.getGltrac())) && u.dc().equalsIgnoreCase(n(g.getGltrcd()))
+                    && g.getGltram() != null && u.amt().compareTo(g.getGltram()) == 0 && u.ds().equals(n(g.getGltrds()));
+            if (sama) continue;
+            if (!u.acc().equals(n(g.getGltrac()))) {
+                String nama = glCodes.descriptionOf(u.acc());
+                if (!nama.isEmpty()) g.setGlName(nama);
+            }
+            g.setGltrac(u.acc()); g.setGltrcd(u.dc()); g.setGltrds(u.ds());
+            // Ketiga kolom nominal dipakai berkas ACCTXT; diisi sama seperti saat upload.
+            g.setGltram(u.amt()); g.setGleqam(u.amt()); g.setGlotam(u.amt());
+            berubah.add(g);
+        }
         if (berubah.isEmpty())
-            return new ExportResult(false, "Tidak ada perubahan pada Batch " + BatchLabel.label(paket) + ".", 0, null);
+            return new ExportResult(false, "Tidak ada perubahan pada " + label + ".", 0, null);
 
         gl.saveAll(berubah);
-        BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
-        for (GlTabel g : batch.values())
-            if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));
         audit.transaction(maker, "BULK_EDIT_PENDING",
-                "Bulk Edit Batch " + BatchLabel.label(paket) + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung.");
-        String balance = d.compareTo(c) == 0 ? " Debit = Credit (balance)."
-                : " PERHATIAN: batch tidak balance (Debit " + Nominal.format(d) + ", Credit " + Nominal.format(c)
-                  + "); checker tidak bisa meng-approve sampai balance.";
-        return new ExportResult(true, "Bulk Edit Batch " + BatchLabel.label(paket) + " diterapkan: " + berubah.size()
-                + " baris diubah." + balance, berubah.size(), null);
+                "Bulk Edit " + label + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung."
+                + " Debit = Credit = " + Nominal.format(d) + ".");
+        return new ExportResult(true, "Bulk Edit " + label + " diterapkan: " + berubah.size()
+                + " baris diubah. Debit = Credit (balance).", berubah.size(), null);
+    }
+
+    public static final String PAKAI_TEMPLATE = "Gunakan file dari tombol Export Excel pada batch tersebut,"
+            + " ubah isinya tanpa mengubah susunan kolom, lalu unggah lagi.";
+
+    /** Maksimal 5 kesalahan pertama + jumlah sisanya, supaya pesannya tidak memenuhi layar. */
+    public static String ringkasSalah(List<String> salah) {
+        if (salah.size() <= 5) return String.join("; ", salah);
+        return String.join("; ", salah.subList(0, 5)) + "; dan " + (salah.size() - 5) + " kesalahan lainnya";
     }
 
     private static String n(String s) { return s == null ? "" : s; }
