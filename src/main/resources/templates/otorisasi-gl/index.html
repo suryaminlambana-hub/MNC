@@ -53,7 +53,7 @@
               <a class="btn btn-sm btn-outline-secondary" th:href="@{'/report/jurnal/'+${p.paket}}" target="_blank"><i class="fa-solid fa-file-pdf"></i> PDF</a>
               <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve batch ini menjadi GL Aktif?');">
                 <input type="hidden" name="paket" th:value="${p.paket}"><input type="hidden" name="inputer" th:value="${p.inputer}">
-                <button class="btn btn-sm btn-success" th:disabled="${!p.balanced or !p.hariIni}"
+                <button class="btn btn-sm" th:classappend="${!p.balanced or !p.hariIni} ? 'btn-secondary' : 'btn-success'" th:disabled="${!p.balanced or !p.hariIni}"
                         th:title="${!p.hariIni} ? 'Batch hari sebelumnya tidak bisa di-approve' : (${p.balanced} ? '' : 'Batch tidak balance (Debit ≠ Credit)')"><i class="fa-solid fa-check"></i> Approve</button>
               </form>
               <button type="button" class="btn btn-sm btn-outline-danger btn-reject-paket"

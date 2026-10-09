@@ -176,7 +176,8 @@ Tidak ada migrasi DB.
     User tetap menampilkan kolom Username, karena itu memang data akunnya.
   - **Batch hari sebelumnya tidak bisa di-approve** (REQ_AUSY_00056). Tombol Approve di-grey-out
     untuk batch yang tanggal posting-nya bukan hari ini (label "Lewat hari" + tanggal posting), dan
-    ditolak juga di server. Batch itu masih bisa di-reject.
+    ditolak juga di server. Tombol yang terkunci berwarna abu-abu (bukan hijau pudar). Batch itu
+    masih bisa di-reject.
     - Maker melihat keterangan "Lewat hari" di List Data GL. Batch itu bisa diperbarui lewat Bulk
       Edit — tanggal posting-nya menjadi hari ini, sehingga bisa di-approve lagi — atau dihapus.
     - Approve juga tetap terkunci bila batch tidak balance; selisihnya tampil di kolom Balance.
