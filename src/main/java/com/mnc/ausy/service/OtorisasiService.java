@@ -73,6 +73,8 @@ public class OtorisasiService {
 
         List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
+        if (!menunggu(rows))
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak sedang menunggu otorisasi.", 0, null);
 
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : rows) {
@@ -98,7 +100,12 @@ public class OtorisasiService {
                 + " baris) masuk penampungan dan siap digenerate oleh role EXECUTE.", rows.size(), null);
     }
 
-    /** Reject a pending paket (Workflow 8.1.e / 8.2.d): data removed from temp, decision note recorded. */
+    /**
+     * Reject a pending paket (Workflow 8.1.e / 8.2.d). REQ_AUSY_00053: barisnya TIDAK dihapus lagi —
+     * ditandai REJECTED (active=0, jadi keluar dari antrian checker dan dari GL Aktif) supaya maker
+     * masih bisa membuka PDF-nya, memperbaikinya lewat Bulk Edit (lalu otomatis diajukan ulang),
+     * atau menghapusnya.
+     */
     @Transactional
     public ExportResult reject(String paket, String inputer, AusyUserDetails me, String note) {
         String checker = me.getUsername();
@@ -110,13 +117,31 @@ public class OtorisasiService {
 
         List<GlTabel> rows = gl.findBatchRows(paket, inputer);
         if (rows.isEmpty()) return new ExportResult(false, "Batch tidak ditemukan.", 0, null);
+        if (!menunggu(rows))
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak sedang menunggu otorisasi.", 0, null);
 
-        // REQ_AUSY_00053: ringkasan batch disimpan dulu supaya maker masih melihatnya berstatus Rejected.
-        batchStatus.rejected(paket, inputer, checker, note, rows);
-        gl.deletePaket(paket, inputer);   // reject -> removed from temp table (gl_tabel)
+        for (GlTabel g : rows) { g.setStatusDual(REJECTED); g.setActive((short) 0); }
+        gl.saveAll(rows);
+        batchStatus.rejected(paket, inputer, checker, note);
         audit.transaction(checker, "OTORISASI_REJECT",
-                "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
-        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak. Data dihapus dari antrian; maker melihat batch ini berstatus Rejected di List Data GL. Alasan tercatat di audit trail.", rows.size(), null);
+                "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") DITOLAK, " + rows.size()
+                + " baris dikembalikan ke maker berstatus Rejected. Catatan: " + note);
+        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak dan keluar dari antrian. Maker melihatnya"
+                + " berstatus Rejected di List Data GL, dapat memperbaikinya lalu mengajukan ulang. Alasan tercatat di"
+                + " audit trail.", rows.size(), null);
+    }
+
+    /** Status baris batch upload yang ditolak checker (REQ_AUSY_00053). */
+    public static final String REJECTED = "REJECTED";
+
+    /** Seluruh baris batch menunggu otorisasi checker. */
+    private static boolean menunggu(List<GlTabel> rows) {
+        return rows.stream().allMatch(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
+    }
+
+    /** Seluruh baris batch ditolak checker (REQ_AUSY_00053). */
+    private static boolean ditolak(List<GlTabel> rows) {
+        return rows.stream().allMatch(g -> REJECTED.equals(g.getStatusDual()));
     }
 
     /**
@@ -134,11 +159,8 @@ public class OtorisasiService {
         List<GlTabel> rows = gl.findBatchRows(paket, maker);
         if (rows.isEmpty())
             return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak ditemukan di upload milik Anda.", 0, null);
-        boolean semuaPending = rows.stream().allMatch(g ->
-                "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
-        if (!semuaPending)
-            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " sudah diproses checker dan tidak bisa dihapus dari sini."
-                    + " Gunakan menu Hapus Batch.", 0, null);
+        if (!menunggu(rows) && !ditolak(rows))
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " sudah diproses checker dan tidak bisa dihapus dari sini.", 0, null);
 
         gl.deletePaket(paket, maker);
         batchStatus.clear(paket, maker);
@@ -167,11 +189,12 @@ public class OtorisasiService {
         for (GlTabel g : gl.findBatchRows(paket, maker)) batch.put(g.getId(), g);
         if (batch.isEmpty())
             return new ExportResult(false, label + " tidak ditemukan di upload milik Anda.", 0, null);
-        boolean semuaPending = batch.values().stream().allMatch(g ->
-                "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
-        if (!semuaPending)
+        // REQ_AUSY_00053: batch yang ditolak checker juga boleh diperbaiki; setelah berhasil, batch itu
+        // otomatis diajukan ulang (kembali menunggu otorisasi checker).
+        boolean dariReject = ditolak(new ArrayList<>(batch.values()));
+        if (!menunggu(new ArrayList<>(batch.values())) && !dariReject)
             return new ExportResult(false, label + " sudah diproses checker; Bulk Edit hanya untuk batch"
-                    + " yang belum diotorisasi.", 0, null);
+                    + " yang belum diotorisasi atau ditolak checker.", 0, null);
         if (isi == null || isi.isEmpty())
             return new ExportResult(false, "File tidak berisi baris data. " + PAKAI_TEMPLATE, 0, null);
 
@@ -245,11 +268,17 @@ public class OtorisasiService {
             return new ExportResult(false, "Tidak ada perubahan pada " + label + ".", 0, null);
 
         gl.saveAll(berubah);
+        if (dariReject) {
+            for (GlTabel g : batch.values()) { g.setStatusDual("PENDING"); g.setActive((short) 1); }
+            gl.saveAll(batch.values());
+            batchStatus.clear(paket, maker);
+        }
         audit.transaction(maker, "BULK_EDIT_PENDING",
-                "Bulk Edit " + label + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung."
-                + " Debit = Credit = " + Nominal.format(d) + ".");
+                "Bulk Edit " + label + (dariReject ? " (Rejected, diajukan ulang ke checker), " : " (belum diotorisasi), ")
+                + berubah.size() + " baris diubah langsung. Debit = Credit = " + Nominal.format(d) + ".");
         return new ExportResult(true, "Bulk Edit " + label + " diterapkan: " + berubah.size()
-                + " baris diubah. Debit = Credit (balance).", berubah.size(), null);
+                + " baris diubah. Debit = Credit (balance)."
+                + (dariReject ? " Batch diajukan ulang dan kembali menunggu otorisasi checker." : ""), berubah.size(), null);
     }
 
     public static final String PAKAI_TEMPLATE = "Gunakan file dari tombol Export Excel pada batch tersebut,"

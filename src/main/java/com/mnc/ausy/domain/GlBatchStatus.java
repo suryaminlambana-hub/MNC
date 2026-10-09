@@ -1,7 +1,6 @@
 package com.mnc.ausy.domain;
 
 import jakarta.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -19,10 +18,6 @@ public class GlBatchStatus {
     @Column(name = "note")        private String note;
     @Column(name = "decided_by")  private String decidedBy;
     @Column(name = "decided_at")  private LocalDateTime decidedAt;
-    @Column(name = "jml")         private Integer jml;
-    @Column(name = "debit")       private BigDecimal debit;
-    @Column(name = "credit")      private BigDecimal credit;
-    @Column(name = "uploaded_at") private LocalDateTime uploadedAt;
 
     public Long getId() { return id; }
     public String getNoPaket() { return noPaket; } public void setNoPaket(String v) { noPaket = v; }
@@ -31,8 +26,4 @@ public class GlBatchStatus {
     public String getNote() { return note; } public void setNote(String v) { note = v; }
     public String getDecidedBy() { return decidedBy; } public void setDecidedBy(String v) { decidedBy = v; }
     public LocalDateTime getDecidedAt() { return decidedAt; } public void setDecidedAt(LocalDateTime v) { decidedAt = v; }
-    public Integer getJml() { return jml; } public void setJml(Integer v) { jml = v; }
-    public BigDecimal getDebit() { return debit; } public void setDebit(BigDecimal v) { debit = v; }
-    public BigDecimal getCredit() { return credit; } public void setCredit(BigDecimal v) { credit = v; }
-    public LocalDateTime getUploadedAt() { return uploadedAt; } public void setUploadedAt(LocalDateTime v) { uploadedAt = v; }
 }

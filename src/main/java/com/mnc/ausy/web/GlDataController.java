@@ -1,7 +1,6 @@
 package com.mnc.ausy.web;
 
 import com.mnc.ausy.service.BatchLabel;
-import com.mnc.ausy.domain.GlBatchStatus;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.domain.TUpload;
 import com.mnc.ausy.repo.GlTabelRepository;
@@ -59,26 +58,12 @@ public class GlDataController {
         model.addAttribute("isMaker", isMaker(me));
         List<Object[]> pending = pendingUploads(me);
         model.addAttribute("pendingUploads", pending);
-        // REQ_AUSY_00053: kolom Status — Dikembalikan (dari Return Data) per batch yang menunggu, dan
-        // batch Rejected milik maker ini (barisnya sudah dihapus, ringkasannya dari gl_batch_status).
-        List<GlBatchStatus> rejected = isMaker(me) ? batchStatus.rejectedOf(me) : List.of();
-        model.addAttribute("returned", batchStatus.returnedMap());
-        model.addAttribute("rejected", rejected);
+        // REQ_AUSY_00053: kolom Status — Dikembalikan / Rejected (beserta catatan checker) per batch.
+        model.addAttribute("statusBatch", batchStatus.statusMap());
         Set<String> pakets = new HashSet<>();
         pending.forEach(p -> pakets.add(String.valueOf(p[0])));
-        rejected.forEach(r -> pakets.add(r.getNoPaket()));
         model.addAttribute("uploadFiles", uploadFiles(pakets));
         return "gl-legacy/list";
-    }
-
-    /** REQ_AUSY_00053: maker menghapus batch Rejected miliknya dari daftar. */
-    @PostMapping("/gl-legacy/rejected/{paket}/delete")
-    public String dismissRejected(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
-                                  RedirectAttributes ra) {
-        String err = batchStatus.dismissRejected(paket, me);
-        ra.addFlashAttribute(err == null ? "ok" : "warn",
-                err == null ? "Batch " + BatchLabel.label(paket) + " (Rejected) dihapus dari daftar." : err);
-        return "redirect:/gl-legacy";
     }
 
     /**
@@ -87,7 +72,9 @@ public class GlDataController {
      * #temporals di template hanya menerima LocalDateTime — diseragamkan di sini.
      */
     private List<Object[]> pendingUploads(AusyUserDetails me) {
-        List<Object[]> out = scope.filterArrays(me, gl.pendingPakets(), 1);
+        List<Object[]> out = new ArrayList<>(scope.filterArrays(me, gl.pendingPakets(), 1));
+        // REQ_AUSY_00053: batch milik maker ini yang ditolak checker tetap tampil (PDF, Bulk Edit, Hapus).
+        if (isMaker(me)) out.addAll(gl.rejectedPakets(me.getUsername()));
         for (Object[] p : out)
             if (p.length > 5 && p[5] instanceof java.sql.Timestamp ts) p[5] = ts.toLocalDateTime();
         return out;
@@ -119,7 +106,7 @@ public class GlDataController {
     public void bulkExportPending(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
                                   HttpServletResponse resp) throws Exception {
         List<GlTabel> rows = me == null ? List.of() : gl.findBatchRows(paket, me.getUsername()).stream()
-                .filter(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                .filter(GlDataController::bisaBulkEdit)
                 .toList();
         if (rows.isEmpty()) {
             resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + BatchLabel.label(paket) + " tidak ada di upload Anda yang belum diotorisasi.");
@@ -180,6 +167,12 @@ public class GlDataController {
     }
 
     private static String nz(String s) { return s == null ? "" : s; }
+
+    /** Baris batch yang menunggu otorisasi, atau yang ditolak checker (REQ_AUSY_00053). */
+    static boolean bisaBulkEdit(GlTabel g) {
+        return ("PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                || OtorisasiService.REJECTED.equals(g.getStatusDual());
+    }
 
     /** Baris judul berkas = kolom hasil Export Excel Bulk Edit (huruf besar/kecil dan spasi diabaikan). */
     private static boolean sesuaiTemplate(Row judul) {

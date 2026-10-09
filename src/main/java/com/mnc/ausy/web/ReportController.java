@@ -84,13 +84,18 @@ public class ReportController {
         String maker = null;
         for (Object[] p : scope.filterArrays(me, gl.pendingPakets(), 1))
             if (paket.equals(String.valueOf(p[0]))) { maker = String.valueOf(p[1]); break; }
+        // REQ_AUSY_00053: batch milik sendiri yang ditolak checker juga bisa dilihat PDF-nya.
+        if (maker == null && me != null)
+            for (Object[] p : gl.rejectedPakets(me.getUsername()))
+                if (paket.equals(String.valueOf(p[0]))) { maker = me.getUsername(); break; }
         if (maker == null) {
             resp.sendError(HttpServletResponse.SC_NOT_FOUND,
                     "Batch " + BatchLabel.label(paket) + " tidak ada di daftar upload yang menunggu otorisasi Anda.");
             return;
         }
         List<GlTabel> rows = gl.findBatchRows(paket, maker).stream()
-                .filter(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                .filter(g -> ("PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                        || "REJECTED".equals(g.getStatusDual()))
                 .toList();
         resp.setContentType("application/pdf");
         resp.setHeader("Content-Disposition", "attachment; filename=\"Jurnal_Batch_" + paket + "_pending.pdf\"");

@@ -24,9 +24,12 @@
         <thead><tr><th>Batch</th><th>Nama File</th><th>Uploader</th><th>Diupload</th><th class="text-end">Jml Baris</th>
           <th class="text-end">Debit</th><th class="text-end">Credit</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
         <tbody>
+        <!--/* REQ_AUSY_00053: termasuk batch milik maker yang ditolak checker — tetap bisa dibuka PDF-nya,
+               di-Bulk Edit (lalu otomatis diajukan ulang), atau dihapus. */-->
         <tr th:each="p : ${pendingUploads}"
             th:with="milikku=${currentUser != null and currentUser.username == p[1]},
-                     st=${returned.get(p[0] + '|' + p[1])}">
+                     st=${statusBatch.get(p[0] + '|' + p[1])},
+                     ditolak=${st != null and st.status == 'REJECTED'}">
           <td class="text-nowrap" th:text="${@batchLabel.of(p[0])}"></td>
           <td class="small" th:text="${uploadFiles.containsKey(p[0]) ? uploadFiles.get(p[0]) : '-'}"></td>
           <td th:text="${p[1]}"></td>
@@ -34,14 +37,15 @@
           <td class="text-end" th:text="${p[2]}"></td>
           <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
           <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[4],1,'POINT',2,'COMMA')}"></td>
-          <!--/* REQ_AUSY_00053: status batch. Dikembalikan = di-Return Data checker, menunggu otorisasi lagi. */-->
+          <!--/* REQ_AUSY_00053: Menunggu Otorisasi / Dikembalikan (Return Data) / Rejected, + catatan checker. */-->
           <td>
             <span th:if="${st == null}" class="badge bg-warning-subtle text-warning text-nowrap">
               <i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span>
-            <th:block th:if="${st != null}">
-              <span class="badge bg-info-subtle text-info text-nowrap"><i class="fa-solid fa-rotate-left"></i> Dikembalikan</span>
-              <div class="small text-muted" th:text="|${st.decidedBy}: ${st.note}|"></div>
-            </th:block>
+            <span th:if="${ditolak}" class="badge bg-danger-subtle text-danger text-nowrap">
+              <i class="fa-solid fa-xmark"></i> Rejected</span>
+            <span th:if="${st != null and !ditolak}" class="badge bg-info-subtle text-info text-nowrap">
+              <i class="fa-solid fa-rotate-left"></i> Dikembalikan</span>
+            <div th:if="${st != null}" class="small text-muted" th:text="|${st.decidedBy}: ${st.note}|"></div>
           </td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
@@ -49,36 +53,15 @@
             <!--/* REQ_AUSY_00037: Bulk Edit hanya untuk batch milik maker sendiri. Unduh Excel batch ada di
                    dalam popup Bulk Edit (REQ_AUSY_00052). */-->
             <button th:if="${milikku}" type="button" class="btn btn-sm btn-outline-secondary btn-bulk"
-                    th:attr="data-batch=${p[0]},data-label=${@batchLabel.of(p[0])}"><i class="fa-solid fa-file-pen"></i> Bulk Edit</button>
+                    th:attr="data-batch=${p[0]},data-label=${@batchLabel.of(p[0])},data-rejected=${ditolak}"><i class="fa-solid fa-file-pen"></i> Bulk Edit</button>
             <!--/* REQ_AUSY_00022: hanya pengunggahnya sendiri yang bisa menghapus. */-->
             <form th:if="${milikku}" method="post" class="d-inline"
                   th:action="@{'/gl-legacy/pending/' + ${p[0]} + '/delete'}" th:attr="data-batch=${@batchLabel.of(p[0])}"
-                  onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + '? Batch ini belum diotorisasi dan akan dibuang dari antrian checker.');">
+                  onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + '? Batch ini belum diotorisasi dan datanya akan dibuang.');">
               <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus</button>
             </form></td>
         </tr>
-        <!--/* REQ_AUSY_00053: batch yang ditolak checker. Datanya sudah dibuang dari antrian; yang tampil
-               ringkasannya, sampai maker menghapusnya dari daftar. */-->
-        <tr th:each="r : ${rejected}" class="table-light">
-          <td class="text-nowrap" th:text="${@batchLabel.of(r.noPaket)}"></td>
-          <td class="small" th:text="${uploadFiles.containsKey(r.noPaket) ? uploadFiles.get(r.noPaket) : '-'}"></td>
-          <td th:text="${r.maker}"></td>
-          <td class="text-nowrap" th:text="${r.uploadedAt != null ? #temporals.format(r.uploadedAt,'dd-MM-yyyy HH:mm') : '-'}"></td>
-          <td class="text-end" th:text="${r.jml}"></td>
-          <td class="text-end text-nowrap" th:text="${r.debit != null ? #numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA') : '-'}"></td>
-          <td class="text-end text-nowrap" th:text="${r.credit != null ? #numbers.formatDecimal(r.credit,1,'POINT',2,'COMMA') : '-'}"></td>
-          <td>
-            <span class="badge bg-danger-subtle text-danger text-nowrap"><i class="fa-solid fa-xmark"></i> Rejected</span>
-            <div class="small text-muted" th:text="|${r.decidedBy}: ${r.note}|"></div>
-          </td>
-          <td class="text-end text-nowrap">
-            <form method="post" class="d-inline" th:action="@{'/gl-legacy/rejected/' + ${r.noPaket} + '/delete'}"
-                  th:attr="data-batch=${@batchLabel.of(r.noPaket)}"
-                  onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + ' (Rejected) dari daftar?');">
-              <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus</button>
-            </form></td>
-        </tr>
-        <tr th:if="${(pendingUploads == null or pendingUploads.isEmpty()) and rejected.isEmpty()}">
+        <tr th:if="${pendingUploads == null or pendingUploads.isEmpty()}">
           <td colspan="9" class="text-center text-muted py-3">Tidak ada upload yang menunggu otorisasi.</td>
         </tr>
         </tbody>
@@ -108,6 +91,9 @@
             <li>Unggah file hasil edit di sini. Perubahan <b>langsung diterapkan</b> ke batch ini saja;
               checker tetap meng-approve batch-nya sesudah itu.</li>
           </ol>
+          <div class="alert alert-warning py-2 small d-none" id="bulkRejected">Batch ini <b>Rejected</b>. Setelah
+            perbaikan diterapkan (valid &amp; balance), batch otomatis <b>diajukan ulang</b> dan kembali menunggu
+            otorisasi checker.</div>
           <label class="form-label">File Excel (hasil edit) <span class="text-danger">*</span></label>
           <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
         </div>
@@ -128,6 +114,7 @@
         b.addEventListener('click', function(){
           var batch = b.dataset.batch;
           document.getElementById('bulkBatch').textContent = b.dataset.label || batch;
+          document.getElementById('bulkRejected').classList.toggle('d-none', b.dataset.rejected !== 'true');
           document.getElementById('bulkDownload').href = base + encodeURIComponent(batch) + '/bulk-export';
           var f = document.getElementById('bulkForm');
           f.action = base + encodeURIComponent(batch) + '/bulk-upload';

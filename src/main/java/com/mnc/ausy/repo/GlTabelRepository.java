@@ -64,6 +64,15 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> pendingPakets();
 
+    /** Batch upload milik maker ini yang ditolak checker (REQ_AUSY_00053); kolom sama dengan pendingPakets. */
+    @Query(value = "select no_paket, gltrus, count(*), " +
+                   "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
+                   "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0), " +
+                   "max(adddt) " +
+                   "from gl_tabel where status_dual='REJECTED' and gltrus=:u and coalesce(glsrc,'p') <> 'm' " +
+                   "group by no_paket, gltrus order by no_paket", nativeQuery = true)
+    List<Object[]> rejectedPakets(@Param("u") String maker);
+
     /**
      * Recap of GL that has passed otorisasi (active & not PENDING) — konsisten dengan List GL.
      * Data yang ditambahkan manual dikelompokkan terpisah dengan penanda {@code (manual)} supaya
