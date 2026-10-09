@@ -366,6 +366,38 @@ public class GlChangeService {
         return out;
     }
 
+    /** Berapa lama pengajuan Kelola Data GL yang ditolak masih tampil di Rekapitulasi maker. */
+    public static final int REKAP_REJECTED_DAYS = 7;
+
+    /**
+     * REQ_AUSY_00054 — pengajuan Tambah/Ubah data GL milik maker ini yang ditolak checker dalam
+     * {@link #REKAP_REJECTED_DAYS} hari terakhir, untuk Rekapitulasi. Kuncinya sama dengan
+     * {@link #pengajuanOf}; "catatan" berisi alasan penolakan.
+     */
+    public List<Map<String, String>> rejectedOf(AusyUserDetails me) {
+        List<Map<String, String>> out = new ArrayList<>();
+        if (me == null) return out;
+        LocalDateTime batas = LocalDateTime.now().minusDays(REKAP_REJECTED_DAYS);
+        for (GlChangeRequest c : cr.findByStatusAndTarget("REJECTED", T_GL_ROW)) {
+            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) || !me.getUsername().equals(c.getMaker())) continue;
+            if (c.getDecidedAt() == null || c.getDecidedAt().isBefore(batas)) continue;
+            Map<String, String> a = parse(c.getAfterJson());
+            if (a == null) continue;
+            Map<String, String> m = new LinkedHashMap<>(a);
+            m.put("crId", String.valueOf(c.getId()));
+            m.put("glId", c.getGlId() == null ? "" : String.valueOf(c.getGlId()));
+            m.put("op", c.getOp());
+            m.put("jenis", "ADD".equals(c.getOp()) ? "Tambah" : "Ubah");
+            m.put("status", "Rejected");
+            m.put("diajukan", c.getCreatedAt() == null ? "" : c.getCreatedAt().format(TAMPIL));
+            m.put("catatan", n(c.getChecker()) + ": " + n(c.getNoteChecker()));
+            m.put("amountTampil", Nominal.format(amt(a.get("gltram"))));
+            out.add(m);
+        }
+        out.sort(Comparator.comparing((Map<String, String> m) -> Long.valueOf(m.get("crId"))).reversed());
+        return out;
+    }
+
     /** Awalan catatan pengajuan ulang otomatis untuk data manual yang dikembalikan dari penampungan. */
     public static final String RETURN_NOTE = "Dikembalikan dari penampungan";
 

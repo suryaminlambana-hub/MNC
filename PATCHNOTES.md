@@ -143,6 +143,14 @@ Tidak ada migrasi DB.
     - Checker tidak bisa meng-approve/reject batch yang tidak sedang menunggu otorisasi (mis. yang
       sudah Rejected) lewat URL langsung.
     - Nomor batch yang ditolak/dihapus tidak dipakai ulang di hari yang sama.
+  - **Rekapitulasi maker: data yang belum di-approve** (REQ_AUSY_00054). Isinya batch upload dan
+    pengajuan Kelola Data GL milik maker itu, berstatus Menunggu Otorisasi, Dikembalikan, atau
+    Rejected, berikut catatan checker.
+    - Jumlah per status tampil di atas tabel dan bisa diklik untuk menyaring.
+    - Filter Sumber (Batch Upload / Kelola Data GL) dan Status; Export Excel ikut filter.
+    - Pengajuan Kelola Data GL yang ditolak tampil 7 hari. Batch upload yang ditolak tampil sampai
+      diperbaiki atau dihapus.
+    - Role lain (checker, dsb.) tetap melihat rekap GL aktif seperti sebelumnya.
   - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
     dihapus:
     - Data manual yang di-Return Data langsung diajukan ulang. Data itu muncul di tabel Pengajuan
