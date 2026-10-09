@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -198,128 +200,216 @@ public class UploadService {
         return true;
     }
 
+    /**
+     * Isi Sheet1 yang sudah dibaca dan diperiksa. Bila {@link #errors} kosong, {@link #rows} berisi
+     * baris GL siap simpan — belum bernomor batch, pemilik, maupun GLTRRF.
+     */
+    public static class Bacaan {
+        public String message;
+        public final List<String[]> errors = new ArrayList<>();   // [baris, pesan]
+        public final List<GlTabel> rows = new ArrayList<>();
+        public BigDecimal debit = BigDecimal.ZERO, credit = BigDecimal.ZERO;
+        public boolean ok() { return message == null && errors.isEmpty(); }
+    }
+
+    /**
+     * Membaca dan memeriksa Sheet1 template MNC. Dipakai Upload Excel dan Bulk Edit batch
+     * (REQ_AUSY_00057), sehingga keduanya memakai template dan aturan yang persis sama.
+     *
+     * @param tanggalPosting tanggal yang wajib tertulis di kolom A: hari ini untuk upload baru,
+     *                       tanggal posting batch itu untuk Bulk Edit.
+     * @param keteranganTanggal penjelasan tanggal itu untuk pesan gagal ("hari ini", ...).
+     */
+    public Bacaan baca(Workbook wb, LocalDate tanggalPosting, String keteranganTanggal) {
+        Bacaan b = new Bacaan();
+        String today = tanggalPosting.format(IN).toLowerCase();
+        Sheet sh = dataSheet(wb);
+        if (sh == null) {
+            // BUG_AUSY_00182: tidak lagi menyuruh "Unduh Template" — tombolnya sudah
+            // disembunyikan (BUG_AUSY_00181), jadi kalimat itu menunjuk ke sesuatu yang
+            // tidak ada di layar dan hanya membuat orang mencari-cari.
+            b.message = "Format file salah: sheet \"" + UploadTemplateService.DATA_SHEET
+                    + "\" tidak ditemukan.";
+            return b;
+        }
+        int last = sh.getLastRowNum();
+
+        // Pass 1: validate posting date (col A) == tanggalPosting
+        for (int r = 1; r <= last; r++) {
+            if (cell(sh.getRow(r), KEY_COLUMN).isBlank()) continue;
+            String a = cell(sh.getRow(r), 0);
+            if (a.isBlank()) {
+                b.errors.add(new String[]{ String.valueOf(r + 1), "Kolom A [Posting Date] belum diisi." });
+            } else if (!a.toLowerCase().equals(today)) {
+                b.errors.add(new String[]{ String.valueOf(r + 1),
+                    "Kolom A [Posting Date] salah: " + a + " (seharusnya " + today + ")" });
+            }
+        }
+        if (!b.errors.isEmpty()) {
+            b.message = "Upload gagal: tanggal posting tidak sesuai " + keteranganTanggal + ".";
+            return b;
+        }
+        if (!hasDataRow(sh, last)) {
+            b.message = "Tidak ada baris data: kolom E [Transaction_Account] kosong di seluruh sheet \""
+                    + sh.getSheetName() + "\".";
+            return b;
+        }
+
+        // Pass 2: bentuk isian per kolom.
+        //
+        // Penyaringan simbol menyeluruh sudah dicabut (BUG_AUSY_00191) — kolom nama dan
+        // deskripsi adalah free text yang memang wajar memuat tanda baca. Yang diperiksa kini
+        // hanya kolom yang bentuknya memang ditentukan aturan bisnis, masing-masing dengan
+        // aturannya sendiri.
+        //
+        // Berkasnya ditolak UTUH, bukan separuh masuk lalu ketahuan saat Checker sudah
+        // menyetujui, dan tiap pelanggaran disebut lengkap dengan baris serta kolomnya.
+        BigDecimal cekDebit = BigDecimal.ZERO, cekCredit = BigDecimal.ZERO;
+        for (int r = 1; r <= last; r++) {
+            Row row = sh.getRow(r);
+            if (cell(row, KEY_COLUMN).isBlank()) continue;
+            String baris = String.valueOf(r + 1);
+
+            // REQ_AUSY_00024 — nominal harus angka dan tidak boleh minus. Dulu nilai yang
+            // tidak terbaca diam-diam menjadi 0 dan nominal minus masuk begitu saja.
+            String nomTeks = cell(row, KOLOM_NOMINAL);
+            BigDecimal nom = nominalAtauNull(nomTeks);
+            if (nom == null)
+                b.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] bukan angka — saat ini \""
+                        + nomTeks + "\"." });
+            else if (nom.signum() < 0)
+                b.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] tidak boleh minus — saat ini "
+                        + nominal(nom) + "." });
+            else if (cell(row, 1).equalsIgnoreCase("D")) cekDebit = cekDebit.add(nom);
+            else cekCredit = cekCredit.add(nom);
+
+            // Sel bernilai galat Excel — hampir selalu VLOOKUP yang tidak menemukan padanan.
+            //
+            // Inilah yang sebenarnya terjadi saat kode diketik dengan tanda petik di depan
+            // ("'10911513"): tanda petiknya BUKAN bagian dari nilai — Excel memakainya untuk
+            // menandai sel itu teks, dan yang tersimpan tetap "10911513". Jadi tidak ada yang
+            // bisa disaring dari nilainya. Yang rusak adalah pencariannya: angka-sebagai-teks
+            // tidak cocok dengan daftar COA yang berisi angka, sehingga Gl_Name menjadi #N/A.
+            //
+            // Dulu baris itu tetap masuk: cell() memetakan sel galat menjadi string kosong,
+            // jadi yang tersimpan adalah baris GL dengan NAMA GL KOSONG, dan begitulah ia
+            // terbawa ke berkas ACCTXT. Sekarang berkasnya ditolak dan sebabnya disebut.
+            for (int c = 0; c < LABEL_KOLOM.length; c++) {
+                String galat = galatExcel(row, c);
+                if (galat != null)
+                    b.errors.add(new String[]{ baris, LABEL_KOLOM[c] + " bernilai " + galat
+                            + " — rumus pencarian tidak menemukan padanannya. Pastikan kodenya"
+                            + " terdaftar dan diisi sebagai angka, bukan teks (diawali tanda petik)." });
+            }
+
+            // BUG_AUSY_00190 — currency wajib IDR. Kosong pun ditolak: baris GL tanpa mata
+            // uang tidak punya arti, dan dulu baris seperti itu lolos tanpa sepatah pesan.
+            String curr = cell(row, KOLOM_CURRENCY);
+            if (!curr.equalsIgnoreCase("IDR"))
+                b.errors.add(new String[]{ baris, "Kolom L [Currency] wajib diisi \"IDR\""
+                        + (curr.isBlank() ? " (saat ini kosong)." : " (saat ini \"" + curr + "\").") });
+
+            // BUG_AUSY_00192 — kode hanya angka. Sel kosong dilewati: yang dipersoalkan
+            // bentuk isiannya, bukan ada atau tidaknya isi.
+            for (int[] col : KOLOM_ANGKA) {
+                String v = cell(row, col[0]);
+                if (!v.isEmpty() && !angkaSaja(v))
+                    b.errors.add(new String[]{ baris, LABEL_ANGKA[col[1]]
+                            + " hanya boleh berisi angka (0-9) — saat ini \"" + v + "\"." });
+            }
+
+            // BUG_AUSY_00193 — cabang & cost centre: angka dan tanda petik satu.
+            for (int[] col : KOLOM_ANGKA_PETIK) {
+                String v = cell(row, col[0]);
+                if (!v.isEmpty() && !angkaAtauPetik(v))
+                    b.errors.add(new String[]{ baris, LABEL_ANGKA_PETIK[col[1]]
+                            + " hanya boleh berisi angka (0-9) dan tanda petik satu (') — saat ini \""
+                            + v + "\"." });
+            }
+        }
+        // REQ_AUSY_00024 — total Debit harus sama dengan total Credit. Dulu berkas yang tidak
+        // balance tetap masuk dengan sekadar peringatan, lalu baru tertahan di checker.
+        // Diperiksa hanya bila semua nominal terbaca, supaya angkanya tidak menyesatkan.
+        if (b.errors.isEmpty() && cekDebit.compareTo(cekCredit) != 0)
+            b.errors.add(new String[]{ "Total", "Total Debit " + nominal(cekDebit)
+                    + " tidak sama dengan total Credit " + nominal(cekCredit) + " (selisih "
+                    + nominal(cekDebit.subtract(cekCredit).abs()) + ")." });
+        if (!b.errors.isEmpty()) {
+            b.message = "Upload gagal: ada isian yang tidak sesuai ketentuan kolom. "
+                    + "Perbaiki di file Excel lalu unggah ulang.";
+            return b;
+        }
+
+        // Pass 3: bentuk baris GL.
+        for (int r = 1; r <= last; r++) {
+            Row row = sh.getRow(r);
+            if (cell(row, KEY_COLUMN).isBlank()) continue;
+            String postingDate = cell(row, 0);
+            String dc = cell(row, 1).toUpperCase();
+            BigDecimal amt = amount(cell(row, 13));
+            String ddmmyy;
+            try { ddmmyy = LocalDate.parse(postingDate, IN).format(DDMMYY); } catch (Exception e) { ddmmyy = ""; }
+
+            // Kolom teks dirapikan di sini, bukan ditolak (BUG_AUSY_00180): karakter di luar
+            // huruf/angka/spasi/titik/koma/garis bawah diganti spasi lalu ujungnya dibuang.
+            // Tanggal dan nominal TIDAK lewat sini — tanda hubung pada "5-Oct-26" justru
+            // bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal
+            // diurai.
+            GlTabel g = new GlTabel();
+            g.setGltrfy(GlTextRule.trim(cell(row, 12)));
+            g.setGltrcd(dc);
+            g.setGlprdc(GlTextRule.trim(cell(row, 2)));
+            g.setGltrac(GlTextRule.trim(cell(row, 4)));
+            g.setGltrpd(ddmmyy);
+            g.setGlName(GlTextRule.trim(cell(row, 5)));
+            String desc = GlTextRule.trim(cell(row, 6));
+            if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
+            g.setGltrds(desc);
+            g.setGltrbr(GlTextRule.trim(cell(row, 7)));
+            g.setBrName(GlTextRule.trim(cell(row, 8)));
+            // Titik & koma dibuang — cost centre itu kode angka, sama seperti source asli.
+            // Karakter lain sudah dijamin bersih oleh pemeriksaan di atas.
+            g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));
+            g.setGltrcy(GlTextRule.trim(cell(row, 11)));
+            g.setGltram(amt);
+            g.setGlflag(GlTextRule.trim(cell(row, 14)));
+            g.setGlresp(GlTextRule.trim(cell(row, 15)));
+            g.setCsName(GlTextRule.trim(cell(row, 10)));
+            g.setGleqam(amt);
+            g.setGlotam(amt);
+            g.setGltrpd1(ddmmyy);
+            g.setStatusPrint("BELUM UPLOAD");
+            g.setGlsrc("p");
+            g.setGlotcc(GlTextRule.trim(cell(row, 11)));
+            g.setStatusDual("PENDING");
+            b.rows.add(g);
+            if (dc.equals("D")) b.debit = b.debit.add(amt); else b.credit = b.credit.add(amt);
+        }
+        return b;
+    }
+
+    /**
+     * Simpan baris hasil {@link #baca} sebagai isi batch {@code paket} milik {@code username}:
+     * nomor batch, pemilik, dan GLTRRF baru per baris.
+     */
+    public void simpanBaris(List<GlTabel> rows, String paket, String username) {
+        for (GlTabel g : rows) {
+            g.setNoPaket(paket);
+            // username utuh: pemiliknya harus bisa dicocokkan untuk pembatasan data per maker (BUG_AUSY_00138).
+            // Pemotongan ke 10 karakter tetap dilakukan GltrrfFormatter saat menulis file ACCTXT.
+            g.setGltrus(username);
+            g.setGltrrf(paket + "-01-" + String.format("%04d", seq.next()));
+            gl.save(g);
+        }
+    }
+
     @Transactional
     public UploadResult process(InputStream in, String fileName, String username) throws Exception {
         UploadResult res = new UploadResult();
-        String today = LocalDate.now().format(IN).toLowerCase();
-
         try (Workbook wb = WorkbookFactory.create(in)) {
-            Sheet sh = dataSheet(wb);
-            if (sh == null) {
-                // BUG_AUSY_00182: tidak lagi menyuruh "Unduh Template" — tombolnya sudah
-                // disembunyikan (BUG_AUSY_00181), jadi kalimat itu menunjuk ke sesuatu yang
-                // tidak ada di layar dan hanya membuat orang mencari-cari.
-                res.message = "Format file salah: sheet \"" + UploadTemplateService.DATA_SHEET
-                        + "\" tidak ditemukan.";
-                return res;
-            }
-            int last = sh.getLastRowNum();
-
-            // Pass 1: validate posting date (col A) == today
-            for (int r = 1; r <= last; r++) {
-                if (cell(sh.getRow(r), KEY_COLUMN).isBlank()) continue;
-                String a = cell(sh.getRow(r), 0);
-                if (a.isBlank()) {
-                    res.errors.add(new String[]{ String.valueOf(r + 1), "Kolom A [Posting Date] belum diisi." });
-                } else if (!a.toLowerCase().equals(today)) {
-                    res.errors.add(new String[]{ String.valueOf(r + 1),
-                        "Kolom A [Posting Date] salah: " + a + " (seharusnya " + today + ")" });
-                }
-            }
-            if (!res.errors.isEmpty()) {
-                res.message = "Upload gagal: tanggal posting tidak sesuai hari ini.";
-                return res;
-            }
-            if (!hasDataRow(sh, last)) {
-                res.message = "Tidak ada baris data: kolom E [Transaction_Account] kosong di seluruh sheet \""
-                        + sh.getSheetName() + "\".";
-                return res;
-            }
-
-            // Pass 2: bentuk isian per kolom.
-            //
-            // Penyaringan simbol menyeluruh sudah dicabut (BUG_AUSY_00191) — kolom nama dan
-            // deskripsi adalah free text yang memang wajar memuat tanda baca. Yang diperiksa kini
-            // hanya kolom yang bentuknya memang ditentukan aturan bisnis, masing-masing dengan
-            // aturannya sendiri.
-            //
-            // Berkasnya ditolak UTUH, bukan separuh masuk lalu ketahuan saat Checker sudah
-            // menyetujui, dan tiap pelanggaran disebut lengkap dengan baris serta kolomnya.
-            BigDecimal cekDebit = BigDecimal.ZERO, cekCredit = BigDecimal.ZERO;
-            for (int r = 1; r <= last; r++) {
-                Row row = sh.getRow(r);
-                if (cell(row, KEY_COLUMN).isBlank()) continue;
-                String baris = String.valueOf(r + 1);
-
-                // REQ_AUSY_00024 — nominal harus angka dan tidak boleh minus. Dulu nilai yang
-                // tidak terbaca diam-diam menjadi 0 dan nominal minus masuk begitu saja.
-                String nomTeks = cell(row, KOLOM_NOMINAL);
-                BigDecimal nom = nominalAtauNull(nomTeks);
-                if (nom == null)
-                    res.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] bukan angka — saat ini \""
-                            + nomTeks + "\"." });
-                else if (nom.signum() < 0)
-                    res.errors.add(new String[]{ baris, "Kolom N [Transaction_Amount] tidak boleh minus — saat ini "
-                            + nominal(nom) + "." });
-                else if (cell(row, 1).equalsIgnoreCase("D")) cekDebit = cekDebit.add(nom);
-                else cekCredit = cekCredit.add(nom);
-
-                // Sel bernilai galat Excel — hampir selalu VLOOKUP yang tidak menemukan padanan.
-                //
-                // Inilah yang sebenarnya terjadi saat kode diketik dengan tanda petik di depan
-                // ("'10911513"): tanda petiknya BUKAN bagian dari nilai — Excel memakainya untuk
-                // menandai sel itu teks, dan yang tersimpan tetap "10911513". Jadi tidak ada yang
-                // bisa disaring dari nilainya. Yang rusak adalah pencariannya: angka-sebagai-teks
-                // tidak cocok dengan daftar COA yang berisi angka, sehingga Gl_Name menjadi #N/A.
-                //
-                // Dulu baris itu tetap masuk: cell() memetakan sel galat menjadi string kosong,
-                // jadi yang tersimpan adalah baris GL dengan NAMA GL KOSONG, dan begitulah ia
-                // terbawa ke berkas ACCTXT. Sekarang berkasnya ditolak dan sebabnya disebut.
-                for (int c = 0; c < LABEL_KOLOM.length; c++) {
-                    String galat = galatExcel(row, c);
-                    if (galat != null)
-                        res.errors.add(new String[]{ baris, LABEL_KOLOM[c] + " bernilai " + galat
-                                + " — rumus pencarian tidak menemukan padanannya. Pastikan kodenya"
-                                + " terdaftar dan diisi sebagai angka, bukan teks (diawali tanda petik)." });
-                }
-
-                // BUG_AUSY_00190 — currency wajib IDR. Kosong pun ditolak: baris GL tanpa mata
-                // uang tidak punya arti, dan dulu baris seperti itu lolos tanpa sepatah pesan.
-                String curr = cell(row, KOLOM_CURRENCY);
-                if (!curr.equalsIgnoreCase("IDR"))
-                    res.errors.add(new String[]{ baris, "Kolom L [Currency] wajib diisi \"IDR\""
-                            + (curr.isBlank() ? " (saat ini kosong)." : " (saat ini \"" + curr + "\").") });
-
-                // BUG_AUSY_00192 — kode hanya angka. Sel kosong dilewati: yang dipersoalkan
-                // bentuk isiannya, bukan ada atau tidaknya isi.
-                for (int[] col : KOLOM_ANGKA) {
-                    String v = cell(row, col[0]);
-                    if (!v.isEmpty() && !angkaSaja(v))
-                        res.errors.add(new String[]{ baris, LABEL_ANGKA[col[1]]
-                                + " hanya boleh berisi angka (0-9) — saat ini \"" + v + "\"." });
-                }
-
-                // BUG_AUSY_00193 — cabang & cost centre: angka dan tanda petik satu.
-                for (int[] col : KOLOM_ANGKA_PETIK) {
-                    String v = cell(row, col[0]);
-                    if (!v.isEmpty() && !angkaAtauPetik(v))
-                        res.errors.add(new String[]{ baris, LABEL_ANGKA_PETIK[col[1]]
-                                + " hanya boleh berisi angka (0-9) dan tanda petik satu (') — saat ini \""
-                                + v + "\"." });
-                }
-            }
-            // REQ_AUSY_00024 — total Debit harus sama dengan total Credit. Dulu berkas yang tidak
-            // balance tetap masuk dengan sekadar peringatan, lalu baru tertahan di checker.
-            // Diperiksa hanya bila semua nominal terbaca, supaya angkanya tidak menyesatkan.
-            if (res.errors.isEmpty() && cekDebit.compareTo(cekCredit) != 0)
-                res.errors.add(new String[]{ "Total", "Total Debit " + nominal(cekDebit)
-                        + " tidak sama dengan total Credit " + nominal(cekCredit) + " (selisih "
-                        + nominal(cekDebit.subtract(cekCredit).abs()) + ")." });
-            if (!res.errors.isEmpty()) {
-                res.message = "Upload gagal: ada isian yang tidak sesuai ketentuan kolom. "
-                        + "Perbaiki di file Excel lalu unggah ulang.";
-                return res;
-            }
+            Bacaan b = baca(wb, LocalDate.now(), "hari ini");
+            res.errors.addAll(b.errors);
+            if (!b.ok()) { res.message = b.message; return res; }
 
             // REQ_AUSY_00031: nomor batch mulai dari 1 setiap hari, digabung tanggal supaya tetap
             // unik (20261008001). Tanpa pemisah "-": referensi GLTRRF berbentuk
@@ -327,57 +417,9 @@ public class UploadService {
             // 11 karakter, jadi referensi 19 karakter masih muat di kolom 20 karakter ACCTXT.
             String tgl = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String paket = tgl + String.format("%03d", gl.maxUrutBatchHarian(tgl) + 1);
-            int n = 0;
-            for (int r = 1; r <= last; r++) {
-                Row row = sh.getRow(r);
-                if (cell(row, KEY_COLUMN).isBlank()) continue;
-                String postingDate = cell(row, 0);
-                String dc = cell(row, 1).toUpperCase();
-                BigDecimal amt = amount(cell(row, 13));
-                String ddmmyy;
-                try { ddmmyy = LocalDate.parse(postingDate, IN).format(DDMMYY); } catch (Exception e) { ddmmyy = ""; }
-
-                // Kolom teks dirapikan di sini, bukan ditolak (BUG_AUSY_00180): karakter di luar
-                // huruf/angka/spasi/titik/koma/garis bawah diganti spasi lalu ujungnya dibuang.
-                // Tanggal dan nominal TIDAK lewat sini — tanda hubung pada "5-Oct-26" justru
-                // bagian dari formatnya, dan menggantinya dengan spasi membuat tanggal gagal
-                // diurai.
-                GlTabel g = new GlTabel();
-                g.setGltrfy(GlTextRule.trim(cell(row, 12)));
-                g.setGltrcd(dc);
-                g.setGlprdc(GlTextRule.trim(cell(row, 2)));
-                g.setGltrac(GlTextRule.trim(cell(row, 4)));
-                g.setGltrpd(ddmmyy);
-                g.setGlName(GlTextRule.trim(cell(row, 5)));
-                String desc = GlTextRule.trim(cell(row, 6));
-                if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
-                g.setGltrds(desc);
-                g.setGltrbr(GlTextRule.trim(cell(row, 7)));
-                g.setBrName(GlTextRule.trim(cell(row, 8)));
-                // Titik & koma dibuang — cost centre itu kode angka, sama seperti source asli.
-                // Karakter lain sudah dijamin bersih oleh pemeriksaan di atas.
-                g.setGltrcc(cell(row, 9).replace(".", "").replace(",", ""));
-                g.setGltrcy(GlTextRule.trim(cell(row, 11)));
-                g.setGltram(amt);
-                g.setGlflag(GlTextRule.trim(cell(row, 14)));
-                g.setGlresp(GlTextRule.trim(cell(row, 15)));
-                g.setCsName(GlTextRule.trim(cell(row, 10)));
-                g.setNoPaket(paket);
-                g.setGleqam(amt);
-                g.setGlotam(amt);
-                // username utuh: pemiliknya harus bisa dicocokkan untuk pembatasan data per maker (BUG_AUSY_00138).
-                // Pemotongan ke 10 karakter tetap dilakukan GltrrfFormatter saat menulis file ACCTXT.
-                g.setGltrus(username);
-                g.setGltrpd1(ddmmyy);
-                g.setStatusPrint("BELUM UPLOAD");
-                g.setGlsrc("p");
-                g.setGlotcc(GlTextRule.trim(cell(row, 11)));
-                g.setGltrrf(paket + "-01-" + String.format("%04d", seq.next()));
-                g.setStatusDual("PENDING");
-                gl.save(g);
-                if (dc.equals("D")) res.debit = res.debit.add(amt); else res.credit = res.credit.add(amt);
-                n++;
-            }
+            simpanBaris(b.rows, paket, username);
+            int n = b.rows.size();
+            res.debit = b.debit; res.credit = b.credit;
 
             res.rows = n;
             res.paket = paket;

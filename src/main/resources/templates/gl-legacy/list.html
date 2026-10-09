@@ -87,9 +87,11 @@
             <li class="mb-1">Unduh Excel batch
               <a id="bulkDownload" href="#" class="btn btn-sm btn-outline-success py-0 px-2 ms-1">
                 <i class="fa-solid fa-file-excel"></i> Download</a></li>
-            <li>Ubah GL Code, D/C, Amount (format <b>1.000.000,50</b>) atau Description. Jangan ubah kolom <b>ID</b>.</li>
-            <li>Unggah file hasil edit di sini. Perubahan <b>langsung diterapkan</b> ke batch ini saja;
-              checker tetap meng-approve batch-nya sesudah itu.</li>
+            <!--/* REQ_AUSY_00057: file-nya template MNC yang sama dengan Upload Excel, sudah terisi batch ini. */-->
+            <li>Ubah isi <b>Sheet1</b> (template MNC, sama dengan Upload Excel). Baris boleh diubah, ditambah,
+              atau dihapus; kolom A [Posting_Date] jangan diubah.</li>
+            <li>Unggah file hasil edit di sini. Diperiksa sama seperti Upload Excel (termasuk Debit = Credit),
+              lalu isi batch ini <b>diganti</b> dengan isi file; checker tetap meng-approve batch-nya sesudah itu.</li>
           </ol>
           <div class="alert alert-warning py-2 small d-none" id="bulkRejected">Batch ini <b>Rejected</b>. Setelah
             perbaikan diterapkan (valid &amp; balance), batch otomatis <b>diajukan ulang</b> dan kembali menunggu

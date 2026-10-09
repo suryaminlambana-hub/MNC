@@ -151,6 +151,22 @@ Tidak ada migrasi DB.
     - Pengajuan Kelola Data GL yang ditolak tampil 7 hari. Batch upload yang ditolak tampil sampai
       diperbaiki atau dihapus.
     - Role lain (checker, dsb.) tetap melihat rekap GL aktif seperti sebelumnya.
+  - **Template Bulk Edit = template MNC** (REQ_AUSY_00057).
+    - Download di popup Bulk Edit sekarang berupa template upload MNC yang sama persis (sheet
+      referensi, Sheet1, 17 kolom dengan judul & urutan yang sama, format dan rumus bantu), dengan
+      Sheet1 sudah terisi baris batch itu.
+    - Hasil editnya diperiksa dengan aturan yang **sama dengan Upload Excel** (nominal, kode, IDR,
+      sel #N/A, Debit = Credit). Kolom A wajib tanggal posting batch itu.
+    - Template MNC tidak punya kolom ID, jadi isi batch **diganti** dengan isi file: baris boleh
+      diubah, ditambah, atau dihapus. Nomor batch dan waktu upload tetap.
+    - File upload asli (template MNC) juga bisa langsung dipakai untuk Bulk Edit. File format lama
+      (6 kolom dengan ID) ditolak.
+    - Sheet referensi template: kode angka tanpa nol di depan (COA, Product Code) kini ditulis
+      sebagai angka seperti di AUSY.xls, supaya VLOOKUP Gl_Name tidak #N/A saat kode GL diketik.
+  - **Checker: alasan Approve terkunci ditampilkan** (REQ_AUSY_00056). Tidak ada batasan tanggal:
+    batch hari sebelumnya bisa di-approve (sudah diuji). Approve hanya terkunci bila batch tidak
+    balance, dan kini selisihnya serta saran "minta maker memperbaiki lewat Bulk Edit" tampil di
+    kolom Balance.
   - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
     dihapus:
     - Data manual yang di-Return Data langsung diajukan ulang. Data itu muncul di tabel Pengajuan

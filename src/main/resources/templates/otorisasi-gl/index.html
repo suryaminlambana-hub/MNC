@@ -34,13 +34,21 @@
             <td class="text-end" th:text="${p.jml}"></td>
             <td class="text-end" th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></td>
             <td class="text-end" th:text="${#numbers.formatDecimal(p.credit,1,'POINT',2,'COMMA')}"></td>
+            <!--/* REQ_AUSY_00056: Approve hanya terkunci bila batch tidak balance — tidak ada batasan
+                   tanggal. Alasannya ditulis supaya tidak terbaca seolah batch lama tidak bisa di-approve. */-->
             <td><span th:if="${p.balanced}" class="badge bg-success-subtle text-success">Balance</span>
-                <span th:unless="${p.balanced}" class="badge bg-danger-subtle text-danger">Tidak Balance</span></td>
+                <th:block th:unless="${p.balanced}">
+                  <span class="badge bg-danger-subtle text-danger">Tidak Balance</span>
+                  <div class="small text-danger text-nowrap"
+                       th:text="'Selisih ' + ${#numbers.formatDecimal(p.debit.subtract(p.credit).abs(),1,'POINT',2,'COMMA')}"></div>
+                  <div class="small text-muted">Approve terkunci; minta maker memperbaiki lewat Bulk Edit.</div>
+                </th:block></td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" th:href="@{'/report/jurnal/'+${p.paket}}" target="_blank"><i class="fa-solid fa-file-pdf"></i> PDF</a>
               <form th:action="@{/otorisasi/process}" method="post" class="d-inline" onsubmit="return confirm('Approve batch ini menjadi GL Aktif?');">
                 <input type="hidden" name="paket" th:value="${p.paket}"><input type="hidden" name="inputer" th:value="${p.inputer}">
-                <button class="btn btn-sm btn-success" th:disabled="${!p.balanced}"><i class="fa-solid fa-check"></i> Approve</button>
+                <button class="btn btn-sm btn-success" th:disabled="${!p.balanced}"
+                        th:title="${p.balanced} ? '' : 'Batch tidak balance (Debit ≠ Credit)'"><i class="fa-solid fa-check"></i> Approve</button>
               </form>
               <button type="button" class="btn btn-sm btn-outline-danger btn-reject-paket"
                       th:attr="data-paket=${p.paket},data-inputer=${p.inputer}"><i class="fa-solid fa-xmark"></i> Reject</button>

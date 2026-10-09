@@ -112,6 +112,17 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query("delete from GlTabel g where g.noPaket=:p and g.gltrus=:u and coalesce(g.glsrc,'p') <> 'm'")
     void deletePaket(@Param("p") String paket, @Param("u") String inputer);
 
+    /** Waktu upload sebuah batch (kolom adddt tidak dipetakan di entity — diisi default DB). */
+    @Query(value = "select max(adddt) from gl_tabel where no_paket=:p and gltrus=:u and coalesce(glsrc,'p') <> 'm'",
+           nativeQuery = true)
+    java.time.LocalDateTime uploadedAt(@Param("p") String paket, @Param("u") String inputer);
+
+    /** Bulk Edit mengganti baris batch; waktu upload aslinya dipertahankan (REQ_AUSY_00057). */
+    @Modifying @Transactional
+    @Query(value = "update gl_tabel set adddt=:t where no_paket=:p and gltrus=:u and coalesce(glsrc,'p') <> 'm'",
+           nativeQuery = true)
+    void setUploadedAt(@Param("p") String paket, @Param("u") String inputer, @Param("t") java.time.LocalDateTime t);
+
     // ===== Export flow (maker Ajukan Export -> checker Otorisasi Export -> file ACCTXT) =====
     /** GL aktif yang sudah lolos otorisasi upload tapi BELUM diajukan/diexport, dibatasi paket pilihan maker. */
     @Query("select g from GlTabel g where g.active=1 and g.statusDual='APPROVED' " +

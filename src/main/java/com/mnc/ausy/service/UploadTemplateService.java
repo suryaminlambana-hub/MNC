@@ -1,5 +1,6 @@
 package com.mnc.ausy.service;
 
+import com.mnc.ausy.domain.GlTabel;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -19,6 +20,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -75,16 +78,30 @@ public class UploadTemplateService {
     private static final int INPUT_ROWS = 167;
 
     public void download(HttpServletResponse resp) throws Exception {
+        kirim(resp, List.of(), "template_upload.xlsx");
+    }
+
+    /**
+     * REQ_AUSY_00057 — Excel Bulk Edit sebuah batch: template MNC yang sama persis dengan template
+     * upload (sheet referensi, Sheet1, judul &amp; urutan kolom, format, rumus bantu), dengan Sheet1
+     * sudah terisi baris batch itu. Hasil editnya diunggah balik dan dibaca dengan aturan yang sama
+     * dengan Upload Excel ({@link UploadService#baca}).
+     */
+    public void downloadBatch(HttpServletResponse resp, List<GlTabel> rows, String fileName) throws Exception {
+        kirim(resp, rows, fileName);
+    }
+
+    private void kirim(HttpServletResponse resp, List<GlTabel> isi, String fileName) throws Exception {
         try (Workbook wb = new XSSFWorkbook()) {
             CellStyle head = headerStyle(wb);
             int[] refRows = new int[REFERENCE.length];
             for (int i = 0; i < REFERENCE.length; i++)
                 refRows[i] = referenceSheet(wb, REFERENCE[i][0], REFERENCE[i][1], head);
 
-            dataSheet(wb, head, refRows[1], refRows[2], refRows[3]);
+            dataSheet(wb, head, refRows[1], refRows[2], refRows[3], isi);
 
             resp.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            resp.setHeader("Content-Disposition", "attachment; filename=\"template_upload.xlsx\"");
+            resp.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
             OutputStream o = resp.getOutputStream();
             wb.write(o);
             o.flush();
@@ -126,8 +143,13 @@ public class UploadTemplateService {
                     // template yang diterbitkan utuh justru gagal diunggah oleh aplikasinya
                     // sendiri. Penolakan itu sudah dicabut (BUG_AUSY_00191), jadi nama COA kini
                     // terbit persis seperti di daftar MNC.
-                    cell.setCellValue(GlTextRule.trim(cells[c]));
-                    if (r == 0) cell.setCellStyle(head);
+                    //
+                    // Kode berupa angka tanpa nol di depan (COA, Product Code) ditulis sebagai
+                    // ANGKA, seperti di AUSY.xls: VLOOKUP di Sheet1 tidak mencocokkan angka yang
+                    // diketik maker dengan teks, sehingga Gl_Name menjadi #N/A (REQ_AUSY_00057).
+                    // Kode berawalan nol (cabang, cost centre) tetap teks.
+                    if (r == 0) { cell.setCellValue(GlTextRule.trim(cells[c])); cell.setCellStyle(head); }
+                    else tulis(cell, GlTextRule.trim(cells[c]));
                 }
                 r++;
             }
@@ -151,7 +173,7 @@ public class UploadTemplateService {
      * Baris pertama tidak diberi Flag: di AUSY.xls baris itu jadi acuan cabang penampung yang
      * ditunjuk rumus {@code =IF(O{n}=2,$H$2,"")} pada baris-baris sesudahnya.
      */
-    private void dataSheet(Workbook wb, CellStyle head, int coaRows, int ccRows, int branchRows) {
+    private void dataSheet(Workbook wb, CellStyle head, int coaRows, int ccRows, int branchRows, List<GlTabel> isi) {
         Sheet sh = wb.createSheet(DATA_SHEET);
 
         CellStyle dateStyle = wb.createCellStyle();
@@ -164,28 +186,66 @@ public class UploadTemplateService {
             c.setCellStyle(head);
         }
 
-        for (int i = 1; i <= INPUT_ROWS; i++) {
+        // Template kosong: 167 baris berumus seperti AUSY.xls. Template batch (Bulk Edit): baris
+        // batch itu, lalu sisa baris berumus supaya maker masih bisa menambah baris.
+        int jumlah = Math.max(INPUT_ROWS, isi.size() + 20);
+        // Template batch: baris kosong pun bertanggal posting batch itu, bukan =NOW() — batch dari
+        // hari sebelumnya wajib tetap bertanggal posting aslinya, dan baris tambahan akan ditolak
+        // kalau tanggalnya ikut berganti hari ini.
+        LocalDate tglBatch = isi.stream().map(x -> tanggal(x.getGltrpd())).filter(java.util.Objects::nonNull)
+                .findFirst().orElse(null);
+        for (int i = 1; i <= jumlah; i++) {
             Row row = sh.createRow(i);
             int n = i + 1;                                  // nomor baris seperti terlihat di Excel
+            GlTabel g = i <= isi.size() ? isi.get(i - 1) : null;
 
             Cell a = row.createCell(0);
-            a.setCellFormula("NOW()");
+            LocalDate tgl = g != null ? tanggal(g.getGltrpd()) : tglBatch;
+            if (tgl != null) a.setCellValue(tgl); else a.setCellFormula("NOW()");
             a.setCellStyle(dateStyle);
 
-            row.createCell(5).setCellFormula(
-                    "VLOOKUP(E" + n + ",COA!$A$2:$B$" + coaRows + ",2,FALSE)");
-            row.createCell(8).setCellFormula(
-                    "VLOOKUP(H" + n + ",Branch_Code!$A$2:$B$" + branchRows + ",2,FALSE)");
-            row.createCell(11).setCellValue("IDR");
+            Cell f = row.createCell(5);
+            f.setCellFormula("VLOOKUP(E" + n + ",COA!$A$2:$B$" + coaRows + ",2,FALSE)");
+            Cell nmCabang = row.createCell(8);
+            nmCabang.setCellFormula("VLOOKUP(H" + n + ",Branch_Code!$A$2:$B$" + branchRows + ",2,FALSE)");
+            row.createCell(11).setCellValue(g == null ? "IDR" : nz(g.getGltrcy()));
 
-            if (i == 1) continue;                           // baris acuan cabang penampung
+            if (g != null) {
+                // Isi batch. Sel berumus tetap berumus seperti template, dengan nilai tersimpan
+                // dari data — supaya terbaca benar walau berkasnya diunggah tanpa dibuka Excel.
+                row.createCell(1).setCellValue(nz(g.getGltrcd()));
+                tulis(row.createCell(2), nz(g.getGlprdc()));
+                tulis(row.createCell(4), nz(g.getGltrac()));
+                f.setCellValue(nz(g.getGlName()));
+                row.createCell(6).setCellValue(nz(g.getGltrds()));
+                tulis(row.createCell(7), nz(g.getGltrbr()));
+                nmCabang.setCellValue(nz(g.getBrName()));
+                tulis(row.createCell(9), nz(g.getGltrcc()));
+                tulis(row.createCell(12), nz(g.getGltrfy()));
+                row.createCell(13).setCellValue(g.getGltram() == null ? 0 : g.getGltram().doubleValue());
+            }
 
-            row.createCell(10).setCellFormula(
-                    "VLOOKUP(J" + n + ",Cost_Center!$A$2:$B$" + ccRows + ",2,FALSE)");
-            row.createCell(14).setCellValue(2);
-            row.createCell(15).setCellFormula("IF(O" + n + "=2,$H$2,\"\")");
+            if (i == 1) {                                   // baris acuan cabang penampung
+                if (g != null) {
+                    if (!nz(g.getCsName()).isEmpty()) row.createCell(10).setCellValue(g.getCsName());
+                    if (!nz(g.getGlflag()).isEmpty()) tulis(row.createCell(14), g.getGlflag());
+                    if (!nz(g.getGlresp()).isEmpty()) tulis(row.createCell(15), g.getGlresp());
+                }
+                continue;
+            }
+
+            Cell k = row.createCell(10);
+            k.setCellFormula("VLOOKUP(J" + n + ",Cost_Center!$A$2:$B$" + ccRows + ",2,FALSE)");
+            Cell o = row.createCell(14);
+            if (g == null) o.setCellValue(2); else tulis(o, nz(g.getGlflag()));
+            Cell p = row.createCell(15);
+            p.setCellFormula("IF(O" + n + "=2,$H$2,\"\")");
             row.createCell(16).setCellFormula(
                     "VLOOKUP(P" + n + ",Branch_Code!$A$2:$B$" + branchRows + ",2,FALSE)");
+            if (g != null) {
+                k.setCellValue(nz(g.getCsName()));
+                p.setCellValue(nz(g.getGlresp()));
+            }
         }
 
         for (int c = 0; c < HEADERS.length; c++) sh.setColumnWidth(c, 22 * 256);
@@ -193,6 +253,22 @@ public class UploadTemplateService {
         // Excel menghitung ulang seluruh rumus saat berkas dibuka: tanpa ini sel rumus yang
         // ditulis POI belum punya nilai tersimpan, dan yang terbaca saat upload akan kosong.
         wb.setForceFormulaRecalculation(true);
+    }
+
+    private static String nz(String s) { return s == null ? "" : s; }
+
+    /**
+     * Kode angka tanpa nol di depan ditulis sebagai angka (seperti AUSY.xls), selain itu teks —
+     * supaya VLOOKUP antara Sheet1 dan sheet referensi selalu membandingkan tipe yang sama.
+     */
+    static void tulis(Cell c, String v) {
+        if (v.matches("0|[1-9][0-9]{0,14}")) c.setCellValue(Double.parseDouble(v));
+        else c.setCellValue(v);
+    }
+
+    /** Tanggal posting baris GL ({@code ddMMyy}), atau null bila tidak terbaca. */
+    private static LocalDate tanggal(String ddmmyy) {
+        try { return LocalDate.parse(ddmmyy, DateTimeFormatter.ofPattern("ddMMyy")); } catch (Exception e) { return null; }
     }
 
     /**

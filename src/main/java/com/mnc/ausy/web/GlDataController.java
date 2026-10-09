@@ -8,11 +8,9 @@ import com.mnc.ausy.repo.TUploadRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.BatchStatusService;
 import com.mnc.ausy.service.DataScopeService;
-import com.mnc.ausy.service.ExcelExportService;
-import com.mnc.ausy.service.Nominal;
+import com.mnc.ausy.service.UploadTemplateService;
 import com.mnc.ausy.service.OtorisasiService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.apache.poi.ss.usermodel.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -20,7 +18,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.math.BigDecimal;
 import java.util.*;
 
 @Controller
@@ -29,13 +26,13 @@ public class GlDataController {
     private final DataScopeService scope;
     private final OtorisasiService otorisasi;
     private final TUploadRepository uploads;
-    private final ExcelExportService excel;
+    private final UploadTemplateService templates;
     private final BatchStatusService batchStatus;
 
     public GlDataController(GlTabelRepository gl, DataScopeService scope, OtorisasiService otorisasi,
-                            TUploadRepository uploads, ExcelExportService excel, BatchStatusService batchStatus) {
+                            TUploadRepository uploads, UploadTemplateService templates, BatchStatusService batchStatus) {
         this.gl = gl; this.scope = scope; this.otorisasi = otorisasi;
-        this.uploads = uploads; this.excel = excel; this.batchStatus = batchStatus;
+        this.uploads = uploads; this.templates = templates; this.batchStatus = batchStatus;
     }
 
     /** Maker (GROUP_3): pemilik batch upload — hanya ia yang mendapat tombol Bulk Edit/Hapus. */
@@ -44,8 +41,6 @@ public class GlDataController {
                 .anyMatch(a -> "GROUP_3".equals(a.getAuthority()));
     }
 
-    /** Kolom Excel Bulk Edit per batch — sama dengan format Bulk Edit sebelumnya. */
-    private static final List<String> BULK_HEAD = List.of("ID", "GL Code", "D/C", "Amount", "Description", "Batch");
 
     /**
      * List Data GL: batch upload yang BELUM diotorisasi (REQ_AUSY_00036 &amp; 00044). Batch yang sudah
@@ -99,8 +94,9 @@ public class GlDataController {
     }
 
     /**
-     * REQ_AUSY_00037 — Bulk Edit per batch, langkah 1: unduh isi batch (milik maker sendiri, belum
-     * diotorisasi) sebagai Excel. Amount ditulis dalam format Indonesia (1.000.000,50).
+     * REQ_AUSY_00037 &amp; 00057 — Bulk Edit per batch, langkah 1: unduh batch (milik maker sendiri,
+     * belum diotorisasi atau ditolak checker) dalam template MNC yang sama dengan Upload Excel,
+     * Sheet1 sudah terisi baris batch itu.
      */
     @GetMapping("/gl-legacy/pending/{paket}/bulk-export")
     public void bulkExportPending(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
@@ -112,53 +108,22 @@ public class GlDataController {
             resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + BatchLabel.label(paket) + " tidak ada di upload Anda yang belum diotorisasi.");
             return;
         }
-        List<List<Object>> data = new ArrayList<>();
-        for (GlTabel g : rows) data.add(Arrays.asList(g.getId(), nz(g.getGltrac()), nz(g.getGltrcd()),
-                Nominal.format(g.getGltram()), nz(g.getGltrds()), BatchLabel.label(g.getNoPaket())));
-        excel.download(resp, "Batch " + BatchLabel.label(paket), "BulkEdit_Batch_" + BatchLabel.label(paket), BULK_HEAD, data, false);
+        String tgl = paket.length() >= 8 && paket.substring(0, 8).chars().allMatch(Character::isDigit)
+                ? "_" + paket.substring(6, 8) + "-" + paket.substring(4, 6) + "-" + paket.substring(0, 4) : "";
+        templates.downloadBatch(resp, rows, "BulkEdit_Batch_" + BatchLabel.label(paket) + tgl + ".xlsx");
     }
 
     /**
-     * REQ_AUSY_00037 &amp; 00047 — Bulk Edit per batch, langkah 2: unggah Excel hasil edit. Langsung
-     * diterapkan ke batch itu saja (belum diotorisasi, jadi tanpa checker); PDF ikut berubah.
+     * REQ_AUSY_00037, 00047 &amp; 00057 — Bulk Edit per batch, langkah 2: unggah template MNC hasil
+     * edit. Diperiksa dengan aturan yang sama dengan Upload Excel, lalu isi batch diganti (lihat
+     * {@link OtorisasiService#bulkEditPending}).
      */
     @PostMapping("/gl-legacy/pending/{paket}/bulk-upload")
     public String bulkUploadPending(@PathVariable String paket, @RequestParam("file") MultipartFile file,
                                     @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         if (file == null || file.isEmpty()) { ra.addFlashAttribute("warn", "File belum dipilih."); return "redirect:/gl-legacy"; }
-        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
-            Sheet sh = wb.getSheetAt(0);
-            // REQ_AUSY_00037 (feedback): berkas yang bukan template Bulk Edit ditolak dengan satu
-            // kalimat — dulu diproses per baris dan pesannya memenuhi layar.
-            if (!sesuaiTemplate(sh.getRow(0))) {
-                ra.addFlashAttribute("warn", "File tidak sesuai template Bulk Edit (kolom harus "
-                        + String.join(", ", BULK_HEAD) + "). " + OtorisasiService.PAKAI_TEMPLATE);
-                return "redirect:/gl-legacy";
-            }
-            List<Map<String, String>> isi = new ArrayList<>();
-            List<String> amountSalah = new ArrayList<>();
-            for (int r = 1; r <= sh.getLastRowNum(); r++) {
-                Row row = sh.getRow(r);
-                if (row == null || cell(row, 0).isBlank()) continue;
-                String amountTeks = cell(row, 3);
-                BigDecimal amount = Nominal.parse(amountTeks);
-                if (amount == null) { amountSalah.add("baris " + (r + 1) + " (\"" + amountTeks + "\")"); continue; }
-                Map<String, String> m = new LinkedHashMap<>();
-                m.put("baris", String.valueOf(r + 1));
-                m.put("id", cell(row, 0));
-                m.put("gltrac", cell(row, 1));
-                m.put("gltrcd", cell(row, 2));
-                m.put("gltram", amount.toPlainString());
-                m.put("gltrds", cell(row, 4));
-                isi.add(m);
-            }
-            if (!amountSalah.isEmpty()) {
-                ra.addFlashAttribute("warn", "Bulk Edit ditolak, tidak ada data yang diubah: kolom Amount tidak terbaca"
-                        + " sebagai angka pada " + OtorisasiService.ringkasSalah(amountSalah)
-                        + ". Gunakan format 1.000.000,50.");
-                return "redirect:/gl-legacy";
-            }
-            OtorisasiService.ExportResult r = otorisasi.bulkEditPending(paket, me, isi);
+        try {
+            OtorisasiService.ExportResult r = otorisasi.bulkEditPending(paket, me, file.getInputStream());
             ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         } catch (Exception e) {
             ra.addFlashAttribute("warn", "Gagal membaca file Excel: " + e.getMessage());
@@ -166,29 +131,9 @@ public class GlDataController {
         return "redirect:/gl-legacy";
     }
 
-    private static String nz(String s) { return s == null ? "" : s; }
-
     /** Baris batch yang menunggu otorisasi, atau yang ditolak checker (REQ_AUSY_00053). */
     static boolean bisaBulkEdit(GlTabel g) {
         return ("PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
                 || OtorisasiService.REJECTED.equals(g.getStatusDual());
-    }
-
-    /** Baris judul berkas = kolom hasil Export Excel Bulk Edit (huruf besar/kecil dan spasi diabaikan). */
-    private static boolean sesuaiTemplate(Row judul) {
-        if (judul == null) return false;
-        for (int i = 0; i < BULK_HEAD.size(); i++)
-            if (!BULK_HEAD.get(i).replace(" ", "").equalsIgnoreCase(cell(judul, i).replace(" ", ""))) return false;
-        return true;
-    }
-
-    private static String cell(Row r, int i) {
-        Cell c = r.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-        if (c == null) return "";
-        return switch (c.getCellType()) {
-            case STRING -> c.getStringCellValue().trim();
-            case NUMERIC -> { double d = c.getNumericCellValue(); yield (d == Math.floor(d)) ? String.valueOf((long) d) : String.valueOf(d); }
-            default -> "";
-        };
     }
 }
