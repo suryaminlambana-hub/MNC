@@ -24,7 +24,7 @@
             th:text="${e.value}">0</span></a>
   </div>
 
-  <form class="ausy-card d-flex flex-wrap gap-2 align-items-end mb-3" method="get" th:action="@{/rekap}">
+  <form class="ausy-card d-flex flex-wrap gap-3 align-items-end mb-3 p-3" method="get" th:action="@{/rekap}">
     <div><label class="form-label small mb-1">Sumber</label>
       <select name="sumber" class="form-select form-select-sm" style="min-width:180px">
         <option value="">Semua sumber</option>
@@ -39,7 +39,7 @@
     <a class="btn btn-sm btn-outline-secondary" th:href="@{/rekap}">Reset</a>
   </form>
 
-  <div class="ausy-card">
+  <div class="ausy-card p-3">
     <table class="table table-hover align-middle mb-0">
       <thead><tr><th>Sumber</th><th>Data</th><th>Tanggal</th><th class="text-end">Jml</th>
         <th class="text-end">Debit</th><th class="text-end">Credit</th><th>Status</th><th>Catatan Checker</th></tr></thead>
