@@ -180,6 +180,10 @@ Tidak ada migrasi DB.
     - Maker melihat keterangan "Lewat hari" di List Data GL. Batch itu bisa diperbarui lewat Bulk
       Edit — tanggal posting-nya menjadi hari ini, sehingga bisa di-approve lagi — atau dihapus.
     - Approve juga tetap terkunci bila batch tidak balance; selisihnya tampil di kolom Balance.
+  - **"Dikembalikan" menjadi "Menunggu Otorisasi" setelah diedit** (REQ_AUSY_00058). Berlaku untuk
+    batch upload yang di-Bulk Edit, dan data Kelola Data GL yang diubah (jenisnya menjadi "Ubah",
+    catatan "Diperbaiki setelah dikembalikan … oleh <checker>: <alasan>" tetap terbaca checker).
+    Statusnya ikut berubah di List Data GL, Kelola Data GL, dan Rekapitulasi.
   - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
     dihapus:
     - Data manual yang di-Return Data langsung diajukan ulang. Data itu muncul di tabel Pengajuan

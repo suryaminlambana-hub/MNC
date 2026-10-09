@@ -402,6 +402,8 @@ public class GlChangeService {
 
     /** Awalan catatan pengajuan ulang otomatis untuk data manual yang dikembalikan dari penampungan. */
     public static final String RETURN_NOTE = "Dikembalikan dari penampungan";
+    /** Awalan catatan setelah data yang dikembalikan diperbaiki maker (REQ_AUSY_00058). */
+    public static final String RETURN_EDITED = "Diperbaiki setelah dikembalikan dari penampungan";
 
     /**
      * REQ_AUSY_00046 (feedback) — data manual yang di-Return Data checker langsung kembali ke tabel
@@ -452,6 +454,10 @@ public class GlChangeService {
         if (lamaN.equals(baruN)) return new Res(false, "Tidak ada perubahan pada pengajuan CR#" + crId + ".");
 
         c.setAfterJson(toJson(baruN));
+        // REQ_AUSY_00058: data "Dikembalikan" yang sudah diperbaiki kembali berstatus Menunggu
+        // Otorisasi; alasan checker tetap terbaca di catatannya.
+        if (n(c.getNoteMaker()).startsWith(RETURN_NOTE))
+            c.setNoteMaker(RETURN_EDITED + n(c.getNoteMaker()).substring(RETURN_NOTE.length()));
         if (!blank(note)) c.setNoteMaker(n(c.getNoteMaker()) + (blank(c.getNoteMaker()) ? "" : " | ") + "Diubah: " + note.trim());
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ_UPDATE",

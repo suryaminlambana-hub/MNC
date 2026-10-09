@@ -248,7 +248,9 @@ public class OtorisasiService {
         uploads.simpanBaris(b.rows, paket, maker);
         // Waktu upload batch tetap waktu upload aslinya, bukan waktu Bulk Edit.
         if (diupload != null) gl.setUploadedAt(paket, maker, diupload);
-        if (dariReject) batchStatus.clear(paket, maker);
+        // Rejected maupun Dikembalikan: setelah diperbaiki, statusnya kembali Menunggu Otorisasi
+        // (REQ_AUSY_00053, 00058).
+        batchStatus.clear(paket, maker);
 
         audit.transaction(maker, "BULK_EDIT_PENDING",
                 "Bulk Edit " + label + (dariReject ? " (Rejected, diajukan ulang ke checker)" : " (belum diotorisasi)")
@@ -256,7 +258,7 @@ public class OtorisasiService {
                 + " baris (D=C=" + Nominal.format(b.debit) + ") dari template MNC.");
         return new ExportResult(true, "Bulk Edit " + label + " diterapkan: " + b.rows.size() + " baris (sebelumnya "
                 + lama.size() + "). Debit = Credit = " + Nominal.format(b.debit) + " (balance)."
-                + (dariReject ? " Batch diajukan ulang dan kembali menunggu otorisasi checker." : ""), b.rows.size(), null);
+                + (dariReject ? " Batch diajukan ulang dan kembali menunggu otorisasi checker." : " Status batch: Menunggu Otorisasi."), b.rows.size(), null);
     }
 
     /** Isi satu baris GL yang bisa diubah lewat template — untuk mendeteksi "tidak ada perubahan". */
