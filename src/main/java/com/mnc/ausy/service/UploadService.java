@@ -393,14 +393,14 @@ public class UploadService {
             t.setAdddt(LocalDateTime.now());
             tUploads.save(t);
 
-            audit.transaction(username, "UPLOAD", "Batch " + paket + " — " + n + " baris (D=" + nominal(res.debit)
+            audit.transaction(username, "UPLOAD", "Batch " + BatchLabel.label(paket) + " — " + n + " baris (D=" + nominal(res.debit)
                     + ", C=" + nominal(res.credit) + ", " + (res.balanced ? "balance" : "TIDAK balance") + ")");
 
             res.success = true;
             // Keterangan "N isian dirapikan" dilepas atas permintaan pengguna (BUG_AUSY_00180):
             // pembersihan karakter dianggap urusan internal, tidak perlu diumumkan tiap unggahan.
             // Berkas yang tidak balance sudah ditolak di pemeriksaan (REQ_AUSY_00024).
-            res.message = "Upload berhasil — Batch " + paket + " menunggu approval Checker (" + n + " baris jurnal). "
+            res.message = "Upload berhasil — Batch " + BatchLabel.label(paket) + " menunggu approval Checker (" + n + " baris jurnal). "
                           + "Debit = Credit (balance).";
             return res;
         }

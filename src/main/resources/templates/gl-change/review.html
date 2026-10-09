@@ -22,7 +22,7 @@
         <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
         <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
         <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
-        <span class="text-muted" th:if="${it.cr.target == 'PAKET'}">· batch <b th:text="${it.cr.noPaket}"></b></span>
+        <span class="text-muted" th:if="${it.cr.target == 'PAKET'}">· batch <b th:text="${@batchLabel.of(it.cr.noPaket)}"></b></span>
       </div>
       <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
     </div>

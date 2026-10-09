@@ -186,7 +186,9 @@ public class GlChangeService {
             if (badCode != null) return badCode;
         }
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
-        if (before.equals(after))
+        // Data dikembalikan yang pengajuan ulangnya ditolak boleh diajukan lagi tanpa perubahan
+        // (REQ_AUSY_00046 feedback) — penolakannya bisa saja soal hal lain, bukan isi datanya.
+        if (before.equals(after) && !"RETURNED".equals(g.getStatusDual()))
             return new Res(false, "Tidak ada perubahan pada data GL — permintaan tidak diajukan.");
 
         GlChangeRequest c = base("EDIT", T_GL_ROW, glId, me, note);
@@ -316,20 +318,162 @@ public class GlChangeService {
         return new Res(true, "Data GL #" + glId + " dihapus.");
     }
 
-    /** Pengajuan Tambah Data GL milik maker ini yang masih menunggu checker (REQ_AUSY_00046). */
-    public List<Map<String, String>> pendingAddsOf(AusyUserDetails me) {
+    private static final DateTimeFormatter TAMPIL = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+
+    /**
+     * REQ_AUSY_00046 (feedback) — satu tabel "Pengajuan" di Kelola Data GL: semua pengajuan Tambah/Ubah
+     * data GL milik maker ini yang menunggu checker (termasuk data yang dikembalikan dari penampungan,
+     * yang otomatis diajukan ulang), ditambah data dikembalikan yang pengajuannya ditolak checker.
+     * Kunci: crId (kosong bila tidak ada pengajuan), glId, op, jenis, status, diajukan + kolom FIELDS.
+     */
+    public List<Map<String, String>> pengajuanOf(AusyUserDetails me) {
         List<Map<String, String>> out = new ArrayList<>();
         if (me == null) return out;
-        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
-            if (!"ADD".equals(c.getOp()) || !me.getUsername().equals(c.getMaker())) continue;
+        Set<Long> adaPengajuan = new HashSet<>();
+        for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            if (!T_GL_ROW.equals(c.getTarget() == null ? T_GL_ROW : c.getTarget())) continue;
+            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) || !me.getUsername().equals(c.getMaker())) continue;
             Map<String, String> a = parse(c.getAfterJson());
             if (a == null) continue;
             Map<String, String> m = new LinkedHashMap<>(a);
             m.put("crId", String.valueOf(c.getId()));
-            m.put("diajukan", c.getCreatedAt() == null ? "" : c.getCreatedAt().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm")));
+            m.put("glId", c.getGlId() == null ? "" : String.valueOf(c.getGlId()));
+            m.put("op", c.getOp());
+            m.put("jenis", "ADD".equals(c.getOp()) ? "Tambah"
+                    : (n(c.getNoteMaker()).startsWith(RETURN_NOTE) ? "Dikembalikan" : "Ubah"));
+            m.put("status", "Menunggu Otorisasi");
+            m.put("diajukan", c.getCreatedAt() == null ? "" : c.getCreatedAt().format(TAMPIL));
+            m.put("catatan", n(c.getNoteMaker()));
+            m.put("amountTampil", Nominal.format(amt(a.get("gltram"))));
+            out.add(m);
+            if (c.getGlId() != null) adaPengajuan.add(c.getGlId());
+        }
+        // Data dikembalikan yang pengajuan ulangnya ditolak checker: tetap di tabel yang sama supaya
+        // bisa diperbaiki lalu diajukan lagi, atau dihapus.
+        for (GlTabel g : gl.findReturnedManual(List.of(me.getUsername()))) {
+            if (adaPengajuan.contains(g.getId())) continue;
+            Map<String, String> m = new LinkedHashMap<>(rowMap(g));
+            m.put("crId", "");
+            m.put("glId", String.valueOf(g.getId()));
+            m.put("op", "EDIT");
+            m.put("jenis", "Dikembalikan");
+            m.put("status", "Perlu Diajukan Ulang");
+            m.put("diajukan", "");
+            m.put("catatan", "");
+            m.put("amountTampil", Nominal.format(g.getGltram()));
             out.add(m);
         }
         return out;
+    }
+
+    /** Awalan catatan pengajuan ulang otomatis untuk data manual yang dikembalikan dari penampungan. */
+    public static final String RETURN_NOTE = "Dikembalikan dari penampungan";
+
+    /**
+     * REQ_AUSY_00046 (feedback) — data manual yang di-Return Data checker langsung kembali ke tabel
+     * Pengajuan maker: dibuatkan pengajuan UBAH (isi sebelum = sesudah) atas nama pemilik datanya,
+     * sehingga juga langsung muncul lagi di antrian Otorisasi Kelola Data GL. Maker dapat mengubah
+     * (lihat {@link #updatePending}) atau menghapusnya (lihat {@link #cancelPending}) selama menunggu.
+     */
+    public void returnToPengajuan(GlTabel g, String checker, String alasan) {
+        if (g == null || g.getId() == null || pendingGlRowIds().contains(g.getId())) return;
+        Map<String, String> isi = normRow(rowMap(g));
+        GlChangeRequest c = new GlChangeRequest();
+        c.setOp("EDIT"); c.setTarget(T_GL_ROW); c.setGlId(g.getId());
+        c.setMaker(g.getGltrus()); c.setMakerGroup(approval.groupOf(g.getGltrus()));
+        c.setNoPaket(g.getNoPaket());
+        c.setBeforeJson(toJson(isi)); c.setAfterJson(toJson(isi));
+        c.setNoteMaker(RETURN_NOTE + " oleh " + checker + ": " + n(alasan));
+        c.setStatus("PENDING");
+        cr.save(c);
+    }
+
+    /**
+     * REQ_AUSY_00046 (feedback) — maker mengubah pengajuan Tambah/Ubah miliknya yang masih menunggu
+     * checker. Isi pengajuan langsung diganti, jadi checker melihat data terbaru; nilai lama &amp; baru
+     * tercatat di audit trail (sama seperti Bulk Edit batch upload, REQ_AUSY_00037).
+     */
+    @Transactional
+    public Res updatePending(Long crId, Map<String, String> f, AusyUserDetails me, String note) {
+        GlChangeRequest c = crId == null ? null : cr.findById(crId).orElse(null);
+        Res tolak = cekPengajuanMilikku(c, me);
+        if (tolak != null) return tolak;
+        f = rapikan(f);
+        Map<String, String> lama = parse(c.getAfterJson());
+        if (lama == null) lama = new LinkedHashMap<>();
+        Map<String, String> baru = formMap(f);
+        if ("EDIT".equals(c.getOp())) baru.put("noPaket", n(lama.get("noPaket")));   // batch baris lama tetap
+        else {
+            String lock = batchLockReason(n(baru.get("noPaket")));
+            if (lock != null) return new Res(false, lock);
+        }
+        String code = n(baru.get("gltrac")).trim();
+        if (!code.equals(n(lama.get("gltrac")).trim())) {
+            Res badCode = checkGlCodeInput(code);
+            if (badCode != null) return badCode;
+        }
+        if (blank(baru.get("gltram")) || amt(baru.get("gltram")).signum() < 0)
+            return new Res(false, "Amount wajib diisi dengan angka 0 atau lebih.");
+        Map<String, String> lamaN = normRow(lama), baruN = normRow(baru);
+        if (lamaN.equals(baruN)) return new Res(false, "Tidak ada perubahan pada pengajuan CR#" + crId + ".");
+
+        c.setAfterJson(toJson(baruN));
+        if (!blank(note)) c.setNoteMaker(n(c.getNoteMaker()) + (blank(c.getNoteMaker()) ? "" : " | ") + "Diubah: " + note.trim());
+        cr.save(c);
+        audit.transaction(me.getUsername(), "GL_CHANGE_REQ_UPDATE",
+                "Pengajuan " + ("ADD".equals(c.getOp()) ? "TAMBAH" : "UBAH baris #" + c.getGlId()) + " CR#" + crId
+                + " diubah sebelum diotorisasi: " + ringkas(lamaN) + " -> " + ringkas(baruN)
+                + (blank(note) ? "" : ". Catatan: " + note.trim()));
+        return new Res(true, "Pengajuan CR#" + crId + " diperbarui — checker melihat data terbaru.");
+    }
+
+    /**
+     * REQ_AUSY_00046 (feedback) — maker menghapus pengajuan Tambah/Ubah miliknya yang masih menunggu
+     * checker. Pengajuan dibatalkan (CANCELLED); untuk data manual yang dikembalikan dari penampungan,
+     * datanya ikut dihapus (soft delete) sehingga tidak akan masuk file ACCTXT.
+     */
+    @Transactional
+    public Res cancelPending(Long crId, AusyUserDetails me) {
+        GlChangeRequest c = crId == null ? null : cr.findById(crId).orElse(null);
+        Res tolak = cekPengajuanMilikku(c, me);
+        if (tolak != null) return tolak;
+        c.setStatus("CANCELLED"); c.setDecidedAt(LocalDateTime.now());
+        c.setNoteChecker("Dibatalkan maker sebelum diotorisasi");
+        cr.save(c);
+        Map<String, String> after = parse(c.getAfterJson());
+        String isi = ringkas(normRow(after == null ? new LinkedHashMap<>() : after));
+        if ("EDIT".equals(c.getOp()) && c.getGlId() != null) {
+            GlTabel g = gl.findById(c.getGlId()).orElse(null);
+            if (g != null && Short.valueOf((short) 1).equals(g.getActive()) && "m".equals(g.getGlsrc())
+                    && "RETURNED".equals(g.getStatusDual()) && g.getExportReqId() == null) {
+                g.setActive((short) 0);
+                gl.save(g);
+                audit.transaction(me.getUsername(), "GL_DELETE",
+                        "Hapus data manual #" + g.getId() + " yang dikembalikan checker (" + ringkas(normRow(rowMap(g)))
+                        + "), pengajuan CR#" + crId + " dibatalkan, tanpa otorisasi checker (REQ_AUSY_00046).");
+                return new Res(true, "Data GL #" + g.getId() + " dihapus dan pengajuannya dibatalkan.");
+            }
+        }
+        audit.transaction(me.getUsername(), "GL_CHANGE_REQ_CANCEL",
+                "Pengajuan " + c.getOp() + " CR#" + crId + " dihapus maker sebelum diotorisasi (" + isi + ").");
+        return new Res(true, "Pengajuan CR#" + crId + " dihapus.");
+    }
+
+    private Res cekPengajuanMilikku(GlChangeRequest c, AusyUserDetails me) {
+        if (c == null || !"PENDING".equals(c.getStatus()))
+            return new Res(false, "Pengajuan tidak ditemukan / sudah diproses checker.");
+        if (me == null || !me.getUsername().equals(c.getMaker()))
+            return new Res(false, "Hanya pengajuan milik Anda sendiri yang bisa diubah atau dihapus.");
+        if (!T_GL_ROW.equals(c.getTarget() == null ? T_GL_ROW : c.getTarget())
+                || !("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())))
+            return new Res(false, "Pengajuan ini tidak bisa diubah dari Kelola Data GL.");
+        return null;
+    }
+
+    /** "100 D 1.000.000,00 'Ket'" — ringkasan satu baris untuk audit trail. */
+    private static String ringkas(Map<String, String> m) {
+        return n(m.get("gltrac")) + " " + n(m.get("gltrcd")) + " " + Nominal.format(amt(m.get("gltram")))
+                + (blank(m.get("gltrds")) ? "" : " '" + m.get("gltrds") + "'");
     }
 
     // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
@@ -445,11 +589,11 @@ public class GlChangeService {
             return new Res(false, "Batch tersebut sudah diajukan untuk dihapus dan menunggu otorisasi Checker.");
         // BUG_AUSY_00106: ACCTXT-nya sudah masuk antrean checker — batch tidak boleh hilang di tengah jalan
         if (exportPendingPakets().contains(n(paket).trim()))
-            return new Res(false, "Batch " + paket + " sedang diajukan untuk export dan menunggu otorisasi Checker"
+            return new Res(false, "Batch " + BatchLabel.label(paket) + " sedang diajukan untuk export dan menunggu otorisasi Checker"
                     + " — batch tidak dapat dihapus sampai otorisasi export diputuskan.");
         List<Long> pendingRows = pendingRowIdsInPaket(paket, inputer);
         if (!pendingRows.isEmpty())
-            return new Res(false, "Batch " + paket + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
+            return new Res(false, "Batch " + BatchLabel.label(paket) + " tidak dapat dihapus: masih ada data yang menunggu otorisasi (ID "
                     + idList(pendingRows) + "). Selesaikan otorisasi data tersebut lebih dulu.");
 
         BigDecimal d = BigDecimal.ZERO, k = BigDecimal.ZERO;
@@ -467,8 +611,8 @@ public class GlChangeService {
         c.setBeforeJson(toJson(before));
         cr.save(c);
         audit.transaction(me.getUsername(), "BATCH_DELETE_REQ",
-                "HAPUS Batch " + paket + " (uploader=" + inputer + ", " + rows.size() + " baris) diajukan (CR#" + c.getId() + ")");
-        return new Res(true, "Permintaan HAPUS Batch " + paket + " diajukan (menunggu otorisasi Checker).");
+                "HAPUS Batch " + BatchLabel.label(paket) + " (uploader=" + inputer + ", " + rows.size() + " baris) diajukan (CR#" + c.getId() + ")");
+        return new Res(true, "Permintaan HAPUS Batch " + BatchLabel.label(paket) + " diajukan (menunggu otorisasi Checker).");
     }
 
     // ---- pending lookups: the maker screens lock what is already submitted ----
@@ -510,11 +654,11 @@ public class GlChangeService {
         }
         for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_PAKET))
             for (GlTabel g : gl.findBatchRows(c.getNoPaket(), c.getInputer()))
-                out.put(g.getId(), "Menunggu Otorisasi Hapus Batch " + n(c.getNoPaket()));
+                out.put(g.getId(), "Menunggu Otorisasi Hapus Batch " + BatchLabel.label(c.getNoPaket()));
         // BUG_AUSY_00106 — baris yang export-nya sudah diajukan ikut terkunci sampai checker memutuskan
         for (GlExportRequest r : exportRequests.findByStatusOrderByCreatedAtDesc("PENDING"))
             for (GlTabel g : gl.findByExportReqIdOrderById(r.getId()))
-                out.put(g.getId(), "Menunggu Otorisasi Export Batch " + n(g.getNoPaket()));
+                out.put(g.getId(), "Menunggu Otorisasi Export Batch " + BatchLabel.label(g.getNoPaket()));
         return out;
     }
 
@@ -545,12 +689,12 @@ public class GlChangeService {
     }
 
     private static String exportLockMsg(String paket) {
-        return "Batch " + paket + " sedang diajukan untuk export — data di dalamnya tidak dapat diubah"
+        return "Batch " + BatchLabel.label(paket) + " sedang diajukan untuk export — data di dalamnya tidak dapat diubah"
                 + " sampai Checker memutuskan otorisasi export.";
     }
 
     private static String deleteLockMsg(String paket) {
-        return "Batch " + paket + " sedang diajukan untuk dihapus — data di dalamnya tidak dapat diubah"
+        return "Batch " + BatchLabel.label(paket) + " sedang diajukan untuk dihapus — data di dalamnya tidak dapat diubah"
                 + " sampai Checker memutuskan.";
     }
 

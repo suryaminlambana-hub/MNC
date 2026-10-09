@@ -1,5 +1,6 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.service.BatchLabel;
 import com.mnc.ausy.repo.*;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AccessService;
@@ -194,7 +195,7 @@ public class DashboardController {
         List<PendingRow> out = new ArrayList<>();
         if (pakets != null) for (Object[] p : pakets) {
             out.add(new PendingRow(p[5] instanceof LocalDateTime t ? t : null, "UPLOAD", "bg-info-subtle text-info",
-                    "Batch " + p[0] + " · " + p[2] + " baris", "Upload GL menunggu otorisasi"));
+                    "Batch " + BatchLabel.label(String.valueOf(p[0])) + " · " + p[2] + " baris", "Upload GL menunggu otorisasi"));
         }
         if (changes != null) for (var c : changes) {
             String kind = "BULK_EDIT".equals(c.getOp()) ? "BULK EDIT" : c.getOp();
@@ -205,10 +206,10 @@ public class DashboardController {
             };
             String target;
             if ("GL_CODE".equals(c.getTarget())) target = "Kode GL";
-            else if ("PAKET".equals(c.getTarget())) target = "Batch " + c.getNoPaket();
+            else if ("PAKET".equals(c.getTarget())) target = "Batch " + BatchLabel.label(c.getNoPaket());
             else {
                 target = c.getGlId() != null ? "GL #" + c.getGlId() : "Data GL";
-                if (c.getNoPaket() != null && !c.getNoPaket().isBlank()) target += " · Batch " + c.getNoPaket();
+                if (c.getNoPaket() != null && !c.getNoPaket().isBlank()) target += " · Batch " + BatchLabel.label(c.getNoPaket());
             }
             out.add(new PendingRow(c.getCreatedAt(), kind, badge, target, c.getNoteMaker()));
         }

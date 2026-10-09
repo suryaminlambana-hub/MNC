@@ -3,21 +3,24 @@
 <head><title>Manajemen Otorisasi GL — AUSY</title></head>
 <main>
   <h1 class="ausy-page-title">Manajemen Otorisasi GL</h1>
-  <p class="text-muted">Otorisasi upload GL dan otorisasi perubahan GL. Data yang di-approve langsung masuk penampungan Generate File ACCTXT (role EXECUTE).</p>
+  <p class="text-muted">Otorisasi Upload Excel, Kelola Data GL, dan Manajemen Kode GL. Data GL yang di-approve langsung masuk penampungan Generate File ACCTXT (role EXECUTE).</p>
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
 
   <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabUpload" type="button">
-      <i class="fa-solid fa-file-circle-check"></i> Otorisasi Upload GL
+      <i class="fa-solid fa-file-circle-check"></i> Otorisasi Upload Excel
       <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(pakets)}">0</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabChange" type="button">
-      <i class="fa-solid fa-clipboard-check"></i> Otorisasi Perubahan GL
-      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(items)}">0</span></button></li>
+      <i class="fa-solid fa-clipboard-check"></i> Otorisasi Kelola Data GL
+      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(itemsGl)}">0</span></button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCode" type="button">
+      <i class="fa-solid fa-list-ol"></i> Otorisasi Manajemen Kode GL
+      <span class="badge bg-secondary-subtle text-secondary ms-1" th:text="${#lists.size(itemsCode)}">0</span></button></li>
   </ul>
 
   <div class="tab-content">
-    <!-- ===== TAB 1: Otorisasi Upload GL (export) ===== -->
+    <!--/* ===== TAB 1: Otorisasi Upload Excel ===== */-->
     <div class="tab-pane fade show active" id="tabUpload">
       <div class="ausy-card">
         <table class="table table-hover align-middle mb-0">
@@ -26,7 +29,7 @@
           <tr th:each="p,i : ${pakets}">
             <td th:text="${i.count}"></td>
             <td class="text-nowrap text-muted small" th:text="${p.uploadedAt != null} ? ${#temporals.format(p.uploadedAt,'dd-MM-yyyy HH:mm')} : '—'"></td>
-            <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${p.paket}"></span></span></td>
+            <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${@batchLabel.of(p.paket)}"></span></span></td>
             <td th:text="${p.inputer}"></td>
             <td class="text-end" th:text="${p.jml}"></td>
             <td class="text-end" th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></td>
@@ -52,80 +55,14 @@
     <!--/* REQ_AUSY_00043: tab Otorisasi Export GL dicabut — setelah upload di-approve, data langsung
            masuk penampungan EXECUTE (REQ_AUSY_00038), jadi tidak ada lagi pengajuan export. */-->
 
-    <!-- ===== TAB 3: Otorisasi Perubahan GL ===== -->
+    <!--/* ===== TAB 2 dan 3: Otorisasi Kelola Data GL, Otorisasi Manajemen Kode GL =====
+           REQ_AUSY_00048: "Otorisasi Perubahan GL" menjadi "Otorisasi Kelola Data GL".
+           REQ_AUSY_00049: otorisasi Kode GL dipisah ke tab sendiri. */-->
     <div class="tab-pane fade" id="tabChange">
-      <div class="ausy-review">
-        <div th:if="${items.isEmpty()}" class="ausy-card text-center text-muted py-4">
-          Tidak ada permintaan perubahan GL yang menunggu otorisasi.
-        </div>
-        <div class="ausy-card mb-3" th:each="it : ${items}" style="padding:16px 18px">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="d-flex align-items-center gap-2">
-              <span class="badge fs-6"
-                    th:classappend="${it.cr.op == 'ADD'} ? 'bg-success' : (${it.cr.op == 'DELETE'} ? 'bg-danger' : (${it.cr.op == 'BULK_EDIT'} ? 'bg-info text-dark' : 'bg-primary'))"
-                    th:text="${it.cr.op == 'BULK_EDIT' ? 'BULK EDIT' : it.cr.op}">EDIT</span>
-              <span class="badge bg-secondary-subtle text-secondary" th:text="${it.targetLabel}">Data GL</span>
-              <span class="fw-semibold">CR#<span th:text="${it.cr.id}"></span></span>
-              <span class="text-muted">· maker <b th:text="${it.cr.maker}"></b></span>
-              <span class="text-muted" th:if="${it.cr.glId}">· baris #<span th:text="${it.cr.glId}"></span></span>
-              <span class="text-muted" th:if="${it.cr.target == 'PAKET'}">· batch <b th:text="${it.cr.noPaket}"></b></span>
-            </div>
-            <span class="text-muted small" th:text="${#temporals.format(it.cr.createdAt,'dd-MM-yyyy HH:mm')}"></span>
-          </div>
-
-          <div th:if="${it.cr.op == 'BULK_EDIT'}" class="mb-2">
-            <p class="mb-2"><i class="fa-solid fa-file-excel text-muted"></i>
-              Bulk edit via Excel — <b th:text="${it.bulkCount}">0</b> baris diubah. Unduh &amp; bandingkan:</p>
-            <div class="d-flex gap-2 flex-wrap">
-              <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-change/' + ${it.cr.id} + '/export/before'}"><i class="fa-solid fa-download"></i> Export Before</a>
-              <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-change/' + ${it.cr.id} + '/export/after'}"><i class="fa-solid fa-download"></i> Export After</a>
-            </div>
-          </div>
-
-          <!-- import CSV Kode GL: daftar baris yang akan ditambahkan -->
-          <div th:if="${it.cr.op == 'IMPORT'}" class="mb-2">
-            <p class="mb-2"><i class="fa-solid fa-file-csv text-muted"></i>
-              Import CSV — <b th:text="${#lists.size(it.rows)}">0</b> Kode GL akan ditambahkan:</p>
-            <table class="table table-sm align-middle mb-0 ausy-diff">
-              <thead><tr><th style="width:25%">NoGL</th><th>Description</th></tr></thead>
-              <tbody>
-                <tr th:each="r : ${it.rows}">
-                  <td><code th:text="${r.code}"></code></td>
-                  <td th:text="${r.description}"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <table th:if="${it.cr.op == 'ADD'}" class="table table-sm align-middle mb-2 ausy-diff ausy-diff-kv">
-            <thead><tr><th>Field</th><th>Nilai Baru</th></tr></thead>
-            <tbody>
-            <tr th:each="d : ${it.diffs}"><td class="text-muted" th:text="${d.label}"></td><td><b th:text="${d.after}"></b></td></tr>
-            </tbody>
-          </table>
-
-          <table th:if="${it.cr.op == 'EDIT' or it.cr.op == 'DELETE'}" class="table table-sm align-middle mb-2 ausy-diff">
-            <thead><tr><th style="width:30%">Field</th><th style="width:35%">Before</th><th style="width:35%">After</th></tr></thead>
-            <tbody>
-            <tr th:each="d : ${it.diffs}" th:classappend="${d.changed} ? 'table-warning'">
-              <td class="text-muted" th:text="${d.label}"></td>
-              <td th:text="${d.before}"></td>
-              <td><b th:if="${d.changed}" th:text="${d.after}"></b><span th:unless="${d.changed}" th:text="${d.after}"></span></td>
-            </tr>
-            </tbody>
-          </table>
-
-          <p class="small text-muted mb-3" th:if="${it.cr.noteMaker}"><i class="fa-solid fa-comment-dots"></i> Justifikasi maker: <span th:text="${it.cr.noteMaker}"></span></p>
-
-          <div class="d-flex gap-2">
-            <form th:action="@{/gl-change/approve}" method="post" onsubmit="return confirm('Approve &amp; terapkan perubahan ini?');">
-              <input type="hidden" name="crId" th:value="${it.cr.id}">
-              <button class="btn btn-sm btn-success"><i class="fa-solid fa-check"></i> Approve</button>
-            </form>
-            <button class="btn btn-sm btn-outline-danger btn-reject-cr" th:attr="data-cr=${it.cr.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
-          </div>
-        </div>
-      </div>
+      <th:block th:replace="~{otorisasi-gl/cr-list :: crList(${itemsGl}, 'Tidak ada pengajuan Kelola Data GL yang menunggu otorisasi.')}"></th:block>
+    </div>
+    <div class="tab-pane fade" id="tabCode">
+      <th:block th:replace="~{otorisasi-gl/cr-list :: crList(${itemsCode}, 'Tidak ada pengajuan Manajemen Kode GL yang menunggu otorisasi.')}"></th:block>
     </div>
   </div>
 

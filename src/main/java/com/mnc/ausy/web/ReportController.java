@@ -7,6 +7,7 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPageEventHelper;
 import com.lowagie.text.pdf.PdfTemplate;
 import com.lowagie.text.pdf.PdfWriter;
+import com.mnc.ausy.service.BatchLabel;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
@@ -85,7 +86,7 @@ public class ReportController {
             if (paket.equals(String.valueOf(p[0]))) { maker = String.valueOf(p[1]); break; }
         if (maker == null) {
             resp.sendError(HttpServletResponse.SC_NOT_FOUND,
-                    "Batch " + paket + " tidak ada di daftar upload yang menunggu otorisasi Anda.");
+                    "Batch " + BatchLabel.label(paket) + " tidak ada di daftar upload yang menunggu otorisasi Anda.");
             return;
         }
         List<GlTabel> rows = gl.findBatchRows(paket, maker).stream()
@@ -97,7 +98,7 @@ public class ReportController {
 
         if (me != null)
             audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
-                    "Unduh PDF Batch " + paket + " (menunggu otorisasi): " + rows.size() + " baris");
+                    "Unduh PDF Batch " + BatchLabel.label(paket) + " (menunggu otorisasi): " + rows.size() + " baris");
     }
 
     /**
@@ -119,7 +120,7 @@ public class ReportController {
                 .sorted(java.util.Comparator.comparing(GlTabel::getId))
                 .toList();
         if (rows.isEmpty()) {
-            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + paket + " tidak ada di GL Aktif yang bisa Anda lihat.");
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + BatchLabel.label(paket) + " tidak ada di GL Aktif yang bisa Anda lihat.");
             return;
         }
         String nama = "(manual)".equals(paket) ? "manual" : paket;
@@ -129,7 +130,7 @@ public class ReportController {
 
         if (me != null)
             audit.transaction(me.getUsername(), "EXPORT_GL_PDF",
-                    "Unduh PDF GL Aktif Batch " + paket + (maker == null ? "" : " (uploader " + maker + ")")
+                    "Unduh PDF GL Aktif Batch " + BatchLabel.label(paket) + (maker == null ? "" : " (uploader " + maker + ")")
                     + ": " + rows.size() + " baris");
     }
 
@@ -169,7 +170,7 @@ public class ReportController {
             // halaman ditutup, jadi halaman terakhir sebuah batch harus masih memegang nomor
             // batch itu. Kebalik sedikit saja dan kaki halaman menyebut batch berikutnya.
             if (!first) doc.newPage();
-            footer.paket = e.getKey();
+            footer.paket = BatchLabel.label(e.getKey());
             first = false;
             journal(writer, doc, e.getKey(), e.getValue());
         }
@@ -179,7 +180,7 @@ public class ReportController {
     private void journal(PdfWriter writer, Document doc, String paket, List<GlTabel> rows) throws DocumentException {
         mnc.stampLogo(writer, doc, MncPdfService.J_LOGO_SCALE);
         mnc.title(doc, "JURNAL \" AUSY \" ( ACCOUNTING UPLOAD SYSTEM )",
-                "Di Proses pada No. Transmisi : " + transmisi(rows) + ", No Paket : " + paket,
+                "Di Proses pada No. Transmisi : " + transmisi(rows) + ", No Paket : " + BatchLabel.label(paket),
                 MncPdfService.J_TITLE);
 
         // REQ_AUSY_00030: font jurnal sendiri (sedikit lebih besar) dan jarak antara judul,

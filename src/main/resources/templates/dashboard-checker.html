@@ -32,7 +32,7 @@
             </tr></thead>
             <tbody>
             <tr th:each="p : ${pendingPaketList}">
-                <td class="ps-3"><span class="badge bg-warning-subtle text-warning" th:text="'Batch ' + ${p[0]}"></span></td>
+                <td class="ps-3"><span class="badge bg-warning-subtle text-warning" th:text="'Batch ' + ${@batchLabel.of(p[0])}"></span></td>
                 <td th:text="${p[1]}"></td>
                 <td class="text-end" th:text="${p[2]}"></td>
                 <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(p[3],1,'POINT')}"></td>
@@ -69,10 +69,10 @@
                           th:text="${c.op}"></span></td>
                 <td class="small">
                     <span th:if="${c.target == 'GL_CODE'}">Kode GL</span>
-                    <span th:if="${c.target == 'PAKET'}" th:text="'Batch ' + ${c.noPaket}"></span>
+                    <span th:if="${c.target == 'PAKET'}" th:text="'Batch ' + ${@batchLabel.of(c.noPaket)}"></span>
                     <span th:if="${c.target == null or c.target == 'GL_ROW'}">
                         <span th:if="${c.glId != null}" th:text="'GL #' + ${c.glId}"></span>
-                        <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Batch ' + ${c.noPaket}"></span>
+                        <span th:if="${c.noPaket != null}" class="text-muted" th:text="' · Batch ' + ${@batchLabel.of(c.noPaket)}"></span>
                     </span>
                 </td>
                 <td th:text="${c.maker}"></td>

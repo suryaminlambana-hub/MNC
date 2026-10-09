@@ -23,7 +23,12 @@ public class OtorisasiGlController {
     @GetMapping("/otorisasi-gl")
     public String page(@AuthenticationPrincipal AusyUserDetails me, Model model) {
         model.addAttribute("pakets", otorisasi.pendingFor(me));
-        model.addAttribute("items", glChange.pendingReviewFor(me));
+        // REQ_AUSY_00049: otorisasi Kode GL dipisah dari Kelola Data GL, masing-masing tab sendiri.
+        var items = glChange.pendingReviewFor(me);
+        model.addAttribute("itemsGl", items.stream()
+                .filter(it -> !GlChangeService.T_GL_CODE.equals(it.cr().getTarget())).toList());
+        model.addAttribute("itemsCode", items.stream()
+                .filter(it -> GlChangeService.T_GL_CODE.equals(it.cr().getTarget())).toList());
         model.addAttribute("exportReqs", glExport.pendingExportFor(me));
         return "otorisasi-gl/index";
     }

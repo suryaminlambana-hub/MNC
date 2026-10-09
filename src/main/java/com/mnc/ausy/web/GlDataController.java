@@ -1,5 +1,6 @@
 package com.mnc.ausy.web;
 
+import com.mnc.ausy.service.BatchLabel;
 import com.mnc.ausy.domain.GlCode;
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.domain.TUpload;
@@ -172,13 +173,13 @@ public class GlDataController {
                 .filter(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
                 .toList();
         if (rows.isEmpty()) {
-            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + paket + " tidak ada di upload Anda yang belum diotorisasi.");
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + BatchLabel.label(paket) + " tidak ada di upload Anda yang belum diotorisasi.");
             return;
         }
         List<List<Object>> data = new ArrayList<>();
         for (GlTabel g : rows) data.add(Arrays.asList(g.getId(), nz(g.getGltrac()), nz(g.getGltrcd()),
-                Nominal.format(g.getGltram()), nz(g.getGltrds()), nz(g.getNoPaket())));
-        excel.download(resp, "Batch " + paket, "BulkEdit_Batch_" + paket, BULK_HEAD, data, false);
+                Nominal.format(g.getGltram()), nz(g.getGltrds()), BatchLabel.label(g.getNoPaket())));
+        excel.download(resp, "Batch " + BatchLabel.label(paket), "BulkEdit_Batch_" + BatchLabel.label(paket).replace(" (", "_").replace(")", ""), BULK_HEAD, data, false);
     }
 
     /**

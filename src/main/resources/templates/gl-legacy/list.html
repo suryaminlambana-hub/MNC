@@ -17,17 +17,15 @@
 
   <!--/* REQ_AUSY_00036 & 00044: per batch, hanya hasil upload yang belum diotorisasi. Kolom sumber
          upload: nama file, uploader, waktu upload. */-->
+  <!--/* REQ_AUSY_00036 (feedback): judul tabel "Upload Menunggu Otorisasi" dihapus. */-->
   <div class="ausy-card mt-3" style="padding:0">
-    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-      <i class="fa-solid fa-hourglass-half text-warning"></i> Upload Menunggu Otorisasi
-      <span class="text-muted fw-normal small">— sumber: Upload Excel</span></h2>
-    <div class="px-3 pb-3">
+    <div class="p-3">
       <table class="table table-sm table-hover align-middle mb-0">
         <thead><tr><th>Batch</th><th>Nama File</th><th>Uploader</th><th>Diupload</th><th class="text-end">Jml Baris</th>
           <th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Aksi</th></tr></thead>
         <tbody>
         <tr th:each="p : ${pendingUploads}" th:with="milikku=${currentUser != null and currentUser.username == p[1]}">
-          <td th:text="${p[0]}"></td>
+          <td class="text-nowrap" th:text="${@batchLabel.of(p[0])}"></td>
           <td class="small" th:text="${uploadFiles.containsKey(p[0]) ? uploadFiles.get(p[0]) : '-'}"></td>
           <td th:text="${p[1]}"></td>
           <td class="text-nowrap" th:text="${p[5] != null ? #temporals.format(p[5],'dd-MM-yyyy HH:mm') : '-'}"></td>
@@ -37,12 +35,16 @@
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
               <i class="fa-solid fa-file-pdf"></i> PDF</a>
-            <!--/* REQ_AUSY_00037: Bulk Edit per batch — hanya untuk batch milik maker sendiri. */-->
+            <!--/* REQ_AUSY_00037: Export Excel per batch (acuan bulk edit) + Bulk Edit — hanya untuk
+                   batch milik maker sendiri. */-->
+            <a th:if="${milikku}" class="btn btn-sm btn-outline-success"
+               th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/bulk-export'}">
+              <i class="fa-solid fa-file-excel"></i> Export Excel</a>
             <button th:if="${milikku}" type="button" class="btn btn-sm btn-outline-secondary btn-bulk"
-                    th:attr="data-batch=${p[0]}"><i class="fa-solid fa-file-pen"></i> Bulk Edit</button>
+                    th:attr="data-batch=${p[0]},data-label=${@batchLabel.of(p[0])}"><i class="fa-solid fa-file-pen"></i> Bulk Edit</button>
             <!--/* REQ_AUSY_00022: hanya pengunggahnya sendiri yang bisa menghapus. */-->
             <form th:if="${milikku}" method="post" class="d-inline"
-                  th:action="@{'/gl-legacy/pending/' + ${p[0]} + '/delete'}" th:attr="data-batch=${p[0]}"
+                  th:action="@{'/gl-legacy/pending/' + ${p[0]} + '/delete'}" th:attr="data-batch=${@batchLabel.of(p[0])}"
                   onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + '? Batch ini belum diotorisasi dan akan dibuang dari antrian checker.');">
               <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus</button>
             </form></td>
@@ -59,7 +61,11 @@
          diterapkan ke batch itu (belum diotorisasi), sehingga PDF-nya ikut berubah. */-->
   <div th:if="${isMaker}" class="modal fade" id="bulkModal" tabindex="-1">
     <div class="modal-dialog">
-      <form class="modal-content" id="bulkForm" method="post" enctype="multipart/form-data" action="#">
+      <!--/* REQ_AUSY_00037 (bug): form wajib pakai th:action supaya token CSRF ikut terkirim — tanpa
+             itu Spring Security menolak unggahan dan pengguna terlempar ke halaman login. Alamat
+             sebenarnya (per batch) diisi lewat JS saat tombol Bulk Edit diklik. */-->
+      <form class="modal-content" id="bulkForm" method="post" enctype="multipart/form-data"
+            th:action="@{/gl-legacy/pending/0/bulk-upload}">
         <div class="modal-header"><h5 class="modal-title">Bulk Edit Batch <span id="bulkBatch"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -88,7 +94,7 @@
       document.querySelectorAll('.btn-bulk').forEach(function(b){
         b.addEventListener('click', function(){
           var batch = b.dataset.batch;
-          document.getElementById('bulkBatch').textContent = batch;
+          document.getElementById('bulkBatch').textContent = b.dataset.label || batch;
           document.getElementById('bulkDownload').href = base + encodeURIComponent(batch) + '/bulk-export';
           var f = document.getElementById('bulkForm');
           f.action = base + encodeURIComponent(batch) + '/bulk-upload';
@@ -113,7 +119,7 @@
             th:action="@{/gl-legacy/batch-pdf}" target="_blank" class="d-flex gap-2 align-items-center">
         <select name="batch" class="form-select form-select-sm" style="min-width:220px" required>
           <option th:each="b : ${activeBatches}" th:value="${b[0] + '::' + b[1]}"
-                  th:text="|Batch ${b[0]} · ${b[1]} · ${b[2]} baris|"></option>
+                  th:text="|Batch ${@batchLabel.of(b[0])} · ${b[1]} · ${b[2]} baris|"></option>
         </select>
         <button class="btn btn-sm btn-outline-secondary text-nowrap"><i class="fa-solid fa-file-pdf"></i> PDF</button>
       </form>
@@ -124,7 +130,7 @@
       <tbody>
       <tr th:each="g : ${rows}">
         <td><code class="ausy-glid" th:text="${g.id}"></code></td>
-        <td th:text="${g.noPaket}"></td><td><code th:text="${g.gltrac}"></code></td>
+        <td class="text-nowrap" th:text="${@batchLabel.of(g.noPaket)}"></td><td><code th:text="${g.gltrac}"></code></td>
         <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${g.gltrcd}"></span></td><td th:text="${g.glName}"></td><td th:text="${g.gltrds}"></td>
         <td class="text-end" th:text="${#numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA')}"></td>
         <td th:text="${g.gltrpd}"></td><td th:text="${g.gltrus}"></td><td><small th:text="${g.gltrrf}"></small></td>

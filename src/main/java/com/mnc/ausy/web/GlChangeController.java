@@ -1,23 +1,14 @@
 package com.mnc.ausy.web;
 
-import com.mnc.ausy.domain.GlTabel;
-import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.security.AusyUserDetails;
-import com.mnc.ausy.service.Nominal;
-import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.ExcelExportService;
 import com.mnc.ausy.service.GlChangeService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.*;
@@ -27,32 +18,44 @@ import java.util.*;
 public class GlChangeController {
     private static final List<String> BULK_HEAD = List.of("ID","GL Code","D/C","Amount","Description","Batch");
     private final GlChangeService service;
-    private final GlTabelRepository gl;
     private final ExcelExportService excel;
-    private final DataScopeService scope;
 
-    public GlChangeController(GlChangeService service, GlTabelRepository gl, ExcelExportService excel,
-                              DataScopeService scope) {
-        this.service = service; this.gl = gl; this.excel = excel; this.scope = scope;
+    public GlChangeController(GlChangeService service, ExcelExportService excel) {
+        this.service = service; this.excel = excel;
     }
 
     // ---- Maker ----
     /**
-     * Kelola Data GL (REQ_AUSY_00046): hanya data manual yang BELUM final.
-     *  - pengajuan Tambah Data GL milik maker ini yang masih menunggu checker;
-     *  - data manual yang dikembalikan checker lewat Return Data (bisa diubah lewat checker, atau
-     *    dihapus langsung).
-     * Setelah checker meng-approve Tambah/Ubah, datanya masuk penampungan EXECUTE dan hilang dari
-     * sini. Data hasil upload diurus di List Data GL, bukan di halaman ini.
+     * Kelola Data GL (REQ_AUSY_00046): hanya data manual yang BELUM final, dalam SATU tabel
+     * Pengajuan (feedback): pengajuan Tambah/Ubah milik maker ini yang menunggu checker — termasuk
+     * data yang dikembalikan dari penampungan, yang otomatis diajukan ulang. Selama menunggu, maker
+     * tetap bisa Ubah (isi pengajuan langsung berganti di sisi checker) atau Hapus.
+     * Setelah checker meng-approve, datanya masuk penampungan EXECUTE dan hilang dari sini.
      */
     @GetMapping("/gl-data")
     public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        model.addAttribute("rows", gl.findReturnedManual(scope.visibleMakers(me)));
-        model.addAttribute("pendingAdds", service.pendingAddsOf(me));
+        model.addAttribute("items", service.pengajuanOf(me));
         model.addAttribute("fields", GlChangeService.FIELDS);
-        // BUG_AUSY_00099 follow-up: kunci baris + alasannya, bukan cuma "Menunggu Otorisasi"
-        model.addAttribute("pendingLabels", service.pendingGlRowLabels());
         return "gl-data/index";
+    }
+
+    /** REQ_AUSY_00046 (feedback): ubah pengajuan yang masih menunggu checker. */
+    @PostMapping("/gl-data/pending/update")
+    public String updatePending(@RequestParam Long crId, @RequestParam Map<String,String> form,
+                                @RequestParam(required=false) String note,
+                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        GlChangeService.Res r = service.updatePending(crId, form, me, note);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        return "redirect:/gl-data";
+    }
+
+    /** REQ_AUSY_00046 (feedback): hapus pengajuan yang masih menunggu checker. */
+    @PostMapping("/gl-data/pending/delete")
+    public String cancelPending(@RequestParam Long crId, @AuthenticationPrincipal AusyUserDetails me,
+                                RedirectAttributes ra) {
+        GlChangeService.Res r = service.cancelPending(crId, me);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        return "redirect:/gl-data";
     }
 
     @PostMapping("/gl-data/add")

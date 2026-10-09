@@ -4,7 +4,9 @@
 <main>
   <!--/* REQ_AUSY_00046: halaman ini hanya berisi data manual yang belum final. Tambah & Ubah lewat
          otorisasi checker; setelah di-approve, data masuk penampungan EXECUTE dan hilang dari sini.
-         Hapus langsung dieksekusi tanpa checker.
+         Feedback: tabel "Data Dikembalikan" dihapus — data yang dikembalikan langsung masuk tabel
+         Pengajuan. Ubah & Hapus tersedia juga selama pengajuan menunggu checker; ubahan langsung
+         terlihat di sisi checker dan tercatat di audit trail.
          REQ_AUSY_00039: Export Excel & Bulk Edit tidak ada di sini lagi — pindah ke List Data GL. */-->
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
@@ -20,66 +22,42 @@
   <div th:if="${ok}" class="alert alert-success py-2 mt-3" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2 mt-3" th:text="${warn}"></div>
 
-  <!--/* Pengajuan Tambah yang masih menunggu checker. */-->
   <div class="ausy-card mt-3" style="padding:0">
     <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-      <i class="fa-solid fa-hourglass-half text-warning"></i> Pengajuan Tambah Menunggu Otorisasi</h2>
+      <i class="fa-solid fa-hourglass-half text-warning"></i> Pengajuan</h2>
     <div class="px-3 pb-3">
       <table class="table table-sm table-hover align-middle mb-0">
-        <thead><tr><th>Diajukan</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Batch</th><th>Status</th></tr></thead>
+        <thead><tr><th>Diajukan</th><th>Jenis</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th>
+          <th>Description</th><th>Batch</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
         <tbody>
-        <tr th:each="a : ${pendingAdds}">
-          <td class="text-nowrap small text-muted" th:text="${a.diajukan}"></td>
+        <tr th:each="a : ${items}"
+            th:attr="data-cr=${a.crId},data-id=${a.glId},data-op=${a.op},data-gltrac=${a.gltrac},data-gltrcd=${a.gltrcd},data-gltram=${a.gltram},data-gltrds=${a.gltrds},data-nopaket=${a.noPaket}">
+          <td class="text-nowrap small text-muted" th:text="${a.diajukan != '' ? a.diajukan : '-'}"></td>
+          <td>
+            <span class="badge" th:classappend="${a.jenis == 'Tambah'} ? 'bg-primary-subtle text-primary'
+                  : (${a.jenis == 'Ubah'} ? 'bg-info-subtle text-info' : 'bg-danger-subtle text-danger')"
+                  th:text="${a.jenis}" th:title="${a.catatan}"></span>
+            <div class="small text-muted" th:if="${a.glId != ''}" th:text="'Data #' + ${a.glId}"></div>
+          </td>
           <td th:text="${a.gltrac}"></td>
           <td><span class="badge ausy-dc" th:classappend="${a.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${a.gltrcd}"></span></td>
-          <td class="text-end" th:text="${a.gltram}"></td>
+          <td class="text-end text-nowrap"
+              th:text="${a.amountTampil}"></td>
           <td th:text="${a.gltrds}"></td>
-          <td th:text="${a.noPaket}"></td>
-          <td><span class="badge bg-warning-subtle text-warning"><i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span></td>
-        </tr>
-        <tr th:if="${pendingAdds == null or pendingAdds.isEmpty()}"><td colspan="7" class="text-center text-muted py-3">Tidak ada pengajuan Tambah yang menunggu otorisasi.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!--/* Data yang dikembalikan checker lewat Return Data (REQ_AUSY_00045): ubah lewat checker, atau
-         hapus langsung. */-->
-  <div class="ausy-card" style="padding:0">
-    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-      <i class="fa-solid fa-rotate-left text-danger"></i> Data Dikembalikan Checker
-      <span class="text-muted fw-normal small">— perbaiki lalu ajukan ke checker, atau hapus</span></h2>
-    <div class="px-3 pb-3">
-    <table class="table table-sm table-hover align-middle mb-0">
-      <thead><tr><th>ID</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Batch</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
-      <tbody>
-      <tr th:each="r : ${rows}"
-          th:attr="data-id=${r.id},data-gltrac=${r.gltrac},data-gltrcd=${r.gltrcd},data-gltram=${r.gltram},data-gltrds=${r.gltrds},data-nopaket=${r.noPaket}">
-        <td th:text="${r.id}"></td>
-        <td th:text="${r.gltrac}"></td>
-        <td><span class="badge ausy-dc" th:classappend="${r.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${r.gltrcd}"></span></td>
-        <td class="text-end" th:text="${r.gltram != null ? #numbers.formatDecimal(r.gltram,1,'POINT',2,'COMMA') : ''}"></td>
-        <td th:text="${r.gltrds}"></td>
-        <td th:text="${r.noPaket}"></td>
-        <td>
-          <span th:if="${pendingLabels != null and pendingLabels.containsKey(r.id)}"
-                class="badge bg-warning-subtle text-warning" th:title="${pendingLabels.get(r.id)}">
-            <i class="fa-solid fa-hourglass-half"></i> <span th:text="${pendingLabels.get(r.id)}">Menunggu Otorisasi</span></span>
-          <span th:unless="${pendingLabels != null and pendingLabels.containsKey(r.id)}"
-                class="badge bg-danger-subtle text-danger">Dikembalikan</span>
-        </td>
-        <td class="text-end text-nowrap">
-          <th:block th:unless="${pendingLabels != null and pendingLabels.containsKey(r.id)}">
+          <td class="text-nowrap" th:text="${@batchLabel.of(a.noPaket)}"></td>
+          <td>
+            <span th:if="${a.crId != ''}" class="badge bg-warning-subtle text-warning">
+              <i class="fa-solid fa-hourglass-half"></i> <span th:text="${a.status}"></span></span>
+            <span th:unless="${a.crId != ''}" class="badge bg-danger-subtle text-danger" th:text="${a.status}"></span>
+          </td>
+          <td class="text-end text-nowrap">
             <button class="btn btn-sm btn-outline-secondary btn-edit" title="Ubah"><i class="fa-solid fa-pen"></i> Ubah</button>
             <button class="btn btn-sm btn-outline-danger btn-del" title="Hapus"><i class="fa-solid fa-trash"></i> Hapus</button>
-          </th:block>
-          <span th:if="${pendingLabels != null and pendingLabels.containsKey(r.id)}"
-                class="text-muted small" th:title="${pendingLabels.get(r.id)}">—</span>
-        </td>
-      </tr>
-      <tr th:if="${rows == null or rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada data yang dikembalikan checker.</td></tr>
-      </tbody>
-    </table>
+          </td>
+        </tr>
+        <tr th:if="${items == null or items.isEmpty()}"><td colspan="9" class="text-center text-muted py-3">Tidak ada pengajuan.</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -91,6 +69,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <input type="hidden" name="glId" id="fGlId">
+          <input type="hidden" name="crId" id="fCrId">
           <div class="row g-3">
             <div class="col-6"><label class="form-label">GL Code <span class="text-danger">*</span></label>
               <input name="gltrac" id="fGltrac" class="form-control" required inputmode="numeric"
@@ -100,13 +79,15 @@
             <div class="col-6"><label class="form-label">Amount <span class="text-danger">*</span></label><input name="gltram" id="fGltram" type="number" step="0.01" min="0" class="form-control" required></div>
             <div class="col-6"><label class="form-label">Batch</label><input name="noPaket" id="fNoPaket" class="form-control"></div>
             <div class="col-12"><label class="form-label">Description</label><input name="gltrds" id="fGltrds" maxlength="40" class="form-control"></div>
-            <div class="col-12"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
-              <textarea name="note" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
+            <div class="col-12"><label class="form-label">Justifikasi / catatan <span class="text-danger" id="fNoteReq">*</span></label>
+              <textarea name="note" id="fNote" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
           </div>
+          <p class="text-muted small mt-2 mb-0 d-none" id="fPendingInfo">Pengajuan ini masih menunggu checker —
+            isinya langsung diganti dan checker melihat data terbaru. Nilai lama &amp; baru tercatat di audit trail.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="submit" class="btn btn-primary">Ajukan ke Checker</button>
+          <button type="submit" class="btn btn-primary" id="fSubmit">Ajukan ke Checker</button>
         </div>
       </form>
     </div>
@@ -115,13 +96,14 @@
   <!-- Delete modal — langsung, tanpa checker (REQ_AUSY_00046) -->
   <div class="modal fade" id="delModal" tabindex="-1">
     <div class="modal-dialog">
-      <form class="modal-content" method="post" th:action="@{/gl-data/delete}">
-        <div class="modal-header"><h5 class="modal-title">Hapus Data GL #<span id="dId"></span></h5>
+      <form class="modal-content" id="delForm" method="post" th:action="@{/gl-data/delete}">
+        <div class="modal-header"><h5 class="modal-title" id="dTitle">Hapus</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <input type="hidden" name="glId" id="dGlId">
+          <input type="hidden" name="crId" id="dCrId">
           <p class="mb-0">Data ini akan <b>langsung dihapus</b> tanpa otorisasi checker dan tidak akan masuk
-            file ACCTXT. Penghapusan tercatat di audit trail.</p>
+            file ACCTXT. Pengajuannya hilang dari antrian checker. Penghapusan tercatat di audit trail.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -133,32 +115,55 @@
 
   <script th:inline="javascript">
     (function(){
-      var addUrl=/*[[@{/gl-data/add}]]*/'', editUrl=/*[[@{/gl-data/edit}]]*/'';
+      var addUrl=/*[[@{/gl-data/add}]]*/'', editUrl=/*[[@{/gl-data/edit}]]*/'',
+          updUrl=/*[[@{/gl-data/pending/update}]]*/'', delUrl=/*[[@{/gl-data/delete}]]*/'',
+          cancelUrl=/*[[@{/gl-data/pending/delete}]]*/'';
       var fm=new bootstrap.Modal(document.getElementById('formModal'));
       var dm=new bootstrap.Modal(document.getElementById('delModal'));
-      var form=document.getElementById('glForm');
+      var form=document.getElementById('glForm'), note=document.getElementById('fNote');
+      function setPending(on){
+        // Mengubah pengajuan yang sedang menunggu: catatan opsional, batch baris lama tidak bisa diganti.
+        note.required=!on;
+        document.getElementById('fNoteReq').classList.toggle('d-none', on);
+        document.getElementById('fPendingInfo').classList.toggle('d-none', !on);
+        document.getElementById('fSubmit').textContent = on ? 'Simpan Perubahan' : 'Ajukan ke Checker';
+      }
       document.getElementById('btnAdd').addEventListener('click',function(){
-        form.action=addUrl; document.getElementById('fmTitle').textContent='Tambah Data GL';
-        form.reset(); document.getElementById('fGlId').value=''; fm.show();
+        form.reset(); form.action=addUrl; document.getElementById('fmTitle').textContent='Tambah Data GL';
+        document.getElementById('fGlId').value=''; document.getElementById('fCrId').value='';
+        document.getElementById('fNoPaket').readOnly=false;
+        setPending(false); fm.show();
       });
       document.querySelectorAll('.btn-edit').forEach(function(b){
         b.addEventListener('click',function(){
           var d=b.closest('tr').dataset;
-          form.action=editUrl; document.getElementById('fmTitle').textContent='Ubah Data GL #'+d.id;
-          document.getElementById('fGlId').value=d.id;
+          form.reset();
+          var pending = !!d.cr;
+          form.action = pending ? updUrl : editUrl;
+          document.getElementById('fmTitle').textContent = pending
+            ? 'Ubah Pengajuan CR#'+d.cr : 'Ubah Data GL #'+d.id;
+          document.getElementById('fGlId').value=d.id||'';
+          document.getElementById('fCrId').value=d.cr||'';
           document.getElementById('fGltrac').value=d.gltrac||'';
           document.getElementById('fGltrcd').value=d.gltrcd||'D';
           document.getElementById('fGltram').value=d.gltram||'';
           document.getElementById('fGltrds').value=d.gltrds||'';
           document.getElementById('fNoPaket').value=d.nopaket||'';
-          fm.show();
+          document.getElementById('fNoPaket').readOnly = d.op==='EDIT';
+          setPending(pending); fm.show();
         });
       });
       document.querySelectorAll('.btn-del').forEach(function(b){
         b.addEventListener('click',function(){
           var d=b.closest('tr').dataset;
-          document.getElementById('dId').textContent=d.id;
-          document.getElementById('dGlId').value=d.id; dm.show();
+          var f=document.getElementById('delForm');
+          f.action = d.cr ? cancelUrl : delUrl;
+          document.getElementById('dTitle').textContent = d.cr
+            ? (d.id ? 'Hapus Data GL #'+d.id+' (CR#'+d.cr+')' : 'Hapus Pengajuan CR#'+d.cr)
+            : 'Hapus Data GL #'+d.id;
+          document.getElementById('dGlId').value=d.id||'';
+          document.getElementById('dCrId').value=d.cr||'';
+          dm.show();
         });
       });
     })();

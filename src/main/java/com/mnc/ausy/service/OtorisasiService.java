@@ -87,11 +87,11 @@ public class OtorisasiService {
             g.setStatusPrint("BELUM UPLOAD");
         }
         gl.saveAll(rows);
-        staging.stage(rows, inputer, checker, "Batch " + paket);
+        staging.stage(rows, inputer, checker, "Batch " + BatchLabel.label(paket));
         audit.transaction(checker, "OTORISASI_APPROVE",
-                "Batch " + paket + " (maker=" + inputer + ") di-approve, " + rows.size()
+                "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") di-approve, " + rows.size()
                 + " baris masuk penampungan Generate File ACCTXT.");
-        return new ExportResult(true, "Otorisasi upload berhasil — Batch " + paket + " (" + rows.size()
+        return new ExportResult(true, "Otorisasi upload berhasil — Batch " + BatchLabel.label(paket) + " (" + rows.size()
                 + " baris) masuk penampungan dan siap digenerate oleh role EXECUTE.", rows.size(), null);
     }
 
@@ -110,8 +110,8 @@ public class OtorisasiService {
 
         gl.deletePaket(paket, inputer);   // reject -> removed from temp table (gl_tabel)
         audit.transaction(checker, "OTORISASI_REJECT",
-                "Batch " + paket + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
-        return new ExportResult(true, "Batch " + paket + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
+                "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") DITOLAK, " + rows.size() + " baris dibuang. Catatan: " + note);
+        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak. Data dihapus dari antrian dan alasan tercatat di audit trail.", rows.size(), null);
     }
 
     /**
@@ -128,17 +128,17 @@ public class OtorisasiService {
         String maker = me.getUsername();
         List<GlTabel> rows = gl.findBatchRows(paket, maker);
         if (rows.isEmpty())
-            return new ExportResult(false, "Batch " + paket + " tidak ditemukan di upload milik Anda.", 0, null);
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak ditemukan di upload milik Anda.", 0, null);
         boolean semuaPending = rows.stream().allMatch(g ->
                 "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
         if (!semuaPending)
-            return new ExportResult(false, "Batch " + paket + " sudah diproses checker dan tidak bisa dihapus dari sini."
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " sudah diproses checker dan tidak bisa dihapus dari sini."
                     + " Gunakan menu Hapus Batch.", 0, null);
 
         gl.deletePaket(paket, maker);
         audit.transaction(maker, "UPLOAD_DELETE",
-                "Batch " + paket + " dihapus pengunggahnya sebelum diotorisasi, " + rows.size() + " baris dibuang.");
-        return new ExportResult(true, "Batch " + paket + " dihapus (" + rows.size()
+                "Batch " + BatchLabel.label(paket) + " dihapus pengunggahnya sebelum diotorisasi, " + rows.size() + " baris dibuang.");
+        return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " dihapus (" + rows.size()
                 + " baris). Batch ini tidak lagi menunggu otorisasi checker.", rows.size(), null);
     }
 
@@ -158,11 +158,11 @@ public class OtorisasiService {
         Map<Long, GlTabel> batch = new LinkedHashMap<>();
         for (GlTabel g : gl.findBatchRows(paket, maker)) batch.put(g.getId(), g);
         if (batch.isEmpty())
-            return new ExportResult(false, "Batch " + paket + " tidak ditemukan di upload milik Anda.", 0, null);
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak ditemukan di upload milik Anda.", 0, null);
         boolean semuaPending = batch.values().stream().allMatch(g ->
                 "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
         if (!semuaPending)
-            return new ExportResult(false, "Batch " + paket + " sudah diproses checker; Bulk Edit hanya untuk batch"
+            return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " sudah diproses checker; Bulk Edit hanya untuk batch"
                     + " yang belum diotorisasi.", 0, null);
 
         List<String> salah = new ArrayList<>();
@@ -172,7 +172,7 @@ public class OtorisasiService {
             Long id;
             try { id = Long.valueOf(m.get("id").trim()); } catch (Exception e) { salah.add("baris " + baris + ": ID tidak valid"); continue; }
             GlTabel g = batch.get(id);
-            if (g == null) { salah.add("baris " + baris + ": ID " + id + " bukan milik Batch " + paket); continue; }
+            if (g == null) { salah.add("baris " + baris + ": ID " + id + " bukan milik Batch " + BatchLabel.label(paket)); continue; }
             String acc = n(m.get("gltrac")).trim(), dc = n(m.get("gltrcd")).trim().toUpperCase();
             String ds = GlTextRule.trim(n(m.get("gltrds")));
             BigDecimal amt;
@@ -199,18 +199,18 @@ public class OtorisasiService {
         if (!salah.isEmpty())
             return new ExportResult(false, "Bulk Edit tidak diterapkan: " + String.join("; ", salah) + ".", 0, null);
         if (berubah.isEmpty())
-            return new ExportResult(false, "Tidak ada perubahan pada Batch " + paket + ".", 0, null);
+            return new ExportResult(false, "Tidak ada perubahan pada Batch " + BatchLabel.label(paket) + ".", 0, null);
 
         gl.saveAll(berubah);
         BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
         for (GlTabel g : batch.values())
             if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));
         audit.transaction(maker, "BULK_EDIT_PENDING",
-                "Bulk Edit Batch " + paket + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung.");
+                "Bulk Edit Batch " + BatchLabel.label(paket) + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung.");
         String balance = d.compareTo(c) == 0 ? " Debit = Credit (balance)."
                 : " PERHATIAN: batch tidak balance (Debit " + Nominal.format(d) + ", Credit " + Nominal.format(c)
                   + "); checker tidak bisa meng-approve sampai balance.";
-        return new ExportResult(true, "Bulk Edit Batch " + paket + " diterapkan: " + berubah.size()
+        return new ExportResult(true, "Bulk Edit Batch " + BatchLabel.label(paket) + " diterapkan: " + berubah.size()
                 + " baris diubah." + balance, berubah.size(), null);
     }
 

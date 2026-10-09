@@ -109,7 +109,27 @@ Tidak ada migrasi DB.
   Data GL. Tercatat di audit trail; setelah file ACCTXT terbit tidak bisa di-return.
 - **Perbaikan:** Ubah dan Bulk Edit kini ikut mengubah `gleqam`/`glotam`, dua kolom nominal yang
   dipakai berkas ACCTXT. Dulu hanya `gltram` yang berubah.
-- **REQ_AUSY_00031 (nomor batch harian) ditahan** sesuai catatan QA, menunggu alur baru.
+- **Feedback QA atas alur baru (09-10-2026):**
+  - **Nomor batch tampil 1, 2, 3 setiap hari** (REQ_AUSY_00031). Di layar, PDF jurnal, Excel, pesan,
+    dan audit trail, `20261009001` tampil sebagai **`1 (09-10-2026)`**. Nomor di database tidak
+    berubah (tetap unik), tidak ada data yang dihapus. Batch format lama tampil apa adanya.
+  - **Judul tabel "Upload Menunggu Otorisasi" dihapus** dari List Data GL (REQ_AUSY_00036).
+  - **Perbaikan: upload Bulk Edit melempar ke halaman login** (REQ_AUSY_00037, 00047). Form unggahnya
+    tidak membawa token CSRF sehingga ditolak Spring Security. Sekarang hasil edit langsung
+    terlihat di antrian checker dan tercatat di audit trail (`BULK_EDIT_PENDING`).
+  - **Tombol Export Excel per batch** di List Data GL (REQ_AUSY_00037), sebagai acuan Bulk Edit.
+  - **Kelola Data GL jadi satu tabel "Pengajuan"** (REQ_AUSY_00046). Tabel "Data Dikembalikan"
+    dihapus:
+    - Data manual yang di-Return Data langsung diajukan ulang. Data itu muncul di tabel Pengajuan
+      (jenis "Dikembalikan", berisi alasan checker) dan di antrian otorisasi checker.
+    - **Ubah & Hapus tersedia selama pengajuan menunggu.** Ubah langsung mengganti isi pengajuan
+      di sisi checker; nilai lama dan baru tercatat di audit trail (`GL_CHANGE_REQ_UPDATE`).
+    - Hapus membatalkan pengajuan (`GL_CHANGE_REQ_CANCEL`). Untuk data yang dikembalikan, datanya
+      ikut dihapus (`GL_DELETE`).
+  - **Manajemen Otorisasi GL** (REQ_AUSY_00048, 00049): tab berganti nama menjadi "Otorisasi
+    Upload Excel" dan "Otorisasi Kelola Data GL". Tab baru **"Otorisasi Manajemen Kode GL"** berisi
+    otorisasi Kode GL, yang tidak lagi tercampur dengan Kelola Data GL.
+  - REQ_AUSY_00050 (tanggal & jam di kanan atas): sudah ada, lihat poin di bawah.
 - **Tanggal & jam berjalan di header** (permintaan tim accounting): ikon kalender +
   `09-10-2026 09:07:13 WIB`, berjalan tiap detik di semua halaman. Berpatokan pada jam server
   (bukan jam laptop pengguna), zona Asia/Jakarta. Disembunyikan di layar sempit.
@@ -133,6 +153,12 @@ Tidak ada migrasi DB.
   `maxPaket()` dihapus: cast seluruh `no_paket` ke int akan error begitu nomor 11 digit ada.
   Nomor batch tidak boleh memuat `-`, karena referensi GLTRRF dipecah per `-` saat mencetak.
 - Format nominal Indonesia ditulis dan dibaca lewat satu kelas, `Nominal`.
+- Label nomor batch dibuat di satu tempat, `BatchLabel.label(...)` (di template: `${@batchLabel.of(x)}`).
+  Nama berkas PDF dan GLTRRF tetap memakai nomor asli.
+- Status baru `gl_change_request.status = 'CANCELLED'` untuk pengajuan yang dihapus maker. Pengajuan
+  ulang otomatis untuk data yang dikembalikan berupa EDIT dengan sebelum = sesudah, dan
+  `note_maker` diawali `Dikembalikan dari penampungan`.
+- Form POST wajib memakai `th:action` (bukan `action="#"`), supaya token CSRF disisipkan.
 - `GlTabel.batchKey()` adalah kunci batch yang sama dengan rekap `approvedPakets()`.
 - PDFBox **tidak** ditambahkan ke project; hanya dipakai sekali untuk merender logo.
 

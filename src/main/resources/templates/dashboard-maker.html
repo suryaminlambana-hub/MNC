@@ -68,7 +68,7 @@
                     <td class="small" th:text="${g.gltrds}"></td>
                     <td class="small" th:text="${g.gltrbr}"></td>
                     <td class="text-end text-nowrap" th:text="${#numbers.formatInteger(g.gltram,1,'POINT')}"></td>
-                    <td th:text="${g.noPaket}"></td>
+                    <td class="text-nowrap" th:text="${@batchLabel.of(g.noPaket)}"></td>
                 </tr>
                 </tbody>
             </table>
