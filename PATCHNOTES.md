@@ -169,8 +169,7 @@ Tidak ada migrasi DB.
   dimasukkan per batch (data manual per maker).
 - `V49__req_00053_status_batch.sql`: tabel `gl_batch_status` (status Dikembalikan/Rejected per
   batch upload, berikut catatan checker). Tabel baru saja; data lama tidak diubah. Batch yang sudah
-  ditolak sebelum rilis
-  ini tidak muncul sebagai Rejected (datanya sudah terhapus). Baris batch yang ditolak sesudah
+  ditolak sebelum rilis ini tidak muncul sebagai Rejected (datanya sudah terhapus). Baris batch yang ditolak sesudah
   rilis ini: `gl_tabel.status_dual = 'REJECTED'`, `active = 0`.
 
 ### Setelah deploy
