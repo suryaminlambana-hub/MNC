@@ -10,7 +10,7 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/font-awesome/6.5.2/css/all.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/datatables/1.13.5/css/jquery.dataTables.min.css}">
-    <link rel="stylesheet" th:href="@{/css/app.css(v=17)}">
+    <link rel="stylesheet" th:href="@{/css/app.css(v=18)}">
     <!-- Libraries in <head> so page-level inline scripts (Bootstrap modals, etc.) always have $/bootstrap available -->
     <script th:src="@{/webjars/jquery/3.7.1/jquery.min.js}"></script>
     <script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
@@ -48,6 +48,11 @@
                 <div class="ausy-title" th:text="${pageHeading} ?: 'AUSY'">AUSY</div>
             </div>
             <div class="ausy-user">
+                <!--/* Tanggal & jam berjalan (permintaan tim accounting), WIB. Berpatokan pada jam
+                       SERVER saat halaman dimuat, bukan jam laptop pengguna yang bisa melenceng. */-->
+                <span class="ausy-clock" id="ausyClock" th:attr="data-server-ms=${#dates.createNow().time}"
+                      title="Tanggal &amp; jam server (WIB)"><i class="fa-regular fa-calendar"></i>
+                    <span id="ausyClockText">--</span></span>
                 <button class="ausy-iconbtn" id="themeToggle" type="button" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
                 <span class="ausy-user-name" th:text="${currentUser != null ? currentUser.nama : ''}">User</span>
                 <span class="ausy-role" th:text="${currentUser != null ? currentUser.level : ''}">ROLE</span>
@@ -191,6 +196,25 @@
   }, true);
   document.addEventListener('input',  function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
   document.addEventListener('change', function(e){ if(e.target.setCustomValidity) e.target.setCustomValidity(''); }, true);
+})();
+</script>
+<script>
+// Jam berjalan di header: "09-10-2026 09:07:13 WIB" (permintaan tim accounting). Selisih jam
+// laptop terhadap jam server dihitung sekali saat halaman dimuat, lalu jam berjalan tiap detik
+// dengan zona Asia/Jakarta — jadi tetap tepat walau jam/zona laptop pengguna berbeda.
+(function(){
+  var box = document.getElementById('ausyClock'), txt = document.getElementById('ausyClockText');
+  if (!box || !txt) return;
+  var server = Number(box.getAttribute('data-server-ms'));
+  var offset = isFinite(server) && server > 0 ? server - Date.now() : 0;
+  var fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit',
+      year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  function tick(){
+    var p = {}; fmt.formatToParts(new Date(Date.now() + offset)).forEach(function(x){ p[x.type] = x.value; });
+    var jam = p.hour === '24' ? '00' : p.hour;
+    txt.textContent = p.day + '-' + p.month + '-' + p.year + ' ' + jam + ':' + p.minute + ':' + p.second + ' WIB';
+  }
+  tick(); setInterval(tick, 1000);
 })();
 </script>
 </body>

@@ -110,6 +110,10 @@ Tidak ada migrasi DB.
 - **Perbaikan:** Ubah dan Bulk Edit kini ikut mengubah `gleqam`/`glotam`, dua kolom nominal yang
   dipakai berkas ACCTXT. Dulu hanya `gltram` yang berubah.
 - **REQ_AUSY_00031 (nomor batch harian) ditahan** sesuai catatan QA, menunggu alur baru.
+- **Tanggal & jam berjalan di header** (permintaan tim accounting): ikon kalender +
+  `09-10-2026 09:07:13 WIB`, berjalan tiap detik di semua halaman. Berpatokan pada jam server
+  (bukan jam laptop pengguna), zona Asia/Jakarta. Disembunyikan di layar sempit.
+  CSS dinaikkan ke `app.css?v=18`.
 
 ### Migrasi DB
 - `V48__req_00034_00046_alur_penampungan.sql`: nama menu, menu Hapus Batch (13) & Ajukan Export
