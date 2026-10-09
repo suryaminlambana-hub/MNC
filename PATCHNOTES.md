@@ -85,7 +85,46 @@ Tidak ada migrasi DB.
     1356×160 px. Untuk mengganti dengan file resmi, timpa berkas itu.
   - Kalau berkasnya hilang, kotaknya otomatis tersembunyi (tidak tampil gambar rusak).
 
+- **Alur baru: approve checker langsung masuk penampungan EXECUTE** (REQ_AUSY_00038).
+  - Dulu: upload → checker approve → maker ajukan export → checker approve export → Execute.
+  - Sekarang: upload → checker approve → **penampungan** ("Menunggu digenerate" di Generate File
+    ACCTXT) → Execute. Penyusunan ACCTXT, FTP, dan Susun Ulang tidak berubah.
+  - Tambah/Ubah dari Kelola Data GL yang di-approve juga langsung masuk penampungan.
+- **Ajukan Export dicabut** dari List Data GL (REQ_AUSY_00034), dan **tab Otorisasi Export**
+  dari Manajemen Otorisasi GL (REQ_AUSY_00043). Endpoint-nya ikut dicabut.
+- **"List GL Aktif" menjadi "List Data GL"** (REQ_AUSY_00035), dan **"Return Export GL" menjadi
+  "Return Data"** (REQ_AUSY_00041).
+- **List Data GL maker** (REQ_AUSY_00036, 00044): hanya batch upload yang belum diotorisasi, per
+  batch, dengan nama file, uploader, dan waktu upload. Batch yang sudah di-approve hilang dari
+  sini. Checker tetap melihat data yang sudah diotorisasi untuk penelusuran.
+- **Bulk Edit per batch di List Data GL** (REQ_AUSY_00037, 00047). Langsung diterapkan ke batch
+  yang belum diotorisasi (tanpa checker, karena checker tetap meng-approve batch-nya), sehingga
+  PDF batch ikut berubah.
+- **Kelola Data GL** (REQ_AUSY_00039, 00046): Export Excel & Bulk Edit dicabut. Isinya hanya data
+  manual yang belum final (pengajuan Tambah yang menunggu, dan data yang di-return). Hapus
+  langsung tanpa checker.
+- **Menu Hapus Batch disembunyikan** (REQ_AUSY_00040); endpoint-nya ikut dicabut.
+- **Return Data** (REQ_AUSY_00042, 00045): data di penampungan (belum dibuat file) dikembalikan ke
+  halaman asalnya — batch upload ke List Data GL dan antrian otorisasi, data manual ke Kelola
+  Data GL. Tercatat di audit trail; setelah file ACCTXT terbit tidak bisa di-return.
+- **Perbaikan:** Ubah dan Bulk Edit kini ikut mengubah `gleqam`/`glotam`, dua kolom nominal yang
+  dipakai berkas ACCTXT. Dulu hanya `gltram` yang berubah.
+- **REQ_AUSY_00031 (nomor batch harian) ditahan** sesuai catatan QA, menunggu alur baru.
+
+### Migrasi DB
+- `V48__req_00034_00046_alur_penampungan.sql`: nama menu, menu Hapus Batch (13) & Ajukan Export
+  (604) nonaktif, kolom `t_upload.no_paket`, dan **data lama masuk penampungan**: pengajuan
+  export yang masih PENDING disetujui sistem, GL yang sudah diotorisasi tapi belum diajukan
+  dimasukkan per batch (data manual per maker).
+
+### Setelah deploy
+- Semua GL lama yang sudah diotorisasi dan belum digenerate muncul di "Menunggu digenerate" hari
+  itu juga untuk role EXECUTE.
+
 ### Catatan untuk developer
+- Penampungan = `gl_export_request` APPROVED tanpa `file_name`, dibuat oleh `StagingService`.
+- Status baru `gl_tabel.status_dual = 'RETURNED'` untuk data manual yang dikembalikan; GL Aktif
+  tidak menghitungnya. Data upload yang dikembalikan kembali ke `PENDING`.
 - Nomor batch baru dibuat di satu tempat (`UploadService`) lewat `maxUrutBatchHarian`.
   `maxPaket()` dihapus: cast seluruh `no_paket` ke int akan error begitu nomor 11 digit ada.
   Nomor batch tidak boleh memuat `-`, karena referensi GLTRRF dipecah per `-` saat mencetak.
