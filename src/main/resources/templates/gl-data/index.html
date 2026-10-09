@@ -2,22 +2,17 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
 <head><title>Kelola Data GL — AUSY</title></head>
 <main>
+  <!--/* REQ_AUSY_00046: halaman ini hanya berisi data manual yang belum final. Tambah & Ubah lewat
+         otorisasi checker; setelah di-approve, data masuk penampungan EXECUTE dan hilang dari sini.
+         Hapus langsung dieksekusi tanpa checker.
+         REQ_AUSY_00039: Export Excel & Bulk Edit tidak ada di sini lagi — pindah ke List Data GL. */-->
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
       <h1 class="ausy-page-title">Kelola Data GL</h1>
-      <p class="text-muted mb-0">Tambah / ubah / hapus baris GL. Setiap perubahan menunggu approval Checker (dual control) sebelum berlaku — Workflow 8.3.</p>
+      <p class="text-muted mb-0">Tambah dan ubah data GL manual lewat otorisasi checker. Setelah di-approve, data
+        masuk penampungan untuk digenerate menjadi file ACCTXT oleh role EXECUTE.</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap align-items-center">
-      <!--/* REQ_AUSY_00029: ekspor bulk edit per batch; Amount berformat 1.000.000,50. */-->
-      <form method="get" th:action="@{/gl-data/bulk-export}" class="d-flex gap-2 align-items-center">
-        <select name="batch" class="form-select" style="min-width:220px">
-          <option value="">Semua batch</option>
-          <option th:each="b : ${activeBatches}" th:value="${b[0] + '::' + b[1]}"
-                  th:text="|Batch ${b[0]} · ${b[1]} · ${b[2]} baris|"></option>
-        </select>
-        <button class="btn btn-outline-secondary text-nowrap"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
-      </form>
-      <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkModal"><i class="fa-solid fa-file-import"></i> Bulk Edit (Upload)</button>
+    <div class="d-flex gap-2">
       <button class="btn btn-primary" id="btnAdd"><i class="fa-solid fa-plus"></i> Tambah Data GL</button>
     </div>
   </div>
@@ -25,8 +20,37 @@
   <div th:if="${ok}" class="alert alert-success py-2 mt-3" th:text="${ok}"></div>
   <div th:if="${warn}" class="alert alert-warning py-2 mt-3" th:text="${warn}"></div>
 
-  <div class="ausy-card mt-3">
-    <table class="table table-hover align-middle mb-0">
+  <!--/* Pengajuan Tambah yang masih menunggu checker. */-->
+  <div class="ausy-card mt-3" style="padding:0">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-hourglass-half text-warning"></i> Pengajuan Tambah Menunggu Otorisasi</h2>
+    <div class="px-3 pb-3">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead><tr><th>Diajukan</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Batch</th><th>Status</th></tr></thead>
+        <tbody>
+        <tr th:each="a : ${pendingAdds}">
+          <td class="text-nowrap small text-muted" th:text="${a.diajukan}"></td>
+          <td th:text="${a.gltrac}"></td>
+          <td><span class="badge ausy-dc" th:classappend="${a.gltrcd == 'D'} ? 'dc-d' : 'dc-c'" th:text="${a.gltrcd}"></span></td>
+          <td class="text-end" th:text="${a.gltram}"></td>
+          <td th:text="${a.gltrds}"></td>
+          <td th:text="${a.noPaket}"></td>
+          <td><span class="badge bg-warning-subtle text-warning"><i class="fa-solid fa-hourglass-half"></i> Menunggu Otorisasi</span></td>
+        </tr>
+        <tr th:if="${pendingAdds == null or pendingAdds.isEmpty()}"><td colspan="7" class="text-center text-muted py-3">Tidak ada pengajuan Tambah yang menunggu otorisasi.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!--/* Data yang dikembalikan checker lewat Return Data (REQ_AUSY_00045): ubah lewat checker, atau
+         hapus langsung. */-->
+  <div class="ausy-card" style="padding:0">
+    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+      <i class="fa-solid fa-rotate-left text-danger"></i> Data Dikembalikan Checker
+      <span class="text-muted fw-normal small">— perbaiki lalu ajukan ke checker, atau hapus</span></h2>
+    <div class="px-3 pb-3">
+    <table class="table table-sm table-hover align-middle mb-0">
       <thead><tr><th>ID</th><th>GL Code</th><th>D/C</th><th class="text-end">Amount</th><th>Description</th><th>Batch</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
       <tbody>
       <tr th:each="r : ${rows}"
@@ -42,9 +66,9 @@
                 class="badge bg-warning-subtle text-warning" th:title="${pendingLabels.get(r.id)}">
             <i class="fa-solid fa-hourglass-half"></i> <span th:text="${pendingLabels.get(r.id)}">Menunggu Otorisasi</span></span>
           <span th:unless="${pendingLabels != null and pendingLabels.containsKey(r.id)}"
-                class="badge bg-secondary-subtle text-secondary" th:text="${r.statusDual}"></span>
+                class="badge bg-danger-subtle text-danger">Dikembalikan</span>
         </td>
-        <td class="text-end">
+        <td class="text-end text-nowrap">
           <th:block th:unless="${pendingLabels != null and pendingLabels.containsKey(r.id)}">
             <button class="btn btn-sm btn-outline-secondary btn-edit" title="Ubah"><i class="fa-solid fa-pen"></i> Ubah</button>
             <button class="btn btn-sm btn-outline-danger btn-del" title="Hapus"><i class="fa-solid fa-trash"></i> Hapus</button>
@@ -53,28 +77,9 @@
                 class="text-muted small" th:title="${pendingLabels.get(r.id)}">—</span>
         </td>
       </tr>
-      <tr th:if="${rows == null or rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Belum ada data GL aktif.</td></tr>
+      <tr th:if="${rows == null or rows.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada data yang dikembalikan checker.</td></tr>
       </tbody>
     </table>
-  </div>
-
-  <!--/* Dipaginasi di server persis seperti List GL Aktif — isinya harus sama (BUG_AUSY_00150)
-         dan halamannya tidak boleh merender belasan ribu baris (BUG_AUSY_00147). */-->
-  <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2"
-       th:if="${totalPages > 1}">
-    <span class="text-muted small">
-      Halaman <b th:text="${page + 1}">1</b> dari <b th:text="${totalPages}">1</b>
-      · <b th:text="${total}">0</b> baris
-    </span>
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
-         th:href="@{/gl-data(page=0)}">&laquo; Awal</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page <= 0} ? 'disabled'"
-         th:href="@{/gl-data(page=${page - 1})}">Sebelumnya</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
-         th:href="@{/gl-data(page=${page + 1})}">Berikutnya</a>
-      <a class="btn btn-outline-secondary" th:classappend="${page + 1 >= totalPages} ? 'disabled'"
-         th:href="@{/gl-data(page=${totalPages - 1})}">Akhir &raquo;</a>
     </div>
   </div>
 
@@ -92,7 +97,7 @@
                      pattern="[0-9]{1,50}" title="GL Code hanya boleh berisi angka" placeholder="cth. 100"></div>
             <div class="col-6"><label class="form-label">D/C</label>
               <select name="gltrcd" id="fGltrcd" class="form-select"><option value="D">D — Debit</option><option value="C">C — Credit</option></select></div>
-            <div class="col-6"><label class="form-label">Amount <span class="text-danger">*</span></label><input name="gltram" id="fGltram" type="number" step="0.01" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">Amount <span class="text-danger">*</span></label><input name="gltram" id="fGltram" type="number" step="0.01" min="0" class="form-control" required></div>
             <div class="col-6"><label class="form-label">Batch</label><input name="noPaket" id="fNoPaket" class="form-control"></div>
             <div class="col-12"><label class="form-label">Description</label><input name="gltrds" id="fGltrds" maxlength="40" class="form-control"></div>
             <div class="col-12"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
@@ -107,7 +112,7 @@
     </div>
   </div>
 
-  <!-- Delete modal -->
+  <!-- Delete modal — langsung, tanpa checker (REQ_AUSY_00046) -->
   <div class="modal fade" id="delModal" tabindex="-1">
     <div class="modal-dialog">
       <form class="modal-content" method="post" th:action="@{/gl-data/delete}">
@@ -115,38 +120,12 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <input type="hidden" name="glId" id="dGlId">
-          <p class="mb-2">Penghapusan bersifat <b>soft-delete</b> (data ditandai non-aktif, bukan dihapus permanen) dan menunggu approval Checker.</p>
-          <label class="form-label">Justifikasi penghapusan <span class="text-danger">*</span></label>
-          <textarea name="note" class="form-control" rows="2" required></textarea>
+          <p class="mb-0">Data ini akan <b>langsung dihapus</b> tanpa otorisasi checker dan tidak akan masuk
+            file ACCTXT. Penghapusan tercatat di audit trail.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="submit" class="btn btn-danger">Ajukan Hapus</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Bulk edit via Excel modal -->
-  <div class="modal fade" id="bulkModal" tabindex="-1">
-    <div class="modal-dialog">
-      <form class="modal-content" method="post" enctype="multipart/form-data" th:action="@{/gl-data/bulk-upload}">
-        <div class="modal-header"><h5 class="modal-title">Bulk Edit via Excel</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <ol class="small text-muted ps-3 mb-3">
-            <li>Klik <b>Export Excel</b> untuk mengunduh data GL saat ini.</li>
-            <li>Ubah nilai di Excel (jangan ubah kolom <b>ID</b>).</li>
-            <li>Upload file yang sudah diubah di sini — hanya baris yang berubah yang diajukan ke Checker.</li>
-          </ol>
-          <div class="mb-2"><label class="form-label">File Excel (hasil edit) <span class="text-danger">*</span></label>
-            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required></div>
-          <div class="mb-2"><label class="form-label">Justifikasi / catatan <span class="text-danger">*</span></label>
-            <textarea name="note" class="form-control" rows="2" required placeholder="Alasan perubahan (tercatat di audit trail)"></textarea></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="submit" class="btn btn-primary">Ajukan ke Checker</button>
+          <button type="submit" class="btn btn-danger">Hapus</button>
         </div>
       </form>
     </div>

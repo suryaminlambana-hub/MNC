@@ -99,10 +99,11 @@ public class GlChangeService {
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
                            AuditService audit, GlCodeService glCodeService,
                            GlExportRequestRepository exportRequests, SequenceService seq,
-                           DataScopeService scope) {
+                           DataScopeService scope, StagingService staging) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
-        this.exportRequests = exportRequests; this.seq = seq; this.scope = scope;
+        this.exportRequests = exportRequests; this.seq = seq; this.scope = scope; this.staging = staging;
     }
+    private final StagingService staging;
 
     // ---- maps & json helpers ----
     private Map<String,String> rowMap(GlTabel g) {
@@ -287,6 +288,48 @@ public class GlChangeService {
         cr.save(c);
         audit.transaction(me.getUsername(), "GL_CHANGE_REQ", "DELETE baris #" + glId + " diajukan (CR#" + c.getId() + ")");
         return new Res(true, "Permintaan HAPUS data GL diajukan (menunggu approval Checker).");
+    }
+
+    /**
+     * REQ_AUSY_00046 — maker menghapus data manual miliknya LANGSUNG, tanpa otorisasi checker.
+     *
+     * Hanya berlaku untuk data yang memang tampil di Kelola Data GL: data manual milik maker itu
+     * yang sedang di-return checker (belum final, belum di penampungan, belum masuk ACCTXT).
+     * Soft delete, sama seperti penghapusan lama yang lewat checker; tercatat di audit trail.
+     */
+    @Transactional
+    public Res deleteDirect(Long glId, AusyUserDetails me) {
+        GlTabel g = glId == null ? null : gl.findById(glId).orElse(null);
+        if (g == null || !Short.valueOf((short) 1).equals(g.getActive()))
+            return new Res(false, "Baris GL tidak ditemukan.");
+        if (me == null || !me.getUsername().equals(g.getGltrus()))
+            return new Res(false, "Hanya data milik Anda sendiri yang bisa dihapus.");
+        if (!"m".equals(g.getGlsrc()) || !"RETURNED".equals(g.getStatusDual()) || g.getExportReqId() != null)
+            return new Res(false, "Data #" + glId + " tidak bisa dihapus dari sini: hanya data manual yang"
+                    + " dikembalikan checker yang bisa dihapus langsung.");
+        if (pendingGlRowIds().contains(glId)) return new Res(false, lockReason(g));
+        g.setActive((short) 0);
+        gl.save(g);
+        audit.transaction(me.getUsername(), "GL_DELETE",
+                "Hapus langsung data manual #" + glId + " (" + n(g.getGltrac()) + " " + n(g.getGltrcd()) + " "
+                + Nominal.format(g.getGltram()) + "), tanpa otorisasi checker (REQ_AUSY_00046).");
+        return new Res(true, "Data GL #" + glId + " dihapus.");
+    }
+
+    /** Pengajuan Tambah Data GL milik maker ini yang masih menunggu checker (REQ_AUSY_00046). */
+    public List<Map<String, String>> pendingAddsOf(AusyUserDetails me) {
+        List<Map<String, String>> out = new ArrayList<>();
+        if (me == null) return out;
+        for (GlChangeRequest c : cr.findByStatusAndTarget("PENDING", T_GL_ROW)) {
+            if (!"ADD".equals(c.getOp()) || !me.getUsername().equals(c.getMaker())) continue;
+            Map<String, String> a = parse(c.getAfterJson());
+            if (a == null) continue;
+            Map<String, String> m = new LinkedHashMap<>(a);
+            m.put("crId", String.valueOf(c.getId()));
+            m.put("diajukan", c.getCreatedAt() == null ? "" : c.getCreatedAt().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm")));
+            out.add(m);
+        }
+        return out;
     }
 
     // ---- maker actions on the GL Code master (BUG_AUSY_00080) ----
@@ -739,6 +782,17 @@ public class GlChangeService {
         String err = apply(c);
         if (err != null) return new Res(false, err);
 
+        // REQ_AUSY_00046: Tambah/Ubah data manual yang di-approve langsung masuk penampungan
+        // role EXECUTE dan hilang dari halaman Kelola Data GL. Baris yang sudah di penampungan
+        // tidak dimasukkan dua kali (StagingService menyaringnya).
+        if (T_GL_ROW.equals(c.getTarget() == null ? T_GL_ROW : c.getTarget())
+                && ("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) && c.getGlId() != null) {
+            GlTabel g = gl.findById(c.getGlId()).orElse(null);
+            if (g != null && Short.valueOf((short) 1).equals(g.getActive()) && "m".equals(g.getGlsrc())
+                    && "APPROVED".equals(g.getStatusDual()) && !"SUDAH UPLOAD".equals(g.getStatusPrint()))
+                staging.stage(List.of(g), c.getMaker(), me.getUsername(), "Data manual #" + g.getId());
+        }
+
         c.setStatus("APPROVED"); c.setChecker(me.getUsername());
         c.setNoteChecker(note); c.setDecidedAt(LocalDateTime.now());
         cr.save(c);
@@ -760,7 +814,10 @@ public class GlChangeService {
 
     private String applyGlRow(GlChangeRequest c) {
         switch (c.getOp()) {
-            case "ADD" -> applyAdd(parse(c.getAfterJson()), c.getMaker());
+            // ID baris baru dicatat di permintaannya supaya bisa langsung dimasukkan ke
+            // penampungan EXECUTE setelah approve (REQ_AUSY_00046).
+            case "ADD" -> { GlTabel baru = applyAdd(parse(c.getAfterJson()), c.getMaker());
+                            if (baru != null) c.setGlId(baru.getId()); }
             case "EDIT" -> applyEdit(c.getGlId(), parse(c.getAfterJson()));
             case "DELETE" -> applyDelete(c.getGlId());
             case "BULK_EDIT" -> applyBulkEdit(parseList(c.getAfterJson()));
@@ -834,8 +891,8 @@ public class GlChangeService {
     }
 
     // ---- apply to live data ----
-    private void applyAdd(Map<String,String> a, String maker) {
-        if (a == null) return;
+    private GlTabel applyAdd(Map<String,String> a, String maker) {
+        if (a == null) return null;
         GlTabel g = new GlTabel();
         String code = n(a.get("gltrac")).trim(), dc = n(a.get("gltrcd")).trim();
         BigDecimal amount = amt(a.get("gltram"));
@@ -859,14 +916,21 @@ public class GlChangeService {
         // tidak akan pernah bisa diajukan export ke core (BUG_AUSY_00109).
         g.setStatusPrint("BELUM UPLOAD"); g.setStatusDual("APPROVED");
         g.setGlsrc("m"); g.setActive((short)1);
-        gl.save(g);
+        return gl.save(g);
     }
     private void applyEdit(Long glId, Map<String,String> a) {
         if (glId == null || a == null) return;
         gl.findById(glId).ifPresent(g -> {
+            BigDecimal amount = amt(a.get("gltram"));
             g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-            g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
+            g.setGltram(amount); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
+            // Ketiga kolom nominal dipakai berkas ACCTXT. Dulu hanya gltram yang ikut berubah,
+            // sehingga nominal ekuivalen di berkas tetap angka lama.
+            g.setGleqam(amount); g.setGlotam(amount);
             g.setNoPaket(a.get("noPaket"));
+            // Data manual yang di-return checker kembali final setelah perubahannya di-approve
+            // (REQ_AUSY_00046); lalu masuk penampungan lewat approve().
+            if ("RETURNED".equals(g.getStatusDual())) g.setStatusDual("APPROVED");
             gl.save(g);
         });
     }
@@ -879,8 +943,10 @@ public class GlChangeService {
             Long id;
             try { id = Long.valueOf(a.get("id")); } catch (Exception e) { continue; }
             gl.findById(id).ifPresent(g -> {
+                BigDecimal amount = amt(a.get("gltram"));
                 g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
-                g.setGltram(amt(a.get("gltram"))); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
+                g.setGltram(amount); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
+                g.setGleqam(amount); g.setGlotam(amount);     // nominal ACCTXT ikut sama
                 g.setNoPaket(a.get("noPaket"));
                 gl.save(g);
             });

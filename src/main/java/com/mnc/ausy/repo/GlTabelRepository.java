@@ -68,7 +68,7 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
                    "            else no_paket end as batch, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
-                   "from gl_tabel where active=1 and (status_dual is null or status_dual <> 'PENDING') " +
+                   "from gl_tabel where active=1 and (status_dual is null or status_dual not in ('PENDING','RETURNED')) " +
                    "group by 1, gltrus order by 1", nativeQuery = true)
     List<Object[]> approvedPakets();
 
@@ -80,7 +80,7 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query(value = "select no_paket, gltrus, count(*), " +
                    "coalesce(sum(case when gltrcd='D' then gltram else 0 end),0), " +
                    "coalesce(sum(case when gltrcd='C' then gltram else 0 end),0) " +
-                   "from gl_tabel where active=1 and (status_dual is null or status_dual <> 'PENDING') " +
+                   "from gl_tabel where active=1 and (status_dual is null or status_dual not in ('PENDING','RETURNED')) " +
                    "and coalesce(glsrc,'p') <> 'm' and coalesce(no_paket,'') <> '' " +
                    "group by no_paket, gltrus order by no_paket", nativeQuery = true)
     List<Object[]> deletablePakets();
@@ -131,13 +131,27 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
          + " and (g.glsrc = 'm' or g.noPaket is null or g.noPaket = '') order by g.id")
     List<GlTabel> findExportableManual();
 
+    /**
+     * Data manual yang dikembalikan checker (Return Data) dan belum final — isi halaman Kelola
+     * Data GL maker (REQ_AUSY_00046). {@code makers} null = tanpa batas maker.
+     */
+    @Query("select g from GlTabel g where g.active=1 and g.glsrc='m' and g.statusDual='RETURNED'"
+         + " and (:all = true or g.gltrus in :makers) order by g.id desc")
+    List<GlTabel> findReturnedManual(@Param("all") boolean all, @Param("makers") Collection<String> makers);
+
+    default List<GlTabel> findReturnedManual(Collection<String> makers) {
+        if (makers == null) return findReturnedManual(true, List.of("\u0000"));
+        if (makers.isEmpty()) return List.of();
+        return findReturnedManual(false, makers);
+    }
+
     // ===== List GL Aktif: dipaginasi di database, tidak lagi memuat seluruh tabel =====
     /** Halaman GL aktif (sudah lolos otorisasi) — tanpa batas maker. */
-    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')")
+    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual not in ('PENDING','RETURNED'))")
     Page<GlTabel> pageActive(Pageable page);
 
     /** Halaman GL aktif milik maker tertentu saja (batas per maker/checker). */
-    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
+    @Query("select g from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual not in ('PENDING','RETURNED'))"
          + " and g.gltrus in :makers")
     Page<GlTabel> pageActiveByMakers(@Param("makers") Collection<String> makers, Pageable page);
 
@@ -171,13 +185,13 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     /** Ringkasan seluruh GL aktif: jumlah baris, total nominal, dan berapa yang kodenya terdaftar. */
     @Query("select count(g), coalesce(sum(g.gltram),0),"
          + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac) then 1 else 0 end)"
-         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')")
+         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual not in ('PENDING','RETURNED'))")
     Object[] activeSummary();
 
     /** Idem, dibatasi maker tertentu. */
     @Query("select count(g), coalesce(sum(g.gltram),0),"
          + " sum(case when exists (select 1 from GlCode c where c.code = g.gltrac) then 1 else 0 end)"
-         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual <> 'PENDING')"
+         + " from GlTabel g where g.active=1 and (g.statusDual is null or g.statusDual not in ('PENDING','RETURNED'))"
          + " and g.gltrus in :makers")
     Object[] activeSummaryByMakers(@Param("makers") Collection<String> makers);
 

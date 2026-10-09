@@ -386,6 +386,7 @@ public class UploadService {
             TUpload t = new TUpload();
             t.setSessId(java.util.UUID.randomUUID().toString().substring(0, 20));
             t.setFileName(fileName);
+            t.setNoPaket(paket);                  // REQ_AUSY_00036: nama file per batch
             t.setJmlData(n);
             t.setUserId(username);
             t.setStatus("Success");

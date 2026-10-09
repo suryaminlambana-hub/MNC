@@ -310,14 +310,35 @@ public class GlExportService {
         if (!scope.canSee(me, req.getRequestedBy())) return DataScopeService.NOT_MY_MAKER;
         if (note == null || note.isBlank()) return "Alasan penarikan wajib diisi.";
 
-        gl.revertExport(reqId);
+        // REQ_AUSY_00042 & 00045: data dikembalikan ke halaman ASALNYA untuk diproses ulang.
+        //   - baris hasil upload (glsrc 'p') → status PENDING lagi: batch-nya muncul kembali di
+        //     List Data GL maker dan di antrian otorisasi upload checker;
+        //   - baris manual Kelola Data GL (glsrc 'm') → status RETURNED: muncul kembali di
+        //     Kelola Data GL maker untuk diubah (lewat checker) atau dihapus.
+        // Asalnya dibaca dari kolom glsrc, yang memang menyimpan dari mana baris itu dibuat.
+        List<GlTabel> rows = gl.findByExportReqIdOrderById(reqId);
+        Set<String> batchUpload = new TreeSet<>();
+        int manual = 0;
+        for (GlTabel g : rows) {
+            boolean dariManual = "m".equals(g.getGlsrc());
+            g.setExportReqId(null);
+            g.setStatusPrint("BELUM UPLOAD");
+            g.setStatusDual(dariManual ? "RETURNED" : "PENDING");
+            if (dariManual) manual++; else batchUpload.add(String.valueOf(g.getNoPaket()));
+        }
+        gl.saveAll(rows);
         req.setStatus("RETURNED"); req.setChecker(checker);
         req.setDecidedAt(LocalDateTime.now()); req.setNoteChecker(note);
         requests.save(req);
+
+        String tujuan = (batchUpload.isEmpty() ? "" : "Batch " + String.join(", ", batchUpload)
+                        + " kembali ke List Data GL maker dan antrian otorisasi upload")
+                + (!batchUpload.isEmpty() && manual > 0 ? "; " : "")
+                + (manual == 0 ? "" : manual + " data manual kembali ke Kelola Data GL maker");
         audit.transaction(checker, "EXPORT_RETURN",
-                "Export CR#" + reqId + " (maker=" + req.getRequestedBy()
-                + ") DITARIK KEMBALI sebelum file dibuat. Alasan: " + note);
-        return "Export ditarik kembali. GL dikembalikan agar bisa diajukan lagi; alasan tercatat di audit trail.";
+                "Data penampungan CR#" + reqId + " (maker=" + req.getRequestedBy() + ", " + rows.size()
+                + " baris) DIKEMBALIKAN sebelum file dibuat: " + tujuan + ". Alasan: " + note);
+        return "Data dikembalikan: " + tujuan + ". Alasan tercatat di audit trail.";
     }
 
     @Transactional

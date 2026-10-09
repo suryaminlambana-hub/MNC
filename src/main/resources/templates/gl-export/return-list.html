@@ -1,11 +1,16 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
-<head><title>Return Export GL — AUSY</title></head>
+<head><title>Return Data — AUSY</title></head>
 <main>
-  <h1 class="ausy-page-title">Return Export GL</h1>
+  <!--/* REQ_AUSY_00041: "Return Export GL" berganti nama menjadi "Return Data".
+         REQ_AUSY_00042 & 00045: data di penampungan (sudah diotorisasi, belum dibuat file ACCTXT)
+         dikembalikan ke halaman ASALNYA untuk diproses ulang. */-->
+  <h1 class="ausy-page-title">Return Data</h1>
   <p class="text-muted">
-    Tarik kembali export yang sudah di-approve selama file ACCTXT-nya belum dibuat (role EXECUTE).
-    Begitu filenya terbit, export tidak bisa ditarik lagi — perbaikannya lewat jurnal koreksi.
+    Kembalikan data yang sudah diotorisasi dan menunggu digenerate oleh role EXECUTE. Batch hasil upload
+    kembali ke <b>List Data GL</b> maker (dan antrian otorisasi upload); data manual kembali ke
+    <b>Kelola Data GL</b> maker. Begitu file ACCTXT-nya terbit, data tidak bisa di-return lagi —
+    perbaikannya lewat jurnal koreksi.
   </p>
 
   <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
@@ -14,23 +19,23 @@
   <div class="ausy-card">
     <table class="table align-middle mb-0">
       <thead><tr>
-        <th>Export</th><th>Maker</th><th>Checker</th><th>Disetujui</th>
+        <th>No</th><th>Data</th><th>Maker</th><th>Diotorisasi</th>
         <th class="text-end">Jml Baris</th><th class="text-end">Debit</th>
         <th class="text-end">Credit</th><th>Aksi</th>
       </tr></thead>
       <tbody>
       <tr th:each="r : ${items}">
-        <td><span class="badge bg-primary-subtle text-primary">CR#<span th:text="${r.id}"></span></span></td>
+        <td><span class="badge bg-primary-subtle text-primary">#<span th:text="${r.id}"></span></span></td>
+        <td class="small" th:text="${r.noteMaker}"></td>
         <td th:text="${r.requestedBy}"></td>
-        <td th:text="${r.checker}"></td>
-        <td th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt,'dd-MM-yyyy HH:mm') : ''}"></td>
+        <td class="text-nowrap" th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt,'dd-MM-yyyy HH:mm') : ''}"></td>
         <td class="text-end" th:text="${r.rowsCount}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.debit,1,'POINT',2,'COMMA')}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(r.credit,1,'POINT',2,'COMMA')}"></td>
         <td class="text-nowrap">
-          <!--/* REQ_AUSY_00028: pratinjau isi ACCTXT export ini — tidak ditulis ke server/FTP. */-->
+          <!--/* REQ_AUSY_00028: pratinjau isi ACCTXT data ini — tidak ditulis ke server/FTP. */-->
           <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-export/return-list/' + ${r.id} + '/acctxt'}"
-             title="Pratinjau isi ACCTXT export ini. Tidak dikirim ke FTP.">
+             title="Pratinjau isi ACCTXT data ini. Tidak dikirim ke FTP.">
             <i class="fa-solid fa-file-arrow-down"></i> Download ACCTXT</a>
           <button type="button" class="btn btn-sm btn-outline-danger"
                   data-bs-toggle="modal" th:attr="data-bs-target='#ret' + ${r.id}">
@@ -41,22 +46,22 @@
             <div class="modal-dialog">
               <form class="modal-content" method="post" th:action="@{/gl-export/return}">
                 <div class="modal-header">
-                  <h5 class="modal-title">Tarik kembali export CR#<span th:text="${r.id}"></span></h5>
+                  <h5 class="modal-title">Return data #<span th:text="${r.id}"></span></h5>
                   <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                   <p class="text-muted small">
-                    GL di dalamnya dikembalikan agar maker bisa mengajukan ulang. Alasan tercatat
-                    di audit trail.
+                    Data dikembalikan ke halaman asalnya untuk diproses ulang oleh maker, lalu
+                    diotorisasi lagi. Data tidak hilang, dan alasannya tercatat di audit trail.
                   </p>
                   <input type="hidden" name="reqId" th:value="${r.id}">
-                  <label class="form-label">Alasan penarikan <span class="text-danger">*</span></label>
+                  <label class="form-label">Alasan return <span class="text-danger">*</span></label>
                   <textarea name="note" class="form-control" rows="3" required
-                            placeholder="Alasan penarikan (tercatat di audit trail)"></textarea>
+                            placeholder="Alasan return (tercatat di audit trail)"></textarea>
                 </div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                  <button type="submit" class="btn btn-danger">Tarik Kembali</button>
+                  <button type="submit" class="btn btn-danger">Return</button>
                 </div>
               </form>
             </div>
@@ -65,7 +70,7 @@
       </tr>
       <tr th:if="${#lists.isEmpty(items)}">
         <td colspan="8" class="text-center text-muted py-4">
-          Tidak ada export approved yang menunggu file ACCTXT.
+          Tidak ada data yang menunggu digenerate.
         </td>
       </tr>
       </tbody>

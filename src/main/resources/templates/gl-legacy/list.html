@@ -1,206 +1,114 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: main(~{::title}, ~{::main})}" lang="id">
-<head><title>List GL Aktif — AUSY</title></head>
+<head><title>List Data GL — AUSY</title></head>
 <main>
-  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-    <div>
-      <h1 class="ausy-page-title">List GL Aktif</h1>
-      <p class="text-muted mb-0">Total <b th:text="${total}">0</b> baris jurnal ·
-        <span th:text="${totalRegistered}">0</span> terdaftar ·
-        nilai <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></p>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
-      <!--/* REQ_AUSY_00013: tombol Download PDF seluruh daftar dicabut. PDF kini per batch yang
-             menunggu otorisasi, di section "Upload Menunggu Otorisasi" (REQ_AUSY_00014). */-->
-      <button th:if="${canExport}" type="button" class="btn btn-primary" id="btnAjukanExport">
-        <i class="fa-solid fa-paper-plane"></i> Ajukan Export
-        <span class="badge bg-light text-primary ms-1" th:if="${exportableCount > 0}" th:text="${exportableCount}">0</span>
-      </button>
-    </div>
+  <!--/* REQ_AUSY_00035: "List GL Aktif" berganti nama menjadi "List Data GL".
+         REQ_AUSY_00034: tombol Ajukan Export beserta modal & riwayatnya dicabut — setelah checker
+         meng-approve upload, data langsung masuk penampungan EXECUTE (REQ_AUSY_00038). */-->
+  <div>
+    <h1 class="ausy-page-title">List Data GL</h1>
+    <p class="text-muted mb-0" th:if="${isMaker}">Batch hasil upload yang belum diotorisasi checker. Setelah
+      di-approve, batch pindah ke penampungan untuk digenerate menjadi file ACCTXT oleh role EXECUTE.</p>
+    <p class="text-muted mb-0" th:unless="${isMaker}">Batch upload yang menunggu otorisasi, dan data GL yang
+      sudah diotorisasi (untuk penelusuran).</p>
   </div>
-  <div th:if="${ok}" class="alert alert-success py-2" th:text="${ok}"></div>
-  <div th:if="${warn}" class="alert alert-warning py-2" th:text="${warn}"></div>
+  <div th:if="${ok}" class="alert alert-success py-2 mt-3" th:text="${ok}"></div>
+  <div th:if="${warn}" class="alert alert-warning py-2 mt-3" th:text="${warn}"></div>
 
-  <!--/* Ajukan Export modal — maker only (BUG_AUSY_00097) */-->
-  <div th:if="${canExport}" class="modal fade" id="exportModal" tabindex="-1">
-    <div class="modal-dialog">
-      <form class="modal-content" id="exportForm" method="post" th:action="@{/gl-legacy/export-request}">
-        <div class="modal-header"><h5 class="modal-title">Ajukan Export GL ke Checker</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <p class="text-muted small">Export membuat file ACCTXT di server (bukan diunduh ke komputer) dan butuh otorisasi checker dulu.</p>
-
-          <label class="form-label">Pilih batch hasil upload <span class="text-danger">*</span></label>
-          <div class="ausy-card mb-3" style="padding:0">
-            <table class="table table-sm align-middle mb-0">
-              <thead><tr>
-                <th class="ps-3"><input type="checkbox" id="paketAll"></th>
-                <th>Batch</th><th class="text-end">Jml Baris</th>
-                <th class="text-end">Debit</th><th class="text-end pe-3">Credit</th>
-              </tr></thead>
-              <tbody>
-              <!--/* BUG_AUSY_00102: batch yang masih punya data menunggu otorisasi tidak bisa dipilih */-->
-              <tr th:each="p : ${exportablePakets}"
-                  th:with="held=${pendingPakets != null and pendingPakets.contains(p[0])}">
-                <td class="ps-3"><input type="checkbox" name="pakets" class="paket-cb" th:value="${p[0]}"
-                                        th:disabled="${held}"></td>
-                <td><span class="badge bg-primary-subtle text-primary">BATCH <span th:text="${p[0]}"></span></span>
-                  <span th:if="${held}" class="badge bg-warning-subtle text-warning">
-                    <i class="fa-solid fa-hourglass-half"></i> Ada Data Menunggu Otorisasi</span></td>
-                <td class="text-end" th:text="${p[1]}"></td>
-                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[2],1,'POINT',2,'COMMA')}"></td>
-                <td class="text-end text-nowrap pe-3" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
-              </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!--/* BUG_AUSY_00125: data tambahan manual dipisah dari batch supaya tidak tercampur;
-                 batch-nya bisa kosong sehingga dulu tidak pernah bisa dipilih (BUG_AUSY_00124). */-->
-          <label class="form-label">Pilih data GL yang ditambahkan manual</label>
-          <div class="ausy-card mb-3" style="padding:0">
-            <table class="table table-sm align-middle mb-0">
-              <thead><tr>
-                <th class="ps-3"><input type="checkbox" id="glAll"></th>
-                <th>ID</th><th>NoGL</th><th>D/C</th><th>Deskripsi</th>
-                <th class="text-end pe-3">Nominal</th>
-              </tr></thead>
-              <tbody>
-              <tr th:each="g : ${exportableManual}">
-                <td class="ps-3"><input type="checkbox" name="glIds" class="gl-cb" th:value="${g.id}"></td>
-                <td th:text="${g.id}"></td>
-                <td th:text="${g.gltrac}"></td>
-                <td><span class="badge ausy-dc" th:classappend="${g.gltrcd == 'D'} ? 'dc-d' : 'dc-c'"
-                          th:text="${g.gltrcd}"></span></td>
-                <td class="small" th:text="${g.gltrds}"></td>
-                <td class="text-end text-nowrap pe-3"
-                    th:text="${g.gltram != null ? #numbers.formatDecimal(g.gltram,1,'POINT',2,'COMMA') : ''}"></td>
-              </tr>
-              <tr th:if="${exportableManual == null or exportableManual.isEmpty()}">
-                <td colspan="6" class="text-center text-muted py-3">Tidak ada data GL tambahan manual yang menunggu export.</td>
-              </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <label class="form-label">Alasan pengajuan export <span class="text-danger">*</span></label>
-          <textarea name="note" class="form-control" rows="3" required placeholder="Alasan pengajuan export (tercatat di audit trail)"></textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="submit" class="btn btn-primary">Ajukan ke Checker</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Info modal: nothing to export / export already pending -->
-  <div th:if="${canExport}" class="modal fade" id="exportInfoModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Ajukan Export GL</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div th:if="${not #lists.isEmpty(myPendingExports)}">
-            <p>Kamu masih punya pengajuan export yang belum di-approve checker:</p>
-            <ul class="mb-0">
-              <li th:each="p : ${myPendingExports}">
-                <span th:text="${#temporals.format(p.createdAt,'dd-MM-yyyy HH:mm')}"></span> —
-                <span th:text="${p.rowsCount}"></span> baris,
-                debit <span th:text="${#numbers.formatDecimal(p.debit,1,'POINT',2,'COMMA')}"></span>
-              </li>
-            </ul>
-          </div>
-          <p th:if="${#lists.isEmpty(myPendingExports)}" class="mb-0">Tidak ada GL aktif yang belum di-export.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script th:if="${canExport}" th:inline="javascript">
-    (function(){
-      var exportableCount = /*[[${exportableCount}]]*/ 0;
-      var em = new bootstrap.Modal(document.getElementById('exportModal'));
-      var im = new bootstrap.Modal(document.getElementById('exportInfoModal'));
-      document.getElementById('btnAjukanExport').addEventListener('click', function(){
-        if (exportableCount > 0) { em.show(); } else { im.show(); }
-      });
-
-      var paketAll = document.getElementById('paketAll');
-      var paketCbs = document.querySelectorAll('.paket-cb');
-      var glAll = document.getElementById('glAll');
-      var glCbs = document.querySelectorAll('.gl-cb');
-      if (glAll) glAll.addEventListener('change', function(){
-        glCbs.forEach(function(cb){ if (!cb.disabled) cb.checked = glAll.checked; });
-      });
-      paketAll.addEventListener('change', function(){
-        paketCbs.forEach(function(cb){ if (!cb.disabled) cb.checked = paketAll.checked; });
-      });
-      document.getElementById('exportForm').addEventListener('submit', function(e){
-        var anyChecked = Array.prototype.some.call(paketCbs, function(cb){ return cb.checked; })
-                      || Array.prototype.some.call(glCbs, function(cb){ return cb.checked; });
-        if (!anyChecked) {
-          e.preventDefault();
-          alert('Pilih minimal satu batch atau satu data GL yang ingin diajukan export.');
-        }
-      });
-    })();
-  </script>
-  <p th:if="${canExport}" class="text-muted small mt-1 mb-3"><i class="fa-solid fa-circle-info"></i>
-     Export membuat file ACCTXT di server (bukan diunduh ke komputer) dan <b>butuh otorisasi checker</b> dulu.
-     Hanya GL aktif yang belum di-export yang disertakan.</p>
-
-  <!--/* REQ_AUSY_00014: batch upload yang masih menunggu otorisasi checker, masing-masing dengan
-         PDF-nya sendiri supaya tidak tercampur. Baris-baris ini belum termasuk GL Aktif di tabel
-         bawah. Disaring per maker seperti tabel bawah. */-->
-  <div class="ausy-card mb-3" style="padding:0">
+  <!--/* REQ_AUSY_00036 & 00044: per batch, hanya hasil upload yang belum diotorisasi. Kolom sumber
+         upload: nama file, uploader, waktu upload. */-->
+  <div class="ausy-card mt-3" style="padding:0">
     <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
       <i class="fa-solid fa-hourglass-half text-warning"></i> Upload Menunggu Otorisasi
-      <span class="text-muted fw-normal small">— belum masuk GL Aktif</span></h2>
+      <span class="text-muted fw-normal small">— sumber: Upload Excel</span></h2>
     <div class="px-3 pb-3">
       <table class="table table-sm table-hover align-middle mb-0">
-        <thead><tr><th>Batch</th><th>Uploader</th><th class="text-end">Jml Baris</th>
-          <th class="text-end">Debit</th><th class="text-end">Credit</th><th>Diupload</th><th></th></tr></thead>
+        <thead><tr><th>Batch</th><th>Nama File</th><th>Uploader</th><th>Diupload</th><th class="text-end">Jml Baris</th>
+          <th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Aksi</th></tr></thead>
         <tbody>
-        <tr th:each="p : ${pendingUploads}">
+        <tr th:each="p : ${pendingUploads}" th:with="milikku=${currentUser != null and currentUser.username == p[1]}">
           <td th:text="${p[0]}"></td>
+          <td class="small" th:text="${uploadFiles.containsKey(p[0]) ? uploadFiles.get(p[0]) : '-'}"></td>
           <td th:text="${p[1]}"></td>
-          <td class="text-end" th:text="${p[2]}"></td>
-          <td class="text-end" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
-          <td class="text-end" th:text="${#numbers.formatDecimal(p[4],1,'POINT',2,'COMMA')}"></td>
           <td class="text-nowrap" th:text="${p[5] != null ? #temporals.format(p[5],'dd-MM-yyyy HH:mm') : '-'}"></td>
+          <td class="text-end" th:text="${p[2]}"></td>
+          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[3],1,'POINT',2,'COMMA')}"></td>
+          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(p[4],1,'POINT',2,'COMMA')}"></td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{'/gl-legacy/pending/' + ${p[0]} + '/pdf'}">
               <i class="fa-solid fa-file-pdf"></i> PDF</a>
+            <!--/* REQ_AUSY_00037: Bulk Edit per batch — hanya untuk batch milik maker sendiri. */-->
+            <button th:if="${milikku}" type="button" class="btn btn-sm btn-outline-secondary btn-bulk"
+                    th:attr="data-batch=${p[0]}"><i class="fa-solid fa-file-pen"></i> Bulk Edit</button>
             <!--/* REQ_AUSY_00022: hanya pengunggahnya sendiri yang bisa menghapus. */-->
-            <form th:if="${currentUser != null and currentUser.username == p[1]}" method="post" class="d-inline"
+            <form th:if="${milikku}" method="post" class="d-inline"
                   th:action="@{'/gl-legacy/pending/' + ${p[0]} + '/delete'}" th:attr="data-batch=${p[0]}"
                   onsubmit="return confirm('Hapus Batch ' + this.dataset.batch + '? Batch ini belum diotorisasi dan akan dibuang dari antrian checker.');">
               <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Hapus</button>
             </form></td>
         </tr>
         <tr th:if="${pendingUploads == null or pendingUploads.isEmpty()}">
-          <td colspan="7" class="text-center text-muted py-3">Tidak ada upload yang menunggu otorisasi.</td>
+          <td colspan="8" class="text-center text-muted py-3">Tidak ada upload yang menunggu otorisasi.</td>
         </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!--/* Dipaginasi di server: 10 baris per halaman. Dulu seluruh baris (belasan ribu) dirender
-         sekaligus dan halamannya blank saat di-scroll — BUG_AUSY_00147. Kelas "dt" sengaja
-         dilepas supaya tidak ada paging ganda di sisi browser. */-->
-  <!--/* REQ_AUSY_00015: judul tabel, supaya tidak terbaca sebagai lanjutan section
-         "Upload Menunggu Otorisasi" di atasnya ketika daftar pending-nya panjang. */-->
+  <!--/* Bulk Edit per batch (REQ_AUSY_00037 & 00047): unduh Excel batch → ubah → unggah. Langsung
+         diterapkan ke batch itu (belum diotorisasi), sehingga PDF-nya ikut berubah. */-->
+  <div th:if="${isMaker}" class="modal fade" id="bulkModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="bulkForm" method="post" enctype="multipart/form-data" action="#">
+        <div class="modal-header"><h5 class="modal-title">Bulk Edit Batch <span id="bulkBatch"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <ol class="small text-muted ps-3 mb-3">
+            <li><a id="bulkDownload" href="#">Unduh Excel batch ini</a>.</li>
+            <li>Ubah GL Code, D/C, Amount (format <b>1.000.000,50</b>) atau Description. Jangan ubah kolom <b>ID</b>.</li>
+            <li>Unggah file hasil edit di sini. Perubahan <b>langsung diterapkan</b> ke batch ini saja;
+              checker tetap meng-approve batch-nya sesudah itu.</li>
+          </ol>
+          <label class="form-label">File Excel (hasil edit) <span class="text-danger">*</span></label>
+          <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Terapkan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script th:if="${isMaker}" th:inline="javascript">
+    (function(){
+      var base = /*[[@{/gl-legacy/pending/}]]*/ '/gl-legacy/pending/';
+      var el = document.getElementById('bulkModal');
+      if (!el) return;
+      var m = new bootstrap.Modal(el);
+      document.querySelectorAll('.btn-bulk').forEach(function(b){
+        b.addEventListener('click', function(){
+          var batch = b.dataset.batch;
+          document.getElementById('bulkBatch').textContent = batch;
+          document.getElementById('bulkDownload').href = base + encodeURIComponent(batch) + '/bulk-export';
+          var f = document.getElementById('bulkForm');
+          f.action = base + encodeURIComponent(batch) + '/bulk-upload';
+          f.reset();
+          m.show();
+        });
+      });
+    })();
+  </script>
+
+  <!--/* Data yang sudah diotorisasi — hanya untuk non-maker (checker/monitoring) sebagai penelusuran
+         (REQ_AUSY_00044). Dipaginasi di server (BUG_AUSY_00147). */-->
+  <th:block th:unless="${isMaker}">
   <div class="ausy-card" style="padding:0">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 pt-3 pb-2">
       <h2 class="h6 mb-0 d-flex align-items-center gap-2">
-        <i class="fa-solid fa-table-list text-success"></i> Tabel List GL Aktif
-        <span class="text-muted fw-normal small">— sudah diotorisasi checker</span></h2>
-      <!--/* REQ_AUSY_00023: PDF jurnal per batch GL Aktif, dibuka di tab baru. */-->
+        <i class="fa-solid fa-table-list text-success"></i> Data GL Sudah Diotorisasi
+        <span class="text-muted fw-normal small">— <b th:text="${total}">0</b> baris, nilai
+          <b th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'COMMA')}">0</b></span></h2>
+      <!--/* REQ_AUSY_00023: PDF jurnal per batch, dibuka di tab baru. */-->
       <form th:if="${activeBatches != null and not activeBatches.isEmpty()}" method="get"
             th:action="@{/gl-legacy/batch-pdf}" target="_blank" class="d-flex gap-2 align-items-center">
         <select name="batch" class="form-select form-select-sm" style="min-width:220px" required>
@@ -227,7 +135,7 @@
         </td>
       </tr>
       <tr th:if="${rows == null or rows.isEmpty()}">
-        <td colspan="11" class="text-center text-muted py-4">Belum ada GL aktif.</td>
+        <td colspan="11" class="text-center text-muted py-4">Belum ada data GL yang diotorisasi.</td>
       </tr>
       </tbody>
     </table>
@@ -251,42 +159,6 @@
          th:href="@{/gl-legacy(page=${totalPages - 1})}">Akhir &raquo;</a>
     </div>
   </div>
-
-  <!--/* Riwayat Export: pengajuan export milik maker ini — pending, approved, rejected (maker only) */-->
-  <div th:if="${canExport}" class="ausy-card mt-3" style="padding:0">
-    <h2 class="h6 mb-0 px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-      <i class="fa-solid fa-clock-rotate-left text-muted"></i> Riwayat Export</h2>
-    <div class="px-3 pb-3">
-      <table class="table table-sm table-hover align-middle mb-0 dt" data-order-col="0" data-order-dir="desc">
-        <thead><tr>
-          <th>Tanggal</th><th class="text-end">Baris</th><th class="text-end">Debit</th><th class="text-end">Credit</th>
-          <th>Alasan</th><th>Status</th><th>Checker</th><th>Catatan Checker</th><th>File</th>
-        </tr></thead>
-        <tbody>
-        <tr th:each="h : ${exportHistory}">
-          <td class="text-nowrap text-muted small"
-              th:attr="data-order=${#temporals.format(h.req.createdAt,'yyyyMMddHHmm')}"
-              th:text="${#temporals.format(h.req.createdAt,'dd-MM-yyyy HH:mm')}"></td>
-          <td class="text-end" th:text="${h.req.rowsCount}"></td>
-          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(h.req.debit,1,'POINT',2,'COMMA')}"></td>
-          <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(h.req.credit,1,'POINT',2,'COMMA')}"></td>
-          <td class="small text-muted" th:text="${h.req.noteMaker}"></td>
-          <td><span class="badge"
-                    th:classappend="${h.req.status == 'APPROVED'} ? 'bg-success-subtle text-success' : (${h.req.status == 'REJECTED'} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
-                    th:text="${h.req.status == 'PENDING'} ? 'MENUNGGU CHECKER' : ${h.req.status}"></span></td>
-          <td th:text="${h.req.checker}"></td>
-          <td class="small text-muted" th:text="${h.req.noteChecker}"></td>
-          <!--/* Kolom ini dulu "Status FTP". Pengiriman FTP sudah tidak ada: hasil export adalah
-                 file yang dibuat di server, jadi yang berguna diketahui maker adalah nama file-nya. */-->
-          <td class="font-monospace small">
-            <span th:if="${h.transfer != null}" th:text="${h.transfer.fileName}"></span>
-            <span th:if="${h.transfer == null}">—</span>
-          </td>
-        </tr>
-        <tr th:if="${exportHistory.isEmpty()}"><td colspan="9" class="text-center text-muted py-4">Belum ada riwayat export.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  </th:block>
 </main>
 </html>

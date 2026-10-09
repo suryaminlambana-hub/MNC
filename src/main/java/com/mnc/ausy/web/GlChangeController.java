@@ -36,27 +36,22 @@ public class GlChangeController {
         this.service = service; this.gl = gl; this.excel = excel; this.scope = scope;
     }
 
-    /** Sama dengan List GL Aktif — dua halaman ini harus menampilkan hal yang sama. */
-    private static final int PAGE_SIZE = 10;
-
     // ---- Maker ----
+    /**
+     * Kelola Data GL (REQ_AUSY_00046): hanya data manual yang BELUM final.
+     *  - pengajuan Tambah Data GL milik maker ini yang masih menunggu checker;
+     *  - data manual yang dikembalikan checker lewat Return Data (bisa diubah lewat checker, atau
+     *    dihapus langsung).
+     * Setelah checker meng-approve Tambah/Ubah, datanya masuk penampungan EXECUTE dan hilang dari
+     * sini. Data hasil upload diurus di List Data GL, bukan di halaman ini.
+     */
     @GetMapping("/gl-data")
-    public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model,
-                           @RequestParam(defaultValue = "0") int page) {
-        // Persis daftar yang sama dengan List GL Aktif: satu definisi "GL Aktif" dipakai berdua
-        // (BUG_AUSY_00150) dan dipaginasi dengan cara yang sama. Dulu halaman ini memakai query
-        // turunan yang menjatuhkan baris ber-status_dual NULL dan berhenti di 200 baris, sehingga
-        // isinya tidak pernah sama dengan List GL Aktif. Dibatasi per maker (BUG_AUSY_00138).
-        Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
-        Page<GlTabel> result = gl.pageGlAktif(scope.visibleMakers(me), req);
-        model.addAttribute("rows", result.getContent());
-        model.addAttribute("total", result.getTotalElements());
-        model.addAttribute("page", result.getNumber());
-        model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
+    public String dataPage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
+        model.addAttribute("rows", gl.findReturnedManual(scope.visibleMakers(me)));
+        model.addAttribute("pendingAdds", service.pendingAddsOf(me));
         model.addAttribute("fields", GlChangeService.FIELDS);
-        // BUG_AUSY_00099 follow-up: kunci baris + alasannya ("… Hapus Batch 01"), bukan cuma "Menunggu Otorisasi"
+        // BUG_AUSY_00099 follow-up: kunci baris + alasannya, bukan cuma "Menunggu Otorisasi"
         model.addAttribute("pendingLabels", service.pendingGlRowLabels());
-        model.addAttribute("activeBatches", scope.filterArrays(me, gl.approvedPakets(), 1));   // REQ_AUSY_00029
         return "gl-data/index";
     }
 
@@ -76,87 +71,17 @@ public class GlChangeController {
         return "redirect:/gl-data";
     }
 
+    /** REQ_AUSY_00046: Hapus oleh maker langsung dieksekusi, tanpa otorisasi checker. */
     @PostMapping("/gl-data/delete")
-    public String delete(@RequestParam Long glId, @RequestParam(required=false) String note,
-                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        GlChangeService.Res r = service.submitDelete(glId, me, note);
-            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+    public String delete(@RequestParam Long glId, @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        GlChangeService.Res r = service.deleteDirect(glId, me);
+        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/gl-data";
     }
 
-    /** Bulk edit step 1 — maker downloads current GL data as an editable Excel (ID + editable fields). */
-    @GetMapping("/gl-data/bulk-export")
-    public void bulkExport(@RequestParam(required = false) String batch,
-                           @AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
-        // Unduhan harus memuat SELURUH baris yang dikelola maker ini, bukan sepotong halaman —
-        // definisi "GL Aktif" yang sama dengan layarnya (BUG_AUSY_00150), batas per maker tetap
-        // berlaku (BUG_AUSY_00138). Sebelumnya berhenti di 200 baris, jadi file Excel-nya diam-diam
-        // terpotong dan bulk edit tidak pernah bisa menyentuh baris selebihnya.
-        //
-        // REQ_AUSY_00029: bisa dibatasi satu batch ("<no batch>::<uploader>", sama seperti PDF per
-        // batch); kosong = semua batch. Amount ditulis dalam format Indonesia (1.000.000,50)
-        // sebagai teks, dan dibaca kembali oleh Nominal.parse saat diunggah ulang.
-        String paket = null, maker = null;
-        if (batch != null && !batch.isBlank()) {
-            int sep = batch.lastIndexOf("::");
-            paket = sep < 0 ? batch : batch.substring(0, sep);
-            maker = sep < 0 ? null : batch.substring(sep + 2);
-        }
-        final String fPaket = paket, fMaker = maker;
-        List<GlTabel> rows = gl.findGlAktifAll(scope.visibleMakers(me)).stream()
-                .filter(g -> fPaket == null || (fPaket.equals(g.batchKey())
-                        && (fMaker == null || fMaker.equals(g.getGltrus()))))
-                .toList();
-        List<List<Object>> data = new ArrayList<>();
-        for (GlTabel g : rows) data.add(Arrays.asList(
-                g.getId(), s(g.getGltrac()), s(g.getGltrcd()),
-                Nominal.format(g.getGltram()), s(g.getGltrds()), s(g.getNoPaket())));
-        String nama = fPaket == null ? "DataGL_untuk_edit"
-                : "DataGL_untuk_edit_Batch_" + ("(manual)".equals(fPaket) ? "manual" : fPaket);
-        excel.download(resp, "Data GL", nama, BULK_HEAD, data, false);
-    }
-
-    /** Bulk edit step 3 — maker uploads the edited Excel; changed rows become one bulk change request. */
-    @PostMapping("/gl-data/bulk-upload")
-    public String bulkUpload(@RequestParam("file") MultipartFile file, @RequestParam(required=false) String note,
-                             @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        if (file == null || file.isEmpty()) { ra.addFlashAttribute("warn", "File belum dipilih."); return "redirect:/gl-data"; }
-        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
-            Sheet sh = wb.getSheetAt(0);
-            List<Map<String,String>> rows = new ArrayList<>();
-            List<String> amountSalah = new ArrayList<>();
-            for (int r = 1; r <= sh.getLastRowNum(); r++) {
-                Row row = sh.getRow(r);
-                if (row == null) continue;
-                String id = cell(row, 0);
-                if (id.isBlank()) continue;
-                // REQ_AUSY_00029: Amount dibaca dalam format Indonesia (1.000.000,50) maupun angka
-                // biasa dari sel numerik. Yang tidak terbaca MENOLAK seluruh berkas — dulu nilai
-                // seperti itu diam-diam menjadi 0 dan ikut diajukan sebagai perubahan.
-                String amountTeks = cell(row, 3);
-                java.math.BigDecimal amount = Nominal.parse(amountTeks);
-                if (amount == null) { amountSalah.add("baris " + (r + 1) + " (\"" + amountTeks + "\")"); continue; }
-                Map<String,String> m = new LinkedHashMap<>();
-                m.put("id", id);
-                m.put("gltrac", cell(row, 1));
-                m.put("gltrcd", cell(row, 2).toUpperCase());
-                m.put("gltram", amount.toPlainString());
-                m.put("gltrds", cell(row, 4));
-                m.put("noPaket", cell(row, 5));
-                rows.add(m);
-            }
-            if (!amountSalah.isEmpty()) {
-                ra.addFlashAttribute("warn", "Bulk edit tidak diajukan: kolom Amount tidak terbaca sebagai angka pada "
-                        + String.join(", ", amountSalah) + ". Gunakan format 1.000.000,50.");
-                return "redirect:/gl-data";
-            }
-            GlChangeService.Res r = service.submitBulkEditExcel(rows, me, note);
-            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-        } catch (Exception e) {
-            ra.addFlashAttribute("warn", "Gagal membaca file Excel: " + e.getMessage());
-        }
-        return "redirect:/gl-data";
-    }
+    // Bulk Edit & Export Excel di halaman ini dicabut (REQ_AUSY_00039): Bulk Edit pindah ke List
+    // Data GL dan berlaku per batch (REQ_AUSY_00037). Endpoint lamanya ikut dihapus supaya tidak
+    // ada jalur tersembunyi yang mengubah data yang sudah di penampungan.
 
     // ---- Checker ----
     @GetMapping("/gl-change/review")

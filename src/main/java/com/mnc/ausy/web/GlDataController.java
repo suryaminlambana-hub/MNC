@@ -2,15 +2,22 @@ package com.mnc.ausy.web;
 
 import com.mnc.ausy.domain.GlCode;
 import com.mnc.ausy.domain.GlTabel;
+import com.mnc.ausy.domain.TUpload;
 import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
+import com.mnc.ausy.repo.TUploadRepository;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.ApprovalService;
 import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.DataScopeService;
 import com.mnc.ausy.service.GlChangeService;
 import com.mnc.ausy.service.GlExportService;
+import com.mnc.ausy.service.ExcelExportService;
+import com.mnc.ausy.service.Nominal;
 import com.mnc.ausy.service.OtorisasiService;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.poi.ss.usermodel.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,12 +42,16 @@ public class GlDataController {
     private final ApprovalService approval;
     private final DataScopeService scope;
     private final OtorisasiService otorisasi;
+    private final TUploadRepository uploads;
+    private final ExcelExportService excel;
 
     public GlDataController(GlTabelRepository gl, GlCodeRepository glCode, GlExportService glExport,
                             AuditService audit, GlChangeService changes, ApprovalService approval,
-                            DataScopeService scope, OtorisasiService otorisasi) {
+                            DataScopeService scope, OtorisasiService otorisasi,
+                            TUploadRepository uploads, ExcelExportService excel) {
         this.gl = gl; this.glCode = glCode; this.glExport = glExport; this.audit = audit;
         this.changes = changes; this.approval = approval; this.scope = scope; this.otorisasi = otorisasi;
+        this.uploads = uploads; this.excel = excel;
     }
 
     /**
@@ -63,58 +74,59 @@ public class GlDataController {
     }
 
     /**
-     * Only the Business Maker (group 3) may request an export — same rule SecurityConfig applies to
-     * /gl-legacy/export-request. The Checker shares this read-only page but has no export rights
-     * (BUG_AUSY_00097), so the button and the export history stay hidden for them.
+     * Pemilik batch upload (maker). Dipakai untuk memisahkan tampilan List Data GL: maker hanya
+     * melihat batch yang masih perlu ia tangani (REQ_AUSY_00044), checker melihat data yang sudah
+     * diotorisasi untuk keperluan tracking.
      */
-    private static boolean canExport(AusyUserDetails me) {
+    private static boolean isMaker(AusyUserDetails me) {
         return me != null && me.getAuthorities().stream()
                 .anyMatch(a -> "GROUP_3".equals(a.getAuthority()));
     }
 
-    /** Baris per halaman di List GL Aktif — datanya bisa belasan ribu (BUG_AUSY_00147). */
+    /** Baris per halaman di tabel data terotorisasi — datanya bisa belasan ribu (BUG_AUSY_00147). */
     private static final int PAGE_SIZE = 10;
+
+    /** Kolom Excel Bulk Edit per batch — sama dengan format Bulk Edit sebelumnya. */
+    private static final List<String> BULK_HEAD = List.of("ID", "GL Code", "D/C", "Amount", "Description", "Batch");
 
     @GetMapping("/gl-legacy")
     public String list(@AuthenticationPrincipal AusyUserDetails me, Model model,
                        @RequestParam(defaultValue = "0") int page) {
-        // GL aktif & sudah lolos otorisasi, DIAMBIL PER HALAMAN dari database. Sebelumnya seluruh
-        // tabel dimuat lalu disaring di Java, sehingga 12 ribu baris dirender sekaligus dan
-        // halamannya blank saat di-scroll (BUG_AUSY_00147).
-        // Isinya tetap dibatasi per maker: maker hanya melihat datanya sendiri, checker melihat
-        // data maker yang dipasangkan padanya (BUG_AUSY_00138 / BUG_AUSY_00139).
-        Set<String> makers = scope.visibleMakers(me);
-        Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
-        Page<GlTabel> result;
-        Object[] sum;
-        if (makers == null) {
-            result = gl.pageActive(req);
-            sum = unwrapRow(gl.activeSummary());
-        } else if (makers.isEmpty()) {
-            result = Page.empty(req);
-            sum = new Object[]{0L, BigDecimal.ZERO, 0L};
-        } else {
-            result = gl.pageActiveByMakers(makers, req);
-            sum = unwrapRow(gl.activeSummaryByMakers(makers));
+        boolean maker = isMaker(me);
+        model.addAttribute("isMaker", maker);
+
+        // REQ_AUSY_00036 & 00044: batch upload yang BELUM diotorisasi — inilah isi List Data GL
+        // bagi maker. Batch yang sudah di-approve pindah ke penampungan EXECUTE dan hilang dari sini.
+        List<Object[]> pending = pendingUploads(me);
+        model.addAttribute("pendingUploads", pending);
+        model.addAttribute("uploadFiles", uploadFiles(pending));
+
+        // Tabel data yang sudah diotorisasi hanya untuk non-maker (checker/monitoring), untuk
+        // keperluan tracking. Tetap dipaginasi di database (BUG_AUSY_00147) dan dibatasi per
+        // pasangan maker (BUG_AUSY_00138 / 00139).
+        if (!maker) {
+            Set<String> makers = scope.visibleMakers(me);
+            Pageable req = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id"));
+            Page<GlTabel> result;
+            Object[] sum;
+            if (makers == null) {
+                result = gl.pageActive(req);
+                sum = unwrapRow(gl.activeSummary());
+            } else if (makers.isEmpty()) {
+                result = Page.empty(req);
+                sum = new Object[]{0L, BigDecimal.ZERO, 0L};
+            } else {
+                result = gl.pageActiveByMakers(makers, req);
+                sum = unwrapRow(gl.activeSummaryByMakers(makers));
+            }
+            model.addAttribute("rows", result.getContent());
+            model.addAttribute("registered", registeredKeys());
+            model.addAttribute("total", ((Number) sum[0]).longValue());
+            model.addAttribute("totalAmount", sum[1] == null ? BigDecimal.ZERO : (BigDecimal) sum[1]);
+            model.addAttribute("page", result.getNumber());
+            model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
+            model.addAttribute("activeBatches", scope.filterArrays(me, gl.approvedPakets(), 1));   // REQ_AUSY_00023
         }
-        Set<String> reg = registeredKeys();
-        model.addAttribute("rows", result.getContent());
-        model.addAttribute("registered", reg);
-        model.addAttribute("total", ((Number) sum[0]).longValue());
-        model.addAttribute("totalRegistered", sum[2] == null ? 0L : ((Number) sum[2]).longValue());
-        model.addAttribute("totalAmount", sum[1] == null ? BigDecimal.ZERO : (BigDecimal) sum[1]);
-        model.addAttribute("page", result.getNumber());
-        model.addAttribute("totalPages", Math.max(result.getTotalPages(), 1));
-        boolean canExport = canExport(me);
-        model.addAttribute("canExport", canExport);
-        model.addAttribute("exportableCount", glExport.exportableCount(me));
-        model.addAttribute("exportablePakets", glExport.exportablePakets(me));
-        model.addAttribute("exportableManual", glExport.exportableManualRows(me));   // BUG_AUSY_00124/00125
-        model.addAttribute("pendingPakets", glExport.pendingPaketKeys());   // BUG_AUSY_00102
-        model.addAttribute("myPendingExports", glExport.myPending(me.getUsername()));
-        model.addAttribute("exportHistory", glExport.myHistory(me.getUsername()));
-        model.addAttribute("pendingUploads", pendingUploads(me));   // REQ_AUSY_00014
-        model.addAttribute("activeBatches", scope.filterArrays(me, gl.approvedPakets(), 1));   // REQ_AUSY_00023
         return "gl-legacy/list";
     }
 
@@ -130,6 +142,16 @@ public class GlDataController {
         return out;
     }
 
+    /** Nama file Excel per nomor batch (REQ_AUSY_00036); upload lama tanpa tautan tidak muncul. */
+    private Map<String, String> uploadFiles(List<Object[]> pending) {
+        Map<String, String> out = new HashMap<>();
+        List<String> pakets = pending.stream().map(p -> String.valueOf(p[0])).toList();
+        if (pakets.isEmpty()) return out;
+        for (TUpload t : uploads.findByNoPaketIn(pakets))
+            if (t.getNoPaket() != null && t.getFileName() != null) out.put(t.getNoPaket(), t.getFileName());
+        return out;
+    }
+
     /** REQ_AUSY_00022 — maker menghapus batch upload miliknya yang belum diotorisasi checker. */
     @PostMapping("/gl-legacy/pending/{paket}/delete")
     public String withdrawPending(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
@@ -140,44 +162,74 @@ public class GlDataController {
     }
 
     /**
-     * Maker "Ajukan Export": ajukan paket GL aktif pilihan maker ke checker (Otorisasi Export GL).
-     * File ACCTXT tidak diunduh ke komputer — dibuat di folder hasil export setelah checker approve.
+     * REQ_AUSY_00037 — Bulk Edit per batch, langkah 1: unduh isi batch (milik maker sendiri, belum
+     * diotorisasi) sebagai Excel. Amount ditulis dalam format Indonesia (1.000.000,50).
      */
-    @PostMapping("/gl-legacy/export-request")
-    public String exportRequest(@RequestParam String note, @RequestParam(required = false) List<String> pakets,
-                                @RequestParam(required = false) List<Long> glIds,
-                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        String msg = glExport.submitExport(me, note, pakets, glIds);
-        ra.addFlashAttribute(msg.startsWith("Permintaan export diajukan") ? "ok" : "warn", msg);
+    @GetMapping("/gl-legacy/pending/{paket}/bulk-export")
+    public void bulkExportPending(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
+                                  HttpServletResponse resp) throws Exception {
+        List<GlTabel> rows = me == null ? List.of() : gl.findBatchRows(paket, me.getUsername()).stream()
+                .filter(g -> "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()))
+                .toList();
+        if (rows.isEmpty()) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Batch " + paket + " tidak ada di upload Anda yang belum diotorisasi.");
+            return;
+        }
+        List<List<Object>> data = new ArrayList<>();
+        for (GlTabel g : rows) data.add(Arrays.asList(g.getId(), nz(g.getGltrac()), nz(g.getGltrcd()),
+                Nominal.format(g.getGltram()), nz(g.getGltrds()), nz(g.getNoPaket())));
+        excel.download(resp, "Batch " + paket, "BulkEdit_Batch_" + paket, BULK_HEAD, data, false);
+    }
+
+    /**
+     * REQ_AUSY_00037 &amp; 00047 — Bulk Edit per batch, langkah 2: unggah Excel hasil edit. Langsung
+     * diterapkan ke batch itu saja (belum diotorisasi, jadi tanpa checker); PDF ikut berubah.
+     */
+    @PostMapping("/gl-legacy/pending/{paket}/bulk-upload")
+    public String bulkUploadPending(@PathVariable String paket, @RequestParam("file") MultipartFile file,
+                                    @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        if (file == null || file.isEmpty()) { ra.addFlashAttribute("warn", "File belum dipilih."); return "redirect:/gl-legacy"; }
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sh = wb.getSheetAt(0);
+            List<Map<String, String>> isi = new ArrayList<>();
+            List<String> amountSalah = new ArrayList<>();
+            for (int r = 1; r <= sh.getLastRowNum(); r++) {
+                Row row = sh.getRow(r);
+                if (row == null || cell(row, 0).isBlank()) continue;
+                String amountTeks = cell(row, 3);
+                BigDecimal amount = Nominal.parse(amountTeks);
+                if (amount == null) { amountSalah.add("baris " + (r + 1) + " (\"" + amountTeks + "\")"); continue; }
+                Map<String, String> m = new LinkedHashMap<>();
+                m.put("baris", String.valueOf(r + 1));
+                m.put("id", cell(row, 0));
+                m.put("gltrac", cell(row, 1));
+                m.put("gltrcd", cell(row, 2));
+                m.put("gltram", amount.toPlainString());
+                m.put("gltrds", cell(row, 4));
+                isi.add(m);
+            }
+            if (!amountSalah.isEmpty()) {
+                ra.addFlashAttribute("warn", "Bulk Edit tidak diterapkan: kolom Amount tidak terbaca sebagai angka pada "
+                        + String.join(", ", amountSalah) + ". Gunakan format 1.000.000,50.");
+                return "redirect:/gl-legacy";
+            }
+            OtorisasiService.ExportResult r = otorisasi.bulkEditPending(paket, me, isi);
+            ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        } catch (Exception e) {
+            ra.addFlashAttribute("warn", "Gagal membaca file Excel: " + e.getMessage());
+        }
         return "redirect:/gl-legacy";
     }
 
-    @GetMapping("/gl-delete")
-    public String deletePage(@AuthenticationPrincipal AusyUserDetails me, Model model) {
-        // Sinkron dengan List GL: tampilkan batch GL aktif (sudah diotorisasi) agar bisa dihapus —
-        // hanya batch milik maker ini sendiri (BUG_AUSY_00138). Kolom ke-2 = gltrus.
-        model.addAttribute("pakets", scope.filterArrays(me, gl.deletablePakets(), 1));   // tanpa data tambahan manual (BUG_AUSY_00126)
-        model.addAttribute("needApproval", true);   // dual control wajib (BUG_AUSY_00116)
-        model.addAttribute("pendingKeys", changes.pendingPaketKeys());
-        model.addAttribute("pendingRows", changes.pendingRowsByPaket());
-        model.addAttribute("exportPending", changes.exportPendingPakets());   // BUG_AUSY_00106
-        return "gl-delete/index";
-    }
+    private static String nz(String s) { return s == null ? "" : s; }
 
-    /** BUG_AUSY_00082 — a maker's batch delete waits for the Checker; nothing is deleted until approved. */
-    @PostMapping("/gl-delete/process")
-    public String delete(@RequestParam String paket, @RequestParam String inputer,
-                         @RequestParam(required=false) String note,
-                         @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        // Batch milik maker lain tidak boleh diajukan hapus, walau nomornya ditebak (BUG_AUSY_00138).
-        if (!scope.canSee(me, inputer)) {
-            ra.addFlashAttribute("warn", DataScopeService.NOT_MY_MAKER);
-            return "redirect:/gl-delete";
-        }
-        // Selalu lewat maker->checker. Kalau group belum punya penyetuju aktif, pengajuan ditolak
-        // di service dengan pesannya sendiri — data TIDAK dihapus langsung (BUG_AUSY_00116).
-        GlChangeService.Res r = changes.submitPaketDelete(paket, inputer, me, note);
-        ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
-        return "redirect:/gl-delete";
+    private static String cell(Row r, int i) {
+        Cell c = r.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (c == null) return "";
+        return switch (c.getCellType()) {
+            case STRING -> c.getStringCellValue().trim();
+            case NUMERIC -> { double d = c.getNumericCellValue(); yield (d == Math.floor(d)) ? String.valueOf((long) d) : String.valueOf(d); }
+            default -> "";
+        };
     }
 }

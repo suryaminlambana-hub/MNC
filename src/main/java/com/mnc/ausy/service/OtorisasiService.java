@@ -21,10 +21,13 @@ public class OtorisasiService {
     private final ApprovalService approval;
     private final AuditService audit;
     private final DataScopeService scope;
+    private final StagingService staging;
+    private final GlCodeService glCodes;
 
     public OtorisasiService(GlTabelRepository gl, ApprovalService approval, AuditService audit,
-                            DataScopeService scope) {
-        this.gl = gl; this.approval = approval; this.audit = audit; this.scope = scope;
+                            DataScopeService scope, StagingService staging, GlCodeService glCodes) {
+        this.gl = gl; this.approval = approval; this.audit = audit; this.scope = scope; this.staging = staging;
+        this.glCodes = glCodes;
     }
 
     public record Paket(String paket, String inputer, long jml, BigDecimal debit, BigDecimal credit, boolean balanced,
@@ -76,17 +79,20 @@ public class OtorisasiService {
         if (d.compareTo(c) != 0)
             return new ExportResult(false, "Batch tidak balance (Debit != Credit). Otorisasi dibatalkan.", 0, null);
 
-        // Tandai lolos otorisasi upload → jadi GL Aktif. status_print tetap 'BELUM UPLOAD'
-        // (artinya: belum di-export ke core). Pembuatan file export dilakukan lewat flow export maker.
+        // Tandai lolos otorisasi upload, lalu langsung masukkan ke penampungan role EXECUTE
+        // (REQ_AUSY_00038). Langkah lama "maker ajukan export → checker approve export" tidak ada
+        // lagi: approve upload sudah cukup.
         for (GlTabel g : rows) {
             g.setStatusDual("APPROVED");
             g.setStatusPrint("BELUM UPLOAD");
         }
         gl.saveAll(rows);
+        staging.stage(rows, inputer, checker, "Batch " + paket);
         audit.transaction(checker, "OTORISASI_APPROVE",
-                "Batch " + paket + " (maker=" + inputer + ") di-approve, " + rows.size() + " baris jadi GL Aktif.");
-        return new ExportResult(true, "Otorisasi upload berhasil — Batch " + paket + " kini menjadi GL Aktif ("
-                + rows.size() + " baris). Export ke core dilakukan lewat menu Export oleh maker.", rows.size(), null);
+                "Batch " + paket + " (maker=" + inputer + ") di-approve, " + rows.size()
+                + " baris masuk penampungan Generate File ACCTXT.");
+        return new ExportResult(true, "Otorisasi upload berhasil — Batch " + paket + " (" + rows.size()
+                + " baris) masuk penampungan dan siap digenerate oleh role EXECUTE.", rows.size(), null);
     }
 
     /** Reject a pending paket (Workflow 8.1.e / 8.2.d): data removed from temp, decision note recorded. */
@@ -135,6 +141,80 @@ public class OtorisasiService {
         return new ExportResult(true, "Batch " + paket + " dihapus (" + rows.size()
                 + " baris). Batch ini tidak lagi menunggu otorisasi checker.", rows.size(), null);
     }
+
+    /**
+     * REQ_AUSY_00037 &amp; 00047 — Bulk Edit per batch untuk batch upload MILIK maker sendiri yang
+     * BELUM diotorisasi. Perubahan langsung diterapkan tanpa checker: datanya belum pernah
+     * di-approve, dan checker tetap meng-approve batch-nya sesudah ini (sama seperti Hapus batch
+     * pending, REQ_AUSY_00022). Karena langsung tersimpan, PDF batch ikut berubah.
+     *
+     * Baris dari berkas: id, gltrac, gltrcd, gltram (sudah berupa angka), gltrds. Berkas ditolak
+     * UTUH bila ada satu pun baris yang tidak valid atau bukan milik batch ini.
+     */
+    @Transactional
+    public ExportResult bulkEditPending(String paket, AusyUserDetails me, List<Map<String, String>> isi) {
+        if (me == null) return new ExportResult(false, "Sesi tidak valid.", 0, null);
+        String maker = me.getUsername();
+        Map<Long, GlTabel> batch = new LinkedHashMap<>();
+        for (GlTabel g : gl.findBatchRows(paket, maker)) batch.put(g.getId(), g);
+        if (batch.isEmpty())
+            return new ExportResult(false, "Batch " + paket + " tidak ditemukan di upload milik Anda.", 0, null);
+        boolean semuaPending = batch.values().stream().allMatch(g ->
+                "PENDING".equals(g.getStatusDual()) && Short.valueOf((short) 1).equals(g.getActive()));
+        if (!semuaPending)
+            return new ExportResult(false, "Batch " + paket + " sudah diproses checker; Bulk Edit hanya untuk batch"
+                    + " yang belum diotorisasi.", 0, null);
+
+        List<String> salah = new ArrayList<>();
+        List<GlTabel> berubah = new ArrayList<>();
+        for (Map<String, String> m : isi) {
+            String baris = m.getOrDefault("baris", "?");
+            Long id;
+            try { id = Long.valueOf(m.get("id").trim()); } catch (Exception e) { salah.add("baris " + baris + ": ID tidak valid"); continue; }
+            GlTabel g = batch.get(id);
+            if (g == null) { salah.add("baris " + baris + ": ID " + id + " bukan milik Batch " + paket); continue; }
+            String acc = n(m.get("gltrac")).trim(), dc = n(m.get("gltrcd")).trim().toUpperCase();
+            String ds = GlTextRule.trim(n(m.get("gltrds")));
+            BigDecimal amt;
+            try { amt = new BigDecimal(n(m.get("gltram")).trim()); } catch (Exception e) { amt = null; }
+            if (!acc.matches("[0-9]{1,50}")) salah.add("baris " + baris + ": GL Code hanya boleh angka");
+            if (!dc.equals("D") && !dc.equals("C")) salah.add("baris " + baris + ": D/C harus D atau C");
+            if (amt == null) salah.add("baris " + baris + ": Amount tidak terbaca");
+            else if (amt.signum() < 0) salah.add("baris " + baris + ": Amount tidak boleh minus");
+            if (ds.length() > 40) ds = ds.substring(0, 40);                    // lebar kolom ACCTXT
+            if (amt == null || amt.signum() < 0 || !acc.matches("[0-9]{1,50}") || !(dc.equals("D") || dc.equals("C")))
+                continue;
+            boolean sama = acc.equals(n(g.getGltrac())) && dc.equalsIgnoreCase(n(g.getGltrcd()))
+                    && g.getGltram() != null && amt.compareTo(g.getGltram()) == 0 && ds.equals(n(g.getGltrds()));
+            if (sama) continue;
+            if (!acc.equals(n(g.getGltrac()))) {
+                String nama = glCodes.descriptionOf(acc);
+                if (!nama.isEmpty()) g.setGlName(nama);
+            }
+            g.setGltrac(acc); g.setGltrcd(dc); g.setGltrds(ds);
+            // Ketiga kolom nominal dipakai berkas ACCTXT; diisi sama seperti saat upload.
+            g.setGltram(amt); g.setGleqam(amt); g.setGlotam(amt);
+            berubah.add(g);
+        }
+        if (!salah.isEmpty())
+            return new ExportResult(false, "Bulk Edit tidak diterapkan: " + String.join("; ", salah) + ".", 0, null);
+        if (berubah.isEmpty())
+            return new ExportResult(false, "Tidak ada perubahan pada Batch " + paket + ".", 0, null);
+
+        gl.saveAll(berubah);
+        BigDecimal d = BigDecimal.ZERO, c = BigDecimal.ZERO;
+        for (GlTabel g : batch.values())
+            if ("D".equalsIgnoreCase(g.getGltrcd())) d = d.add(nz(g.getGltram())); else c = c.add(nz(g.getGltram()));
+        audit.transaction(maker, "BULK_EDIT_PENDING",
+                "Bulk Edit Batch " + paket + " (belum diotorisasi), " + berubah.size() + " baris diubah langsung.");
+        String balance = d.compareTo(c) == 0 ? " Debit = Credit (balance)."
+                : " PERHATIAN: batch tidak balance (Debit " + Nominal.format(d) + ", Credit " + Nominal.format(c)
+                  + "); checker tidak bisa meng-approve sampai balance.";
+        return new ExportResult(true, "Bulk Edit Batch " + paket + " diterapkan: " + berubah.size()
+                + " baris diubah." + balance, berubah.size(), null);
+    }
+
+    private static String n(String s) { return s == null ? "" : s; }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 }

@@ -10,6 +10,10 @@ public class TUpload {
     @Column(name="user_id") private String userId;
     private String status;
     @Column(name="adddt") private LocalDateTime adddt;
+    /** Nomor batch hasil upload ini (REQ_AUSY_00036) — supaya nama file bisa ditampilkan per batch. */
+    @Column(name="no_paket") private String noPaket;
+    public String getNoPaket() { return noPaket; }
+    public void setNoPaket(String noPaket) { this.noPaket = noPaket; }
     public Long getId(){return id;} public void setId(Long v){id=v;}
     public String getSessId(){return sessId;} public void setSessId(String v){sessId=v;}
     public String getFileName(){return fileName;} public void setFileName(String v){fileName=v;}

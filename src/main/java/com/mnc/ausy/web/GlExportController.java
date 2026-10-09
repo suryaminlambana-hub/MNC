@@ -84,7 +84,7 @@ public class GlExportController {
     public String returnExport(@RequestParam Long reqId, @RequestParam(required = false) String note,
                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         String msg = glExport.returnExport(reqId, me, note);
-        ra.addFlashAttribute(msg.startsWith("Export ditarik kembali") ? "ok" : "warn", msg);
+        ra.addFlashAttribute(msg.startsWith("Data dikembalikan") ? "ok" : "warn", msg);
         return "redirect:/gl-export/return-list";
     }
 }
