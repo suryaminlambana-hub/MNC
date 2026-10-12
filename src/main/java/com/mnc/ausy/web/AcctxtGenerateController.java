@@ -69,6 +69,10 @@ public class AcctxtGenerateController {
         model.addAttribute("schedulerCronSah", scheduler.cronSah());
         model.addAttribute("schedulerCronSetelan", scheduler.cronSetelan());
         model.addAttribute("schedulerBerikutnya", scheduler.jalanBerikutnya());
+        // Jam server, bukan jam laptop pembaca. Ditaruh bersebelahan dengan "jalan berikutnya"
+        // supaya pertanyaan "penjadwalnya ikut jam yang mana" terjawab sendiri di layar.
+        model.addAttribute("schedulerSekarang",
+                java.time.LocalDateTime.now(com.mnc.ausy.service.AcctxtSchedulerService.ZONA));
         // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
         // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.

@@ -218,6 +218,9 @@
             Jalan berikutnya
             <strong th:text="${#temporals.format(schedulerBerikutnya,'dd-MM-yyyy HH:mm:ss')}"></strong>.
           </span>
+          Jam server saat halaman ini dibuka:
+          <strong th:text="${#temporals.format(schedulerSekarang,'dd-MM-yyyy HH:mm:ss')}"></strong>
+          — penjadwal memakai jam ini, bukan jam komputer Anda.
           <span th:unless="${schedulerAktif}">Penjadwal sedang dimatikan, jadi jadwal ini dilewati.</span>
         </small>
       </div>
