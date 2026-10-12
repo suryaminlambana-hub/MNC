@@ -6,12 +6,15 @@ import com.mnc.ausy.repo.AcctxtSchedulerLogRepository;
 import com.mnc.ausy.repo.AcctxtSchedulerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 /**
@@ -32,6 +35,13 @@ public class AcctxtSchedulerService {
 
     /** Nama pelaku pada catatan audit & berkas yang dihasilkan penjadwal. */
     public static final String PELAKU = "scheduler";
+
+    /** Jadwal bawaan: tiap hari jam 23:00. Dipakai juga kalau setelannya salah tulis. */
+    public static final String CRON_BAWAAN = "0 0 23 * * *";
+    public static final ZoneId ZONA = ZoneId.of("Asia/Jakarta");
+
+    @Value("${ausy.scheduler-cron:" + CRON_BAWAAN + "}")
+    private String cronSetelan;
 
     private final AcctxtSchedulerRepository setelan;
     private final AcctxtSchedulerLogRepository riwayat;
@@ -72,6 +82,43 @@ public class AcctxtSchedulerService {
         return riwayat.findAllByOrderByMulaiDesc(PageRequest.of(0, berapa));
     }
 
+    // ------------------------------------------------------------------ jadwal
+
+    /**
+     * Jadwal yang BENAR-BENAR berlaku.
+     *
+     * Setelan yang salah tulis tidak boleh menjatuhkan aplikasi. Dulu ekspresi cron dipasang
+     * langsung di {@code @Scheduled}, dan satu salah ketik — misalnya gaya crontab 5 kolom
+     * {@code 59 22 * * *}, padahal Spring menuntut 6 — membuat aplikasinya GAGAL START
+     * seluruhnya, bukan sekadar penjadwalnya mati. Sekarang diperiksa dulu: kalau tidak sah,
+     * dipakai jadwal bawaan dan sebabnya disebut di layar serta di log.
+     */
+    public String cron() {
+        return cronSah() ? cronSetelan.trim() : CRON_BAWAAN;
+    }
+
+    public boolean cronSah() {
+        try {
+            CronExpression.parse(cronSetelan == null ? "" : cronSetelan.trim());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Isi setelan apa adanya — ditampilkan saat salah tulis supaya jelas apa yang diperbaiki. */
+    public String cronSetelan() { return cronSetelan; }
+
+    /** Kapan penjadwal akan berjalan lagi; null kalau jadwalnya tidak sah. */
+    public LocalDateTime jalanBerikutnya() {
+        try {
+            ZonedDateTime n = CronExpression.parse(cron()).next(ZonedDateTime.now(ZONA));
+            return n == null ? null : n.toLocalDateTime();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------ penjadwal
 
     /**
@@ -81,9 +128,6 @@ public class AcctxtSchedulerService {
      * karena tidak ada yang gagal; riwayat yang penuh "dilewati" justru menyulitkan mencari
      * kegagalan yang sebenarnya.
      */
-    // Jadwalnya bisa diubah lewat setelan tanpa menyentuh kode — terutama supaya bisa diuji
-    // tanpa menunggu jam 23:00 sungguhan. Bawaannya tetap jam 23:00.
-    @Scheduled(cron = "${ausy.scheduler-cron:0 0 23 * * *}", zone = "Asia/Jakarta")
     public void jalanTerjadwal() {
         if (!aktif()) {
             LOG.info("Penjadwal ACCTXT sedang dimatikan — jalan jam 23:00 dilewati.");

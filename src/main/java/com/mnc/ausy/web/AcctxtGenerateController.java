@@ -63,6 +63,12 @@ public class AcctxtGenerateController {
         model.addAttribute("schedulerAktif", scheduler.aktif());
         model.addAttribute("schedulerSetelan", scheduler.setelan());
         model.addAttribute("schedulerRiwayat", scheduler.riwayatTerakhir(10));
+        // Jadwal yang BENAR-BENAR berlaku + kapan jalan berikutnya. Tanpa ini "penjadwalnya
+        // tidak jalan" hanya bisa ditebak dari gejala.
+        model.addAttribute("schedulerCron", scheduler.cron());
+        model.addAttribute("schedulerCronSah", scheduler.cronSah());
+        model.addAttribute("schedulerCronSetelan", scheduler.cronSetelan());
+        model.addAttribute("schedulerBerikutnya", scheduler.jalanBerikutnya());
         // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
         // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.

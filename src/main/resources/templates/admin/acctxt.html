@@ -187,9 +187,8 @@
         <i class="fa-solid fa-circle-pause"></i> TIDAK AKTIF
       </span>
       <span class="text-muted small">
-        Berjalan setiap hari <strong>jam 23:00 WIB</strong>. Yang dibuatkan file:
-        <strong>seluruh isi penampungan</strong> yang belum pernah digenerate — otorisasi upload
-        maupun perubahan dari Kelola Data GL, tanpa batas tanggal.
+        Yang dibuatkan file: <strong>seluruh isi penampungan</strong> yang belum pernah
+        digenerate — otorisasi upload maupun perubahan dari Kelola Data GL, tanpa batas tanggal.
       </span>
       <form method="post" th:action="@{/admin/acctxt/scheduler}" class="ms-auto"
             th:attr="onsubmit=${schedulerAktif}
@@ -209,6 +208,28 @@
         </button>
       </form>
     </div>
+    <!--/* Jadwal yang berlaku + kapan jalan berikutnya. Ada supaya "penjadwalnya tidak jalan"
+           bisa DILIHAT, bukan ditebak dari gejala. */-->
+    <div class="mt-3">
+      <div>
+        <small class="text-muted">
+          Jadwal: <code th:text="${schedulerCron}">0 0 23 * * *</code> (zona Asia/Jakarta).
+          <span th:if="${schedulerAktif and schedulerBerikutnya != null}">
+            Jalan berikutnya
+            <strong th:text="${#temporals.format(schedulerBerikutnya,'dd-MM-yyyy HH:mm:ss')}"></strong>.
+          </span>
+          <span th:unless="${schedulerAktif}">Penjadwal sedang dimatikan, jadi jadwal ini dilewati.</span>
+        </small>
+      </div>
+      <div th:unless="${schedulerCronSah}" class="alert alert-warning py-2 mt-2 mb-0">
+        Setelan <code>AUSY_SCHEDULER_CRON</code> berisi
+        <code th:text="${schedulerCronSetelan}"></code> yang <strong>tidak sah</strong>, jadi
+        dipakai jadwal bawaan di atas. Ekspresinya <strong>6 kolom</strong>
+        (detik menit jam tanggal bulan hari) — misalnya <code>0 59 22 * * *</code> untuk jam
+        22:59, bukan <code>59 22 * * *</code> seperti crontab biasa.
+      </div>
+    </div>
+
     <div class="mt-2" th:if="${schedulerSetelan != null and schedulerSetelan.diubahPada != null}">
       <small class="text-muted">
         Terakhir diubah <span th:text="${#temporals.format(schedulerSetelan.diubahPada,'dd-MM-yyyy HH:mm')}"></span>
