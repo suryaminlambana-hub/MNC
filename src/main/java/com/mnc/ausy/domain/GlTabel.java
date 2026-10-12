@@ -13,6 +13,13 @@ public class GlTabel {
     private String glprdc;   // product code
     private String gltrac;   // transaction account (GL code)
     private String gltrpd;   // posting date ddMMyy
+    /**
+     * Kapan baris ini diunggah. Diisi basis data ({@code default now()}), jadi hanya dibaca —
+     * dipakai untuk membedakan otorisasi hari ini dari otorisasi hari sebelumnya
+     * (REQ_AUSY_00060).
+     */
+    @Column(name = "adddt", insertable = false, updatable = false)
+    private java.time.LocalDateTime adddt;
     @Column(name="gl_name") private String glName;
     private String gltrds;   // description (<=40)
     private String gltrbr;   // branch
@@ -43,6 +50,7 @@ public class GlTabel {
     public String getGltrcd(){return gltrcd;} public void setGltrcd(String v){gltrcd=v;}
     public String getGlprdc(){return glprdc;} public void setGlprdc(String v){glprdc=v;}
     public String getGltrac(){return gltrac;} public void setGltrac(String v){gltrac=v;}
+    public java.time.LocalDateTime getAdddt(){return adddt;}
     public String getGltrpd(){return gltrpd;} public void setGltrpd(String v){gltrpd=v;}
     public String getGlName(){return glName;} public void setGlName(String v){glName=v;}
     public String getGltrds(){return gltrds;} public void setGltrds(String v){gltrds=v;}

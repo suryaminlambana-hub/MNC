@@ -136,6 +136,24 @@ public class OtorisasiService {
         if (!menunggu(rows))
             return new ExportResult(false, "Batch " + BatchLabel.label(paket) + " tidak sedang menunggu otorisasi.", 0, null);
 
+        // REQ_AUSY_00060 — otorisasi yang menginap tidak dikembalikan ke maker. Batch yang
+        // diunggah hari sebelumnya dan baru ditolak sekarang langsung hilang: barisnya dihapus,
+        // tidak ada catatan status, sehingga tidak muncul di List Data GL maupun Rekapitulasi.
+        // Aturan bisnis yang disengaja — maker tidak boleh memperbaiki dan mengajukan ulang
+        // data yang tanggal posting-nya sudah lewat.
+        boolean menginap = BatchStatusService.lintasHari(rows.get(0).getAdddt());
+        if (menginap) {
+            gl.deletePaket(paket, inputer);
+            batchStatus.clear(paket, inputer);
+            audit.transaction(checker, "OTORISASI_REJECT",
+                    "Batch " + BatchLabel.label(paket) + " (maker=" + inputer + ") DITOLAK, " + rows.size()
+                    + " baris DIHAPUS — otorisasi dari hari sebelumnya tidak dikembalikan ke maker"
+                    + " (REQ_AUSY_00060). Catatan: " + note);
+            return new ExportResult(true, "Batch " + BatchLabel.label(paket) + " ditolak. Karena otorisasinya"
+                    + " berasal dari hari sebelumnya, datanya tidak dikembalikan ke maker dan langsung dihapus."
+                    + " Alasan tercatat di audit trail.", rows.size(), null);
+        }
+
         for (GlTabel g : rows) { g.setStatusDual(REJECTED); g.setActive((short) 0); }
         gl.saveAll(rows);
         batchStatus.rejected(paket, inputer, checker, note);

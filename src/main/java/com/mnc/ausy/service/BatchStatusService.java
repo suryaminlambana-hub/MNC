@@ -37,6 +37,21 @@ public class BatchStatusService {
     }
 
     /** Batch di-approve, diajukan ulang, atau dihapus maker: statusnya tidak dicatat lagi. */
+    /**
+     * Otorisasi yang sedang diproses berasal dari hari sebelumnya? (REQ_AUSY_00060)
+     *
+     * Aturan bisnisnya: otorisasi yang melewati batas hari dan baru diproses sekarang TIDAK
+     * dikembalikan ke maker — datanya langsung hilang. Yang diproses pada hari yang sama tetap
+     * mengikuti alur normal.
+     *
+     * Acuannya {@code adddt}, yaitu kapan barisnya diunggah, bukan tanggal posting: tanggal
+     * posting bisa diatur terpisah, sedangkan yang dimaksud "otorisasi kemarin" adalah
+     * pengajuannya yang menginap.
+     */
+    public static boolean lintasHari(java.time.LocalDateTime diajukan) {
+        return diajukan != null && diajukan.toLocalDate().isBefore(java.time.LocalDate.now());
+    }
+
     public void clear(String paket, String maker) {
         repo.findByNoPaketAndMaker(paket, maker).ifPresent(repo::delete);
     }

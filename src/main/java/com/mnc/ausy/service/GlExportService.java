@@ -321,8 +321,13 @@ public class GlExportService {
         List<GlTabel> rows = gl.findByExportReqIdOrderById(reqId);
         Set<String> batchUpload = new TreeSet<>(), kunciBatch = new HashSet<>();
         List<GlTabel> barisManual = new ArrayList<>();
+        // REQ_AUSY_00060 — baris yang otorisasinya menginap tidak dikembalikan ke maker,
+        // melainkan dihapus. Dinilai per baris memakai adddt-nya sendiri, bukan per permintaan
+        // export: satu pengajuan export bisa memuat batch dari beberapa hari sekaligus.
+        List<GlTabel> dihapus = new ArrayList<>();
         for (GlTabel g : rows) {
             boolean dariManual = "m".equals(g.getGlsrc());
+            if (BatchStatusService.lintasHari(g.getAdddt())) { dihapus.add(g); continue; }
             g.setExportReqId(null);
             g.setStatusPrint("BELUM UPLOAD");
             g.setStatusDual(dariManual ? "RETURNED" : "PENDING");
@@ -332,7 +337,22 @@ public class GlExportService {
             if (kunciBatch.add(g.getNoPaket() + "|" + g.getGltrus()))
                 batchStatus.returned(g.getNoPaket(), g.getGltrus(), checker, note);
         }
+        rows.removeAll(dihapus);
         gl.saveAll(rows);
+        if (!dihapus.isEmpty()) {
+            Set<String> kunciHapus = new HashSet<>();
+            for (GlTabel g : dihapus) kunciHapus.add(g.getNoPaket() + "|" + g.getGltrus());
+            gl.deleteAll(dihapus);
+            // Catatan statusnya ikut dibersihkan: tanpa ini batch itu masih tampil di layar
+            // maker sebagai "Dikembalikan" padahal barisnya sudah tidak ada.
+            for (String k : kunciHapus) {
+                String[] kp = k.split("\\|", 2);
+                if (kp.length == 2) batchStatus.clear(kp[0], kp[1]);
+            }
+            audit.transaction(checker, "EXPORT_RETURN",
+                    dihapus.size() + " baris dari otorisasi hari sebelumnya DIHAPUS, tidak dikembalikan"
+                    + " ke maker (REQ_AUSY_00060).");
+        }
         for (GlTabel g : barisManual) changes.returnToPengajuan(g, checker, note);
         int manual = barisManual.size();
         req.setStatus("RETURNED"); req.setChecker(checker);
