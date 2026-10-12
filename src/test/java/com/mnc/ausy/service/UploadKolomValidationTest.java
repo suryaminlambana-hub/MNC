@@ -1,5 +1,7 @@
 package com.mnc.ausy.service;
 
+import com.mnc.ausy.domain.GlCode;
+import com.mnc.ausy.repo.GlCodeRepository;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -83,7 +85,36 @@ class UploadKolomValidationTest {
     }
 
     private static UploadResult proses(String[]... baris) throws Exception {
-        return new UploadService(null, null, null, null)
+        // Bawaan: seluruh kode yang muncul di data uji dianggap terdaftar, supaya tes kolom
+        // LAIN tidak ikut gagal karena validasi kode GL (REQ_AUSY_00059). Tes yang memang
+        // menguji validasi itu memakai overload di bawah dan menyebut daftarnya sendiri.
+        java.util.Set<String> kode = new java.util.LinkedHashSet<>();
+        for (String[] r : baris) if (r.length > 4 && r[4] != null && !r[4].isBlank()) kode.add(r[4].trim());
+        return proses(kode, baris);
+    }
+
+    /**
+     * Master Kode GL yang berlaku untuk pengujian ini (REQ_AUSY_00059).
+     *
+     * Hanya {@code findAll} yang dipakai sisi validasi, jadi sisanya dibiarkan tidak didukung:
+     * kalau suatu hari validasinya menanyakan hal lain, tesnya gagal dengan jelas di method itu
+     * dan bukan diam-diam memakai jawaban kosong.
+     */
+    private static GlCodeRepository masterKode(java.util.Set<String> kode) {
+        return (GlCodeRepository) java.lang.reflect.Proxy.newProxyInstance(
+                GlCodeRepository.class.getClassLoader(),
+                new Class<?>[]{ GlCodeRepository.class },
+                (proxy, method, args) -> {
+                    if (!"findAll".equals(method.getName()) || (args != null && args.length > 0))
+                        throw new UnsupportedOperationException("tak terduga: " + method.getName());
+                    java.util.List<GlCode> out = new java.util.ArrayList<>();
+                    for (String k : kode) { GlCode c = new GlCode(); c.setCode(k); out.add(c); }
+                    return out;
+                });
+    }
+
+    private static UploadResult proses(java.util.Set<String> kodeTerdaftar, String[]... baris) throws Exception {
+        return new UploadService(null, null, null, null, masterKode(kodeTerdaftar))
                 .process(new ByteArrayInputStream(berkas(baris)), "uji.xlsx", "penguji");
     }
 
@@ -304,5 +335,83 @@ class UploadKolomValidationTest {
     private static UploadResult currencyAtauKolomLain(String[] barisUji) throws Exception {
         String[] rusak = barisSah(); rusak[2] = "XX";       // Product Code jelas bukan angka
         return proses(barisUji, rusak);
+    }
+
+    // ---- REQ_AUSY_00059: Transaction Account wajib terdaftar di Manajemen Kode GL ----
+
+    @Test
+    void transactionAccountTidakTerdaftarDitolak() throws Exception {
+        String[] b = barisSah(); b[4] = "9999999999";
+        UploadResult res = proses(java.util.Set.of("1010100001"), b);
+
+        assertFalse(res.success);
+        assertEquals(0, res.rows, "tidak satu baris pun boleh tersimpan");
+        assertTrue(pesanBaris(res, 2).contains("tidak terdaftar"), pesanBaris(res, 2));
+        assertTrue(pesanBaris(res, 2).contains("9999999999"), "kodenya ikut disebut: " + pesanBaris(res, 2));
+    }
+
+    @Test
+    void barisTerisiTanpaTransactionAccountDitolak() throws Exception {
+        // Kolom E juga penanda "baris berisi data", jadi yang ditolak adalah baris yang jelas
+        // sedang diisi (ada D/C, keterangan dan nominal) tapi akunnya tertinggal. Dipasangkan
+        // dengan satu baris sah supaya berkasnya tidak ditolak lebih dulu sebagai "tidak ada
+        // baris data" — itu jalur lain, dan bukan yang sedang diuji di sini.
+        String[] sah = barisSah();
+        String[] tanpaAkun = barisSah(); tanpaAkun[4] = ""; tanpaAkun[1] = "C";
+        UploadResult res = proses(java.util.Set.of(sah[4]), sah, tanpaAkun);
+
+        assertFalse(res.success);
+        assertTrue(pesanBaris(res, 3).contains("Transaction_Account"), "baris 3: " + pesanBaris(res, 3));
+        assertTrue(pesanBaris(res, 3).contains("belum diisi"), "baris 3: " + pesanBaris(res, 3));
+    }
+
+    @Test
+    void berkasTanpaSatuPunAkunDitolakSebagaiTidakAdaData() throws Exception {
+        // Seluruh barisnya tanpa akun: berkasnya ditolak lebih dulu di jalur "tidak ada baris
+        // data", bukan sebagai kesalahan per baris. Dua jalur berbeda, dua pesan berbeda.
+        String[] b = barisSah(); b[4] = "";
+        UploadResult res = proses(java.util.Set.of("1010100001"), b);
+
+        assertFalse(res.success);
+        assertTrue(res.message.contains("Tidak ada baris data"), res.message);
+    }
+
+    @Test
+    void barisBenarBenarKosongTidakDianggapSalah() throws Exception {
+        // Template MNC datang dengan 167 baris kosong. Kalau kolom E kosong ditolak mentah,
+        // tidak ada satu berkas pun yang bisa diunggah.
+        String[] kosong = new String[17];
+        java.util.Arrays.fill(kosong, "");
+        kosong[0] = LocalDate.now().format(IN);     // seperti rumus =NOW() di template
+        String[] sah = barisSah();
+        UploadResult res = proses(java.util.Set.of(sah[4]), sah, kosong);
+
+        assertFalse(pesanBaris(res, 3).contains("Transaction_Account"),
+                "baris kosong tidak boleh dikeluhkan: " + pesanBaris(res, 3));
+    }
+
+    @Test
+    void transactionAccountTerdaftarDiterima() throws Exception {
+        // Baris yang sah seutuhnya tidak boleh tersangkut di validasi kolom. Penyimpanannya
+        // memang gagal (repository null), jadi yang diperiksa: TIDAK ada keluhan soal kode GL.
+        String[] b = barisSah();
+        try {
+            UploadResult res = proses(java.util.Set.of(b[4]), b);
+            assertFalse(pesanBaris(res, 2).contains("tidak terdaftar"), pesanBaris(res, 2));
+        } catch (NullPointerException lolosValidasi) {
+            // sampai ke tahap simpan = validasi kolomnya lulus
+        }
+    }
+
+    @Test
+    void barisBermasalahDisebutNomornya() throws Exception {
+        // Validasi berjalan per baris: yang salah baris ketiga, bukan seluruh berkas.
+        String[] sah = barisSah();
+        String[] salah = barisSah(); salah[4] = "8888888888"; salah[1] = "C";
+        UploadResult res = proses(java.util.Set.of(sah[4]), sah, salah);
+
+        assertFalse(res.success);
+        assertTrue(pesanBaris(res, 3).contains("8888888888"), "baris 3: " + pesanBaris(res, 3));
+        assertFalse(pesanBaris(res, 2).contains("tidak terdaftar"), "baris 2 bersih: " + pesanBaris(res, 2));
     }
 }

@@ -2,6 +2,8 @@ package com.mnc.ausy.service;
 
 import com.mnc.ausy.domain.GlTabel;
 import com.mnc.ausy.domain.TUpload;
+import com.mnc.ausy.domain.GlCode;
+import com.mnc.ausy.repo.GlCodeRepository;
 import com.mnc.ausy.repo.GlTabelRepository;
 import com.mnc.ausy.repo.TUploadRepository;
 import org.apache.poi.ss.usermodel.*;
@@ -15,6 +17,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Locale;
 
 @Service
@@ -42,12 +46,25 @@ public class UploadService {
     private static final int KEY_COLUMN = 4;
 
     private final GlTabelRepository gl;
+    private final GlCodeRepository glCodes;
     private final TUploadRepository tUploads;
     private final SequenceService seq;
     private final AuditService audit;
 
-    public UploadService(GlTabelRepository gl, TUploadRepository tUploads, SequenceService seq, AuditService audit) {
+    public UploadService(GlTabelRepository gl, TUploadRepository tUploads, SequenceService seq, AuditService audit, GlCodeRepository glCodes) {
+        this.glCodes = glCodes;
         this.gl = gl; this.tUploads = tUploads; this.seq = seq; this.audit = audit;
+    }
+
+    /**
+     * Baris yang sudah mulai diisi orang: ada D/C, keterangan, atau nominal.
+     * Kolom A sengaja tidak dihitung — di template MNC seluruh 167 baris isiannya berisi
+     * rumus {@code =NOW()}, jadi kolom itu terisi bahkan pada baris yang masih kosong.
+     */
+    private static boolean barisTerisiSebagian(Row r) {
+        for (int c : new int[]{ 1, 6, KOLOM_NOMINAL })
+            if (!cell(r, c).isBlank()) return true;
+        return false;
     }
 
     private static String cell(Row r, int i) {
@@ -127,6 +144,8 @@ public class UploadService {
 
     /** Kolom currency — wajib berisi IDR (BUG_AUSY_00190). */
     private static final int KOLOM_CURRENCY = 11;
+    /** Kolom E — Transaction Account, dicocokkan ke master Kode GL (REQ_AUSY_00059). */
+    private static final int KOLOM_AKUN = 4;
 
     /**
      * Kolom kode yang hanya boleh berisi angka 0-9 — tanda petik satu pun tidak
@@ -233,6 +252,9 @@ public class UploadService {
             return b;
         }
         int last = sh.getLastRowNum();
+        // REQ_AUSY_00059: master kode GL dibaca sekali untuk seluruh berkas.
+        Set<String> kodeGl = new HashSet<>();
+        for (GlCode c : glCodes.findAll()) if (c.getCode() != null) kodeGl.add(c.getCode().trim());
 
         // Pass 1: validate posting date (col A) == tanggalPosting
         for (int r = 1; r <= last; r++) {
@@ -267,7 +289,15 @@ public class UploadService {
         BigDecimal cekDebit = BigDecimal.ZERO, cekCredit = BigDecimal.ZERO;
         for (int r = 1; r <= last; r++) {
             Row row = sh.getRow(r);
-            if (cell(row, KEY_COLUMN).isBlank()) continue;
+            if (cell(row, KEY_COLUMN).isBlank()) {
+                // Kolom E juga penanda "baris ini berisi data" — template MNC datang dengan 167
+                // baris kosong, jadi kolom E kosong TIDAK bisa ditolak begitu saja. Yang ditolak
+                // baris yang jelas sedang diisi orang tapi akunnya tertinggal (REQ_AUSY_00059).
+                if (barisTerisiSebagian(row))
+                    b.errors.add(new String[]{ String.valueOf(r + 1),
+                            "Kolom E [Transaction_Account] belum diisi, padahal baris ini sudah berisi data." });
+                continue;
+            }
             String baris = String.valueOf(r + 1);
 
             // REQ_AUSY_00024 — nominal harus angka dan tidak boleh minus. Dulu nilai yang
@@ -301,6 +331,15 @@ public class UploadService {
                             + " — rumus pencarian tidak menemukan padanannya. Pastikan kodenya"
                             + " terdaftar dan diisi sebagai angka, bukan teks (diawali tanda petik)." });
             }
+
+            // REQ_AUSY_00059 — Transaction Account wajib terdaftar di Manajemen Kode GL.
+            // Dulu kode yang tidak dikenal lolos begitu saja dan baru ketahuan jauh di hilir,
+            // saat berkas ACCTXT ditolak core. Daftar kodenya dibaca SEKALI di luar perulangan,
+            // bukan satu query per baris: berkas 167 baris akan menanyakan hal yang sama 167 kali.
+            String akun = GlTextRule.trim(cell(row, KOLOM_AKUN));
+            if (!kodeGl.contains(akun))
+                b.errors.add(new String[]{ baris, "Transaction Account \"" + akun + "\" tidak terdaftar"
+                        + " pada Manajemen Kode GL." });
 
             // BUG_AUSY_00190 — currency wajib IDR. Kosong pun ditolak: baris GL tanpa mata
             // uang tidak punya arti, dan dulu baris seperti itu lolos tanpa sepatah pesan.
