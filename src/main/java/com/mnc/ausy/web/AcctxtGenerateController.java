@@ -3,6 +3,7 @@ package com.mnc.ausy.web;
 import com.mnc.ausy.domain.GlExportRequest;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AcctxtGenerateService;
+import com.mnc.ausy.service.AcctxtSchedulerService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -25,8 +26,12 @@ import java.util.List;
 public class AcctxtGenerateController {
 
     private final AcctxtGenerateService acctxt;
+    private final AcctxtSchedulerService scheduler;
 
-    public AcctxtGenerateController(AcctxtGenerateService acctxt) { this.acctxt = acctxt; }
+    public AcctxtGenerateController(AcctxtGenerateService acctxt, AcctxtSchedulerService scheduler) {
+        this.acctxt = acctxt;
+        this.scheduler = scheduler;
+    }
 
     @GetMapping("/admin/acctxt")
     public String page(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -52,6 +57,11 @@ public class AcctxtGenerateController {
         model.addAttribute("pending", pending);
         model.addAttribute("todayPendingCount", pending.size());
         model.addAttribute("stranded", acctxt.strandedPending());
+        // REQ_AUSY_00061: status penjadwal + riwayat jalannya, supaya "kenapa berkas hari itu
+        // tidak terbit" bisa dibaca, bukan ditebak.
+        model.addAttribute("schedulerAktif", scheduler.aktif());
+        model.addAttribute("schedulerSetelan", scheduler.setelan());
+        model.addAttribute("schedulerRiwayat", scheduler.riwayatTerakhir(10));
         // BUG_AUSY_00167: yang sudah jadi file ikut ditampilkan, kalau tidak memilih tanggal
         // lampau selalu berakhir layar kosong — begitu digenerate, exportnya keluar dari
         // daftar "belum dibuatkan file" dan tidak muncul di mana pun lagi.
@@ -78,6 +88,20 @@ public class AcctxtGenerateController {
     public String generateToday(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         AcctxtGenerateService.Result r = acctxt.generateToday(me);
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
+        return "redirect:/admin/acctxt";
+    }
+
+    /**
+     * Nyalakan / matikan penjadwal otomatis (REQ_AUSY_00061).
+     * Tombol generate manual tidak terpengaruh — keduanya memang berdampingan.
+     */
+    @PostMapping("/admin/acctxt/scheduler")
+    public String ubahScheduler(@RequestParam boolean aktif,
+                                @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        scheduler.ubahAktif(aktif, me == null ? "-" : me.getUsername());
+        ra.addFlashAttribute("ok", aktif
+                ? "Penjadwal otomatis DINYALAKAN — berkas ACCTXT dibuat setiap hari jam 23:00."
+                : "Penjadwal otomatis DIMATIKAN — berkas hanya dibuat lewat tombol di halaman ini.");
         return "redirect:/admin/acctxt";
     }
 }

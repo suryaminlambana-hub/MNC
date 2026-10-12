@@ -174,5 +174,62 @@
     });
   })();
   </script>
+  <!--/* REQ_AUSY_00061: penjadwal otomatis. Tombol manual di atas TIDAK diganti — keduanya
+         berdampingan, dan status serta riwayat jalannya ditulis di layar supaya "kenapa berkas
+         hari itu tidak terbit" bisa dibaca, bukan ditebak. */-->
+  <h2 class="h6 text-uppercase text-muted mt-4 mb-2">Penjadwal otomatis</h2>
+  <div class="ausy-card mb-3" style="padding:20px 22px">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <span th:if="${schedulerAktif}" class="badge bg-success-subtle text-success">
+        <i class="fa-solid fa-circle-check"></i> AKTIF
+      </span>
+      <span th:unless="${schedulerAktif}" class="badge bg-secondary-subtle text-secondary">
+        <i class="fa-solid fa-circle-pause"></i> TIDAK AKTIF
+      </span>
+      <span class="text-muted small">
+        Berjalan setiap hari <strong>jam 23:00 WIB</strong>, isinya sama dengan tombol
+        <em>Generate File ACCTXT Hari Ini</em>.
+      </span>
+      <form method="post" th:action="@{/admin/acctxt/scheduler}" class="ms-auto"
+            th:attr="onsubmit=${schedulerAktif}
+                     ? 'return confirm(\'Matikan penjadwal? Berkas ACCTXT tidak lagi dibuat otomatis jam 23:00.\')'
+                     : 'return confirm(\'Nyalakan penjadwal otomatis jam 23:00?\')'">
+        <input type="hidden" name="aktif" th:value="${!schedulerAktif}">
+        <button type="submit" class="btn btn-sm"
+                th:classappend="${schedulerAktif} ? 'btn-outline-secondary' : 'btn-outline-success'"
+                th:text="${schedulerAktif} ? 'Matikan Penjadwal' : 'Nyalakan Penjadwal'">Ubah</button>
+      </form>
+    </div>
+    <div class="mt-2" th:if="${schedulerSetelan != null and schedulerSetelan.diubahPada != null}">
+      <small class="text-muted">
+        Terakhir diubah <span th:text="${#temporals.format(schedulerSetelan.diubahPada,'dd-MM-yyyy HH:mm')}"></span>
+        oleh <span th:text="${schedulerSetelan.diubahOleh}"></span>.
+      </small>
+    </div>
+  </div>
+
+  <h2 class="h6 text-uppercase text-muted mb-2">Riwayat penjadwal</h2>
+  <div class="ausy-card">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Waktu</th><th>Hasil</th><th>File</th><th class="text-end">Baris</th><th>Keterangan</th></tr></thead>
+      <tbody>
+      <tr th:each="r : ${schedulerRiwayat}">
+        <td th:text="${#temporals.format(r.mulai,'dd-MM-yyyy HH:mm:ss')}"></td>
+        <td>
+          <span th:if="${r.berhasil}" class="badge bg-success-subtle text-success">Berhasil</span>
+          <span th:unless="${r.berhasil}" class="badge bg-danger-subtle text-danger">Gagal</span>
+        </td>
+        <td th:text="${r.fileName != null ? r.fileName : '-'}"></td>
+        <td class="text-end" th:text="${r.rowsCount}"></td>
+        <td class="small text-muted" th:text="${r.pesan}"></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(schedulerRiwayat)}">
+        <td colspan="5" class="text-center text-muted py-4">
+          Penjadwal belum pernah berjalan.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
 </main>
 </html>

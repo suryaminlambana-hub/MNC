@@ -139,7 +139,7 @@ public class AcctxtGenerateService {
         // berkas tanggal itu, sehingga rentang yang sama bisa disusun ulang lagi kapan pun —
         // memang itu gunanya tombol ini — dan daftar "Menunggu digenerate" tidak ikut bergerak
         // sedikit pun, karena tidak ada yang dilepas maupun ditarik ke berkas lain.
-        Result r = publish(isi, me, "ACCTXT_GENERATE",
+        Result r = publish(isi, me.getUsername(), "ACCTXT_GENERATE",
                 "Susun ulang " + rangeText(from, to) + " dari " + String.join(", ", sumber));
         if (!r.ok()) return r;
         return new Result(true, r.message() + " Digabung dari " + String.join(" + ", sumber) + ".",
@@ -192,8 +192,18 @@ public class AcctxtGenerateService {
      * menampilkan SELURUH yang menunggu, bukan hanya hari ini, dan menandai yang sudah lewat
      * jangkauan — supaya kelihatan, bukan hilang diam-diam. Lihat {@link #strandedPending()}.
      */
+    /** Tombol manual: pelakunya user yang sedang login. */
+    public Result generateToday(AusyUserDetails me) { return generateToday(me.getUsername()); }
+
+    /**
+     * Dipakai tombol manual maupun penjadwal otomatis (REQ_AUSY_00061).
+     *
+     * Sengaja satu jalur: kalau penjadwal menyusun berkasnya sendiri, dua cara pembuatan akan
+     * berbeda perilaku begitu salah satunya diubah, dan yang otomatis justru yang paling jarang
+     * diperiksa orang.
+     */
     @Transactional
-    public Result generateToday(AusyUserDetails me) {
+    public Result generateToday(String pelaku) {
         LocalDate today = LocalDate.now();
         // Persis isi daftar "Menunggu digenerate": disetujui hari ini DAN belum pernah dibuatkan
         // berkas (BUG_AUSY_00178). Yang sudah ikut generate sebelumnya tidak diambil lagi, jadi
@@ -210,7 +220,7 @@ public class AcctxtGenerateService {
             req.setFileName(todayFile());
             requests.save(req);
         }
-        return publish(isi, me, "ACCTXT_GENERATE_TODAY",
+        return publish(isi, pelaku, "ACCTXT_GENERATE_TODAY",
                 "Generate export yang disetujui hari ini (" + isi.size() + " export)");
     }
 
@@ -273,7 +283,7 @@ public class AcctxtGenerateService {
      * menyeret export dari penekanan sebelumnya, sehingga memilih 27-29 tetap menghasilkan
      * berkas yang memuat tanggal 30.
      */
-    private Result publish(List<GlExportRequest> isi, AusyUserDetails me, String auditAction, String alasan) {
+    private Result publish(List<GlExportRequest> isi, String pelaku, String auditAction, String alasan) {
         String fileName = todayFile();
         if (isi.isEmpty()) return Result.fail("Tidak ada export yang bisa mengisi " + fileName + ".");
 
@@ -311,8 +321,8 @@ public class AcctxtGenerateService {
         ExportTransfer t = new ExportTransfer();
         t.setFileName(fileName);
         t.setCreatedAt(LocalDateTime.now());
-        t.setInputer(me.getUsername());
-        t.setChecker(me.getUsername());
+        t.setInputer(pelaku);
+        t.setChecker(pelaku);
         t.setPaket(cakupan(isi));
         t.setRowsCount(rowCount);
         t.setStatus("SENT");
@@ -336,7 +346,7 @@ public class AcctxtGenerateService {
             ids.append("CR#").append(req.getId());
         }
 
-        audit.transaction(me.getUsername(), auditAction,
+        audit.transaction(pelaku, auditAction,
                 alasan + " -> " + fileName + " berisi " + isi.size() + " export (" + ids + "), "
                 + rowCount + " baris, " + (sentTo != null ? "terkirim ke FTP " + ftp.target() : "di " + out));
 

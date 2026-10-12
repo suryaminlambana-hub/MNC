@@ -44,6 +44,9 @@ ausy:
   # di log saat start: "File hasil export ditulis ke ...".
   txt-dir: ${AUSY_TXT_DIR:}
   export-dir: ${AUSY_EXPORT_DIR:}
+  # REQ_AUSY_00061 — kapan berkas ACCTXT dibuat otomatis. Bawaan: tiap hari jam 23:00 WIB.
+  # Penjadwalnya masih bisa dimatikan dari halaman Generate File ACCTXT tanpa mengubah ini.
+  scheduler-cron: ${AUSY_SCHEDULER_CRON:0 0 23 * * *}
   # Setelah ditulis, file ACCTXT dikirim ke FTP MNC (BUG_AUSY_00189). FTP_HOST kosong = tidak dikirim.
   ftp:
     host: ${FTP_HOST:}
