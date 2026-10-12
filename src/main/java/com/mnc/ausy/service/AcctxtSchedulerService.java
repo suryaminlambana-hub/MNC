@@ -7,6 +7,8 @@ import com.mnc.ausy.repo.AcctxtSchedulerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
@@ -109,6 +111,29 @@ public class AcctxtSchedulerService {
     /** Isi setelan apa adanya — ditampilkan saat salah tulis supaya jelas apa yang diperbaiki. */
     public String cronSetelan() { return cronSetelan; }
 
+    /**
+     * Jadwal TERAKHIR yang seharusnya sudah lewat, atau null kalau belum ada.
+     *
+     * Dipakai untuk menyusul jalan yang terlewat. CronExpression hanya bisa maju, jadi
+     * dijalankan maju dari dua hari lalu dan yang terakhir sebelum sekarang itulah jawabannya.
+     */
+    public LocalDateTime jadwalTerakhirYangLewat() {
+        try {
+            CronExpression c = CronExpression.parse(cron());
+            ZonedDateTime sekarang = ZonedDateTime.now(ZONA);
+            ZonedDateTime calon = c.next(sekarang.minusDays(2));
+            ZonedDateTime terakhir = null;
+            // Dibatasi supaya jadwal yang sangat sering (uji coba) tidak membuat perulangan panjang.
+            for (int i = 0; i < 5000 && calon != null && !calon.isAfter(sekarang); i++) {
+                terakhir = calon;
+                calon = c.next(calon);
+            }
+            return terakhir == null ? null : terakhir.toLocalDateTime();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Kapan penjadwal akan berjalan lagi; null kalau jadwalnya tidak sah. */
     public LocalDateTime jalanBerikutnya() {
         try {
@@ -120,6 +145,40 @@ public class AcctxtSchedulerService {
     }
 
     // ------------------------------------------------------------------ penjadwal
+
+    /**
+     * Menyusul jalan yang terlewat saat aplikasi mati (REQ_AUSY_00061).
+     *
+     * Penjadwal di dalam aplikasi tidak mungkin menyala ketika aplikasinya tidak hidup — itu
+     * berlaku untuk penjadwal in-process mana pun. Yang bisa dilakukan: begitu aplikasi hidup
+     * lagi, periksa apakah jadwal terakhir sudah lewat tanpa sempat dijalankan, lalu kerjakan
+     * susulannya. Tanpa ini, server yang mati semalam berarti berkas hari itu tidak pernah
+     * terbit dan tidak ada yang tahu.
+     *
+     * Sekali saja: setelah susulan tercatat, start berikutnya melihat catatan itu dan melewatinya.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void susulSaatStart() {
+        if (!aktif()) {
+            LOG.info("Penjadwal ACCTXT sedang dimatikan — pemeriksaan jalan terlewat dilewati.");
+            return;
+        }
+        LocalDateTime seharusnya = jadwalTerakhirYangLewat();
+        if (seharusnya == null) return;
+
+        List<AcctxtSchedulerLog> terakhir = riwayatTerakhir(1);
+        boolean sudahDijalankan = !terakhir.isEmpty()
+                && terakhir.get(0).getMulai() != null
+                && !terakhir.get(0).getMulai().isBefore(seharusnya);
+        if (sudahDijalankan) return;
+
+        LOG.warn("Jadwal {} terlewat (aplikasi tidak hidup saat itu) — dikerjakan susulan sekarang.",
+                seharusnya);
+        AcctxtSchedulerLog log = jalankan();
+        log.setPesan("Susulan jadwal " + seharusnya + " yang terlewat: "
+                + (log.getPesan() == null ? "" : log.getPesan()));
+        riwayat.save(log);
+    }
 
     /**
      * Setiap hari jam 23:00 WIB.
