@@ -192,6 +192,34 @@ public class AcctxtGenerateService {
      * menampilkan SELURUH yang menunggu, bukan hanya hari ini, dan menandai yang sudah lewat
      * jangkauan — supaya kelihatan, bukan hilang diam-diam. Lihat {@link #strandedPending()}.
      */
+    /**
+     * Seluruh isi penampungan yang belum pernah dibuatkan berkas — TANPA batas tanggal
+     * (REQ_AUSY_00061).
+     *
+     * Dipakai penjadwal jam 23:00. Bedanya dengan tombol Hari Ini disengaja: tombol itu
+     * dibatasi persetujuan hari ini (REQ_AUSY_00174) karena orang menekannya sambil melihat
+     * daftar di layar, sedangkan penjadwal berjalan tanpa ada yang menonton — kalau ia juga
+     * dibatasi hari ini, otorisasi yang menginap tidak akan pernah terbawa siapa pun dan
+     * mengendap selamanya di penampungan.
+     *
+     * Mencakup semua yang masuk penampungan: otorisasi upload maupun perubahan dari Kelola
+     * Data GL, karena keduanya menitipkan barisnya lewat jalan yang sama (StagingService).
+     */
+    @Transactional
+    public Result generateSemuaMenunggu(String pelaku) {
+        List<GlExportRequest> isi = requests.findApprovedNotGenerated();
+        if (isi.isEmpty())
+            return Result.fail("Tidak ada data di penampungan yang menunggu digenerate.");
+
+        for (GlExportRequest req : isi) {
+            gl.markExported(req.getId());
+            req.setFileName(todayFile());
+            requests.save(req);
+        }
+        return publish(isi, pelaku, "ACCTXT_GENERATE_SEMUA",
+                "Generate seluruh penampungan yang menunggu (" + isi.size() + " catatan)");
+    }
+
     /** Tombol manual: pelakunya user yang sedang login. */
     public Result generateToday(AusyUserDetails me) { return generateToday(me.getUsername()); }
 

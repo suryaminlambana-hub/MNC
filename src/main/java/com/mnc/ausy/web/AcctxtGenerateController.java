@@ -104,4 +104,20 @@ public class AcctxtGenerateController {
                 : "Penjadwal otomatis DIMATIKAN — berkas hanya dibuat lewat tombol di halaman ini.");
         return "redirect:/admin/acctxt";
     }
+
+    /**
+     * Jalankan penjadwal SEKARANG, tanpa menunggu jam 23:00 (REQ_AUSY_00061).
+     *
+     * Ada karena "penjadwalnya tidak jalan" nyaris mustahil dibuktikan kalau pembuktiannya
+     * harus menunggu tengah malam. Yang dikerjakan persis sama dengan yang dikerjakan jam
+     * 23:00, dan hasilnya masuk riwayat yang sama — jadi ini pengujian yang sesungguhnya,
+     * bukan tiruan.
+     */
+    @PostMapping("/admin/acctxt/scheduler/jalankan")
+    public String jalankanScheduler(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        var log = scheduler.jalankan();
+        ra.addFlashAttribute(log.isBerhasil() ? "ok" : "warn",
+                "Penjadwal dijalankan manual: " + log.getPesan());
+        return "redirect:/admin/acctxt";
+    }
 }

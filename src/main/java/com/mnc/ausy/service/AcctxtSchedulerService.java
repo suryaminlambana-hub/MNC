@@ -104,7 +104,7 @@ public class AcctxtSchedulerService {
         AcctxtSchedulerLog log = new AcctxtSchedulerLog();
         log.setMulai(LocalDateTime.now());
         try {
-            AcctxtGenerateService.Result r = acctxt.generateToday(PELAKU);
+            AcctxtGenerateService.Result r = acctxt.generateSemuaMenunggu(PELAKU);
             log.setBerhasil(r.ok());
             log.setPesan(r.message());
             log.setFileName(r.fileName());

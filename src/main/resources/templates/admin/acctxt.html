@@ -187,8 +187,9 @@
         <i class="fa-solid fa-circle-pause"></i> TIDAK AKTIF
       </span>
       <span class="text-muted small">
-        Berjalan setiap hari <strong>jam 23:00 WIB</strong>, isinya sama dengan tombol
-        <em>Generate File ACCTXT Hari Ini</em>.
+        Berjalan setiap hari <strong>jam 23:00 WIB</strong>. Yang dibuatkan file:
+        <strong>seluruh isi penampungan</strong> yang belum pernah digenerate — otorisasi upload
+        maupun perubahan dari Kelola Data GL, tanpa batas tanggal.
       </span>
       <form method="post" th:action="@{/admin/acctxt/scheduler}" class="ms-auto"
             th:attr="onsubmit=${schedulerAktif}
@@ -198,6 +199,14 @@
         <button type="submit" class="btn btn-sm"
                 th:classappend="${schedulerAktif} ? 'btn-outline-secondary' : 'btn-outline-success'"
                 th:text="${schedulerAktif} ? 'Matikan Penjadwal' : 'Nyalakan Penjadwal'">Ubah</button>
+      </form>
+      <!--/* Pembuktian tanpa menunggu tengah malam: yang dikerjakan persis sama dengan
+             yang dikerjakan jam 23:00, dan hasilnya masuk riwayat yang sama. */-->
+      <form method="post" th:action="@{/admin/acctxt/scheduler/jalankan}"
+            onsubmit="return confirm('Jalankan penjadwal sekarang? Seluruh isi penampungan yang menunggu akan dibuatkan file ACCTXT.');">
+        <button type="submit" class="btn btn-sm btn-outline-primary">
+          <i class="fa-solid fa-play"></i> Jalankan Sekarang
+        </button>
       </form>
     </div>
     <div class="mt-2" th:if="${schedulerSetelan != null and schedulerSetelan.diubahPada != null}">
