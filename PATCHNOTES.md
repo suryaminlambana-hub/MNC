@@ -16,6 +16,73 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Commit `9c5b149`. DB naik dari v49 ke **v52**.
+
+### Perubahan
+- **Transaction Account dicocokkan ke master Kode GL saat upload** (REQ_AUSY_00059). Diperiksa
+  per baris, nomor barisnya disebut. Kolom E kosong hanya ditolak kalau barisnya jelas sedang
+  diisi — kolom itu sekaligus penanda "baris berisi data", dan template MNC datang dengan 167
+  baris isian kosong.
+- **Otorisasi yang menginap tidak dikembalikan ke maker** (REQ_AUSY_00060). Reject/Return atas
+  otorisasi dari hari sebelumnya menghapus datanya; yang diproses pada hari yang sama tetap
+  seperti biasa.
+- **Role EXECUTE dirapikan** (REQ_AUSY_00018-00020) dan **Download Excel pada menu User**
+  (REQ_AUSY_00021).
+- **User baru dibuat tanpa satu pun hak akses** (REQ_AUSY_00017). Membatalkan BUG_AUSY_00143 dan
+  BUG_AUSY_00184 — maker baru tidak lagi otomatis memegang Upload Excel.
+- **Penjadwal pembuatan ACCTXT jam 23:00 WIB** (REQ_AUSY_00061).
+  - Menyapu SELURUH isi penampungan yang belum pernah digenerate — otorisasi upload maupun
+    Kelola Data GL, tanpa batas tanggal. Tombol manual tidak berubah.
+  - Bisa dimatikan/dinyalakan dari halaman Generate File ACCTXT; statusnya, jadwal yang berlaku,
+    dan jam jalan berikutnya tertulis di layar.
+  - Tiap jalannya dicatat di Riwayat Penjadwal, berhasil maupun gagal.
+  - Tombol **Jalankan Sekarang** untuk membuktikan tanpa menunggu tengah malam.
+  - **Jadwal yang terlewat dikerjakan susulan saat aplikasi hidup lagi.**
+- **Gagal kirim FTP tidak lagi membuang data** (lanjutan REQ_AUSY_00061). Dulu penandaan "sudah
+  digenerate" tetap commit walau pengiriman gagal, padahal pesannya berbunyi "export tetap
+  menunggu" — satu batch hilang tiap kali. Sekarang transaksinya dibatalkan dan datanya benar
+  kembali ke penampungan.
+
+### Migrasi DB
+Dijalankan Flyway otomatis saat service start.
+- `V50` tabel setelan penjadwal (satu baris, **aktif sejak awal**) dan tabel riwayatnya.
+- `V51`, `V52` baris ACTION untuk tombol nyala/mati dan Jalankan Sekarang (role EXECUTE).
+
+### Setelan server
+Opsional, hanya kalau jadwalnya mau diubah dari jam 23:00:
+
+```
+AUSY_SCHEDULER_CRON=0 0 23 * * *
+```
+
+**Ekspresinya 6 kolom** (detik menit jam tanggal bulan hari). Jam 22:59 ditulis `0 59 22 * * *`,
+bukan `59 22 * * *` seperti crontab biasa. Salah tulis tidak lagi menjatuhkan aplikasi: dipakai
+jadwal bawaan dan peringatannya muncul di layar.
+
+### Setelah deploy
+1. `sudo systemctl status ausy` — pastikan **active (running)** dan **enabled**, supaya ikut
+   hidup saat server boot. Penjadwal hanya menyala kalau aplikasinya hidup.
+2. Buka **Generate File ACCTXT** dan periksa panel Penjadwal Otomatis: badge **AKTIF**, jadwal
+   yang berlaku, dan jam jalan berikutnya.
+3. Kalau badge-nya **TIDAK AKTIF**, nyalakan dari tombolnya. Migrasi `V50` hanya memasang baris
+   setelan bila belum ada — kalau penjadwal pernah dimatikan dari layar, deploy TIDAK
+   menyalakannya kembali.
+4. Tekan **Jalankan Sekarang** sekali untuk memastikan jalurnya hidup; hasilnya masuk Riwayat
+   Penjadwal.
+
+### Catatan untuk developer
+- Start pertama sesudah deploy kemungkinan langsung mengerjakan **susulan** jadwal 23:00 yang
+  terlewat. Kalau penampungan sedang berisi, berkas terbit dan dikirim ke FTP saat itu juga,
+  bukan menunggu jam 23:00. Disengaja — data yang menunggu memang untuk diterbitkan — tapi
+  perlu diketahui kalau deploy dilakukan siang hari.
+- Diuji memakai artefak deploy yang sebenarnya (`java -jar`, bukan `mvnw spring-boot:run`) di
+  basis data kosong: 51 migrasi sampai v52, penjadwal terdaftar dengan jadwalnya, susulan
+  dikerjakan sekali, dan jadwal jam tertentu menyala tepat pada detiknya.
+
+---
+
 ## dev-20261009-1 — 09-10-2026 16:43
 
 Commit `c553944`. DB naik dari v47 ke **v49**.
