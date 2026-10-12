@@ -67,6 +67,28 @@ public class AcctxtGenerateService {
     private final AuditService audit;
     private final FtpService ftp;
 
+    /**
+     * Hanya satu penyusunan berkas ACCTXT pada satu waktu.
+     *
+     * Penjaga "sudah digenerate" cuma kolom {@code file_name is null}, yang dibaca di awal dan
+     * ditulis di akhir. Dua penyusunan yang berjalan bersamaan — penjadwal jam 23:00 dan
+     * seseorang menekan tombol pada detik yang sama — sama-sama membaca "belum digenerate",
+     * sama-sama menulis ACCTXT tanggal itu, dan yang belakangan MENIMPA yang duluan. Sebagian
+     * data tercatat sudah terkirim padahal isinya tidak ada di berkas, tanpa satu pun pesan.
+     *
+     * tryLock, bukan lock: yang datang belakangan ditolak dengan keterangan, bukan diantrikan.
+     * Mengantre hanya memindahkan tabrakannya ke beberapa detik kemudian.
+     *
+     * Berlaku untuk SATU proses aplikasi. Kalau suatu saat AUSY dijalankan lebih dari satu
+     * instance pada basis data yang sama, ini tidak cukup — perlu kunci di tingkat basis data
+     * (advisory lock).
+     */
+    private final java.util.concurrent.locks.ReentrantLock gembok = new java.util.concurrent.locks.ReentrantLock();
+
+    private static final String SEDANG_BERJALAN =
+            "Penyusunan berkas ACCTXT sedang berjalan (mungkin dipicu penjadwal). Tunggu sampai"
+            + " selesai, lalu lihat hasilnya di Riwayat Penjadwal atau coba lagi.";
+
     public AcctxtGenerateService(GlExportRequestRepository requests, GlTabelRepository gl,
                                  ExportTransferRepository transfers, ExportFileStore files,
                                  AuditService audit, FtpService ftp) {
@@ -106,6 +128,8 @@ public class AcctxtGenerateService {
      */
     @Transactional
     public Result generate(LocalDate from, LocalDate to, AusyUserDetails me) {
+        if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
+        try {
         if (from == null || to == null) return Result.fail("Tanggal awal dan tanggal akhir wajib diisi.");
         if (to.isBefore(from)) return Result.fail("Tanggal akhir tidak boleh lebih awal dari tanggal awal.");
 
@@ -144,6 +168,9 @@ public class AcctxtGenerateService {
         if (!r.ok()) return r;
         return new Result(true, r.message() + " Digabung dari " + String.join(" + ", sumber) + ".",
                 r.fileName(), r.rows(), r.exportCount());
+        } finally {
+            gembok.unlock();
+        }
     }
 
     /**
@@ -207,6 +234,8 @@ public class AcctxtGenerateService {
      */
     @Transactional
     public Result generateSemuaMenunggu(String pelaku) {
+        if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
+        try {
         List<GlExportRequest> isi = requests.findApprovedNotGenerated();
         if (isi.isEmpty())
             return Result.fail("Tidak ada data di penampungan yang menunggu digenerate.");
@@ -218,6 +247,9 @@ public class AcctxtGenerateService {
         }
         return publish(isi, pelaku, "ACCTXT_GENERATE_SEMUA",
                 "Generate seluruh penampungan yang menunggu (" + isi.size() + " catatan)");
+        } finally {
+            gembok.unlock();
+        }
     }
 
     /** Tombol manual: pelakunya user yang sedang login. */
@@ -232,6 +264,8 @@ public class AcctxtGenerateService {
      */
     @Transactional
     public Result generateToday(String pelaku) {
+        if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
+        try {
         LocalDate today = LocalDate.now();
         // Persis isi daftar "Menunggu digenerate": disetujui hari ini DAN belum pernah dibuatkan
         // berkas (BUG_AUSY_00178). Yang sudah ikut generate sebelumnya tidak diambil lagi, jadi
@@ -250,6 +284,9 @@ public class AcctxtGenerateService {
         }
         return publish(isi, pelaku, "ACCTXT_GENERATE_TODAY",
                 "Generate export yang disetujui hari ini (" + isi.size() + " export)");
+        } finally {
+            gembok.unlock();
+        }
     }
 
     /**

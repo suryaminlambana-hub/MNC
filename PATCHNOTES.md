@@ -62,8 +62,15 @@ bukan `59 22 * * *` seperti crontab biasa. Salah tulis tidak lagi menjatuhkan ap
 jadwal bawaan dan peringatannya muncul di layar.
 
 ### Setelah deploy
-1. `sudo systemctl status ausy` — pastikan **active (running)** dan **enabled**, supaya ikut
-   hidup saat server boot. Penjadwal hanya menyala kalau aplikasinya hidup.
+1. **Pasang ulang unit systemd** — `Restart=` berubah dari `on-failure` menjadi `always`:
+   ```
+   sudo cp /opt/ausy/ausy.service /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl restart ausy
+   sudo systemctl status ausy        # harus active (running) DAN enabled
+   ```
+   Penjadwal hanya menyala kalau aplikasinya hidup, jadi berhenti dengan alasan apa pun —
+   termasuk keluar normal — harus dihidupkan lagi. `enabled` membuatnya ikut hidup saat
+   server boot.
 2. Buka **Generate File ACCTXT** dan periksa panel Penjadwal Otomatis: badge **AKTIF**, jadwal
    yang berlaku, dan jam jalan berikutnya.
 3. Kalau badge-nya **TIDAK AKTIF**, nyalakan dari tombolnya. Migrasi `V50` hanya memasang baris

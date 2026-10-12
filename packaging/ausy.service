@@ -20,7 +20,9 @@ WorkingDirectory=/opt/ausy
 EnvironmentFile=/opt/ausy/.env
 ExecStart=/usr/bin/java -jar /opt/ausy/ausy-2.0.0.jar
 SuccessExitStatus=143
-Restart=on-failure
+# Dipilih always, bukan on-failure: penjadwal ACCTXT jam 23:00 hanya menyala kalau proses ini
+# hidup, jadi berhenti dengan alasan apa pun — termasuk keluar normal — harus dihidupkan lagi.
+Restart=always
 RestartSec=10
 # File GLTRRF/ACCTXT & upload sementara ditulis di bawah WorkingDirectory
 ReadWritePaths=/opt/ausy
