@@ -327,16 +327,20 @@ public class AcctxtGenerateService {
             return Result.fail("Gagal menulis file ACCTXT: " + e.getMessage());
         }
 
-        // Berkas baru dianggap terbit setelah sampai di FTP MNC (BUG_AUSY_00189). Gagal kirim =
-        // catatan tidak diperbarui, jadi export tetap menunggu dan tombolnya bisa ditekan lagi.
+        // Berkas baru dianggap terbit setelah sampai di FTP MNC (BUG_AUSY_00189).
+        //
+        // Kegagalannya DILEMPAR, bukan dikembalikan sebagai Result. Niat semula memang "gagal
+        // kirim = export tetap menunggu", tapi penandaan "sudah digenerate" sudah dilakukan
+        // PEMANGGIL sebelum sampai ke sini, dan Result biasa tidak membatalkan apa pun: transaksi
+        // tetap commit, penampungan kosong, dan berkas yang tidak pernah sampai core tidak bisa
+        // dikirim ulang oleh siapa pun. Pesannya pun berbohong — berbunyi "coba generate lagi"
+        // padahal sudah tidak ada yang tersisa untuk digenerate.
         String sentTo = null;
         if (ftp.enabled()) {
             try {
                 sentTo = ftp.push(out);
             } catch (Exception e) {
-                return Result.fail("File " + fileName + " GAGAL dikirim ke FTP " + ftp.target()
-                        + ": " + e.getMessage()
-                        + ". Export tetap menunggu; coba generate lagi.");
+                throw new FtpGagalException(fileName, rowCount, ftp.target(), e.getMessage());
             }
         }
 

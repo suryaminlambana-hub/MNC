@@ -4,6 +4,7 @@ import com.mnc.ausy.domain.GlExportRequest;
 import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AcctxtGenerateService;
 import com.mnc.ausy.service.AcctxtSchedulerService;
+import com.mnc.ausy.service.FtpGagalException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -74,7 +75,9 @@ public class AcctxtGenerateController {
     public String generate(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                            @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        AcctxtGenerateService.Result r = acctxt.generate(from, to, me);
+        AcctxtGenerateService.Result r;
+        try { r = acctxt.generate(from, to, me); }
+        catch (FtpGagalException e) { ra.addFlashAttribute("warn", e.pesan()); return "redirect:/admin/acctxt"; }
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/admin/acctxt?from=" + from + "&to=" + to;
     }
@@ -86,7 +89,9 @@ public class AcctxtGenerateController {
      */
     @PostMapping("/admin/acctxt/generate-today")
     public String generateToday(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
-        AcctxtGenerateService.Result r = acctxt.generateToday(me);
+        AcctxtGenerateService.Result r;
+        try { r = acctxt.generateToday(me); }
+        catch (FtpGagalException e) { ra.addFlashAttribute("warn", e.pesan()); return "redirect:/admin/acctxt"; }
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/admin/acctxt";
     }

@@ -99,7 +99,13 @@ public class AcctxtSchedulerService {
      * dan baru ketahuan berhari-hari kemudian saat berkasnya dicari. Yang dicatat pesannya,
      * bukan hanya "gagal".
      */
-    @Transactional
+    /**
+     * SENGAJA tidak @Transactional.
+     *
+     * Kegagalan FTP membatalkan transaksi pembuatan berkas supaya data kembali ke penampungan.
+     * Kalau pencatatan riwayat ikut satu transaksi dengan itu, catatannya ikut terhapus — dan
+     * kegagalan yang paling perlu dilihat justru yang paling tidak meninggalkan jejak.
+     */
     public AcctxtSchedulerLog jalankan() {
         AcctxtSchedulerLog log = new AcctxtSchedulerLog();
         log.setMulai(LocalDateTime.now());
@@ -111,6 +117,15 @@ public class AcctxtSchedulerService {
             log.setRowsCount(r.rows());
             if (r.ok()) LOG.info("Penjadwal ACCTXT: {}", r.message());
             else        LOG.warn("Penjadwal ACCTXT tidak menghasilkan berkas: {}", r.message());
+        } catch (FtpGagalException e) {
+            // Berkasnya tersusun, pengirimannya yang gagal. Nama berkas dan jumlah barisnya ikut
+            // dicatat supaya riwayat tidak menampilkan "- / 0 baris" untuk sesuatu yang isinya
+            // sebenarnya sudah jadi.
+            log.setBerhasil(false);
+            log.setPesan(e.pesan());
+            log.setFileName(e.getFileName());
+            log.setRowsCount(e.getRows());
+            LOG.warn("Penjadwal ACCTXT: {}", e.pesan());
         } catch (Exception e) {
             log.setBerhasil(false);
             log.setPesan("Gagal: " + e.getMessage());
