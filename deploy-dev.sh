@@ -19,7 +19,7 @@ TOKEN="${1:-}"
 GW=ssh.cyolo.io
 SSH=(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o BatchMode=yes "$GW" -l "$TOKEN")
 
-echo ">> [1/5] Build paket"
+echo ">> [1/6] Build paket"
 ZIP=target/app-dist.zip
 STAMP=target/app-dist.commit
 HEAD_NOW=$(git rev-parse HEAD)$(git status --porcelain | shasum -a 256 | cut -d" " -f1)
@@ -34,10 +34,10 @@ fi
 SUM=$(shasum -a 256 "$ZIP" | cut -d' ' -f1)
 echo "   $(ls -lh "$ZIP" | awk '{print $5}')  sha256=${SUM:0:16}…"
 
-echo ">> [2/5] Cek koneksi ke server"
+echo ">> [2/6] Cek koneksi ke server"
 "${SSH[@]}" 'hostname' || { echo "Token tidak valid / grant sudah habis — request akses lagi di portal."; exit 1; }
 
-echo ">> [3/5] Kirim paket (tanpa progress bar, tunggu 1-3 menit)"
+echo ">> [3/6] Kirim paket (tanpa progress bar, tunggu 1-3 menit)"
 REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip 2>/dev/null | cut -d" " -f1' || true)
 if [ "$SUM" = "$REMOTE_SUM" ]; then
   echo "   paket identik sudah ada di server — transfer dilewati"
@@ -48,7 +48,7 @@ else
   echo "   checksum cocok"
 fi
 
-echo ">> [4/5] Pasang & restart service (minta password sudo ausyapp_dev)"
+echo ">> [4/6] Pasang & restart service (minta password sudo ausyapp_dev)"
 PW="${AUSY_SUDO_PASS:-}"
 if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
 "${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
@@ -58,7 +58,22 @@ if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
   S chmod 600 /opt/ausy/.env
   S systemctl start ausy"
 
-echo ">> [5/5] Verifikasi"
+echo ">> [5/6] Setelan penjadwal di .env server"
+# .env server sengaja TIDAK ikut ditimpa unzip, jadi setelan yang hanya ada di sana diurus di
+# sini. Idempoten: baris lama dibuang dulu, baru ditulis ulang — menjalankan ulang skrip ini
+# tidak menumpuk baris yang sama.
+#   AUSY_SCHEDULER=off  (bawaan) penjadwal tidak dipasang; berkas ACCTXT hanya lewat tombol
+#   AUSY_SCHEDULER=on              penjadwal jam 23:00 hidup
+SCHED="${AUSY_SCHEDULER:-off}"
+case "$SCHED" in on) VAL=true ;; off) VAL=false ;; *) echo "AUSY_SCHEDULER harus on/off"; exit 1 ;; esac
+"${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
+  S sed -i '/^AUSY_SCHEDULER_ENABLED=/d' /opt/ausy/.env
+  echo 'AUSY_SCHEDULER_ENABLED=$VAL' | S tee -a /opt/ausy/.env >/dev/null
+  S chmod 600 /opt/ausy/.env
+  S systemctl restart ausy"
+echo "   penjadwal: $SCHED (AUSY_SCHEDULER_ENABLED=$VAL)"
+
+echo ">> [6/6] Verifikasi"
 sleep 30
 JAR_LOCAL=$(shasum -a 256 target/ausy-*.jar | cut -d' ' -f1)
 JAR_REMOTE=$("${SSH[@]}" "PW='$PW'; echo \"\$PW\" | sudo -S -p '' sha256sum /opt/ausy/ausy-2.0.0.jar | cut -d' ' -f1")
