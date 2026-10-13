@@ -66,11 +66,19 @@ echo ">> [5/6] Setelan penjadwal di .env server"
 #   AUSY_SCHEDULER=on              penjadwal jam 23:00 hidup
 SCHED="${AUSY_SCHEDULER:-off}"
 case "$SCHED" in on) VAL=true ;; off) VAL=false ;; *) echo "AUSY_SCHEDULER harus on/off"; exit 1 ;; esac
-"${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
-  S sed -i '/^AUSY_SCHEDULER_ENABLED=/d' /opt/ausy/.env
-  echo 'AUSY_SCHEDULER_ENABLED=$VAL' | S tee -a /opt/ausy/.env >/dev/null
-  S chmod 600 /opt/ausy/.env
-  S systemctl restart ausy"
+# CATATAN PENTING: jangan memakai pola "echo ... | S tee -a".
+# Helper S() menyuapkan password ke stdin sudo (<<< "$PW"), sehingga sudo MENELAN stdin dan
+# isi pipanya tidak pernah sampai ke tee. Perintahnya tetap melaporkan sukses, tapi berkasnya
+# tidak berubah — persis yang terjadi pada deploy 13-10-2026: penjadwal ikut hidup karena
+# barisnya tidak pernah tertulis, lalu susulan langsung mengirim ACCTXT ke FTP.
+# Penulisannya dilakukan DI DALAM satu sh -c, sehingga stdin sudo tidak dipakai perintahnya.
+"${SSH[@]}" "PW='$PW'
+  echo \"\$PW\" | sudo -S -p '' sh -c \"sed -i '/^AUSY_SCHEDULER_ENABLED=/d' /opt/ausy/.env; \
+    printf 'AUSY_SCHEDULER_ENABLED=$VAL\\n' >> /opt/ausy/.env; chmod 600 /opt/ausy/.env\"
+  # Dibuktikan, bukan diasumsikan.
+  echo \"\$PW\" | sudo -S -p '' grep -q '^AUSY_SCHEDULER_ENABLED=$VAL' /opt/ausy/.env \
+    || { echo 'GAGAL: AUSY_SCHEDULER_ENABLED tidak tertulis di /opt/ausy/.env'; exit 1; }
+  echo \"\$PW\" | sudo -S -p '' systemctl restart ausy"
 echo "   penjadwal: $SCHED (AUSY_SCHEDULER_ENABLED=$VAL)"
 
 echo ">> [6/6] Verifikasi"
