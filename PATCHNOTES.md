@@ -58,18 +58,32 @@ Dijalankan Flyway otomatis saat service start.
   ```
   JAR yang sama, bukan aplikasi kedua — konfigurasi, aturan, dan pencatatan riwayat tetap satu
   tempat. Tomcat tidak dinyalakan pada mode ini, jadi tidak berebut port 8080 dengan aplikasi
-  web yang sedang jalan. Kode keluar **0** bila berkasnya terbit, **1** bila tidak, sehingga
-  crontab atau pemantau mengenali kegagalan tanpa membaca log.
+  web yang sedang jalan. Kode keluar **0** bila berkasnya terbit, **0 juga** bila penampungan
+  memang kosong, dan **1** bila penyusunannya gagal. Malam tanpa otorisasi sama sekali adalah
+  hal yang wajar — kalau itu dihitung gagal, tandanya menyala hampir tiap akhir pekan dan orang
+  berhenti mempercayainya.
 
-  Contoh baris crontab (cron memakai **5 kolom**, berbeda dari ekspresi Spring yang 6):
-  ```cron
-  CRON_TZ=Asia/Jakarta
-  0 23 * * *  cd /opt/ausy && set -a && . ./.env && set +a && \
-              /usr/bin/java -jar ausy-2.0.0.jar --ausy.task=generate-acctxt \
-              >> /opt/ausy/logs/cron-acctxt.log 2>&1
+- **Pemicu malamnya dipasang `deploy-dev.sh`** dengan `AUSY_CRON=on`:
   ```
-  Kalau crontab dipakai, **biarkan `AUSY_SCHEDULER_ENABLED=false`** — penjadwal internal yang
-  ikut hidup akan menembak jam yang sama.
+  AUSY_CRON=on ./deploy-dev.sh <token-safous>
+  ```
+  Yang dipasang dua berkas:
+  - `/etc/systemd/system/ausy-acctxt.service` — unit oneshot yang menjalankan tugasnya;
+  - `/etc/cron.d/ausy-acctxt` — pemicunya jam 23:00 WIB.
+
+  **Cron tidak memanggil `java` langsung**, melainkan `systemctl start ausy-acctxt.service`.
+  Sebabnya nyata: nilai di `/opt/ausy/.env` tidak dikutip dan sandi DB DEV mengandung `&`
+  dan `#`. Perintah `set -a && . ./.env` memotongnya di `&` lalu menganggap sisanya komentar,
+  jadi tugasnya mati di sambungan DB padahal service web dengan berkas yang sama jalan normal —
+  systemd membaca `EnvironmentFile` apa adanya, tanpa shell. Lewat unit, setelan tugas malam
+  dijamin sama persis dengan setelan aplikasi web.
+
+  Hasilnya dilihat dengan `systemctl status ausy-acctxt` atau `journalctl -u ausy-acctxt`,
+  bukan berkas log tersendiri.
+
+  `AUSY_SCHEDULER=on` dan `AUSY_CRON=on` sekaligus **ditolak skripnya**: dua penjadwal menembak
+  jam 23:00 bersamaan, yang kalah mencatat `ACCTXT_GENERATE_GAGAL` di audit trail tanpa ada
+  yang benar-benar salah.
 
 - **Penyusunan ACCTXT dikunci antar-proses** (lanjutan REQ_AUSY_00058) memakai advisory lock
   Postgres. Kunci yang lama hanya berlaku dalam satu JVM, jadi tidak berarti apa-apa begitu

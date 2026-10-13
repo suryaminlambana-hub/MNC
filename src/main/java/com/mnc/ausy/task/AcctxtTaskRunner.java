@@ -1,6 +1,7 @@
 package com.mnc.ausy.task;
 
 import com.mnc.ausy.domain.AcctxtSchedulerLog;
+import com.mnc.ausy.service.AcctxtGenerateService;
 import com.mnc.ausy.service.AcctxtSchedulerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,8 +31,11 @@ import org.springframework.stereotype.Component;
  * <p>Tabrakan dengan aplikasi web yang sedang berjalan dijaga kunci advisory Postgres di dalam
  * penyusunannya — gembok di dalam JVM tidak berlaku lintas proses.
  *
- * <p>Kode keluar: 0 bila berkasnya terbit, 1 bila tidak. Dengan begitu crontab atau pemantau
- * mengenali kegagalan tanpa harus membaca log.
+ * <p>Kode keluar: 0 bila berkasnya terbit, 0 juga bila penampungan memang kosong, dan 1 bila
+ * penyusunannya gagal. Malam tanpa otorisasi sama sekali adalah hal yang wajar, jadi tidak
+ * dilaporkan sebagai kegagalan — kalau dilaporkan, systemd menandai tugasnya "failed" hampir
+ * setiap akhir pekan dan orang berhenti mempercayai tandanya. Dengan begitu crontab atau
+ * pemantau mengenali kegagalan yang sungguhan tanpa harus membaca log.
  */
 @Component
 @ConditionalOnProperty(name = "ausy.task", havingValue = "generate-acctxt")
@@ -51,9 +55,13 @@ public class AcctxtTaskRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         LOG.info("Mode tugas: menyusun berkas ACCTXT dari penampungan.");
         AcctxtSchedulerLog hasil = scheduler.jalankan();
-        LOG.info("Selesai — {}: {}", hasil.isBerhasil() ? "BERHASIL" : "GAGAL", hasil.getPesan());
+        boolean kosong = !hasil.isBerhasil()
+                && AcctxtGenerateService.TIDAK_ADA_DATA.equals(hasil.getPesan());
+        LOG.info("Selesai — {}: {}",
+                hasil.isBerhasil() ? "BERHASIL" : kosong ? "TIDAK ADA YANG DIKERJAKAN" : "GAGAL",
+                hasil.getPesan());
 
-        int kode = hasil.isBerhasil() ? 0 : 1;
+        int kode = hasil.isBerhasil() || kosong ? 0 : 1;
         System.exit(SpringApplication.exit(ctx, () -> kode));
     }
 }

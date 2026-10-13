@@ -103,6 +103,15 @@ public class AcctxtGenerateService {
     public static final String AUDIT_HARI_INI    = "ACCTXT_GENERATE_TODAY";
     public static final String AUDIT_GAGAL       = "ACCTXT_GENERATE_GAGAL";
 
+    /**
+     * Penampungan kosong. Bukan kegagalan, melainkan "tidak ada yang perlu dikerjakan": malam
+     * tanpa otorisasi sama sekali adalah hal yang wajar. Dipisahkan sebagai konstanta supaya
+     * mode tugas (crontab) bisa membedakannya dari gagal betulan dan tetap keluar dengan kode 0,
+     * sehingga systemd tidak menandai tugas malam itu "failed" tanpa ada yang salah.
+     */
+    public static final String TIDAK_ADA_DATA =
+            "Tidak ada data di penampungan yang menunggu digenerate.";
+
     public static final java.util.List<String> AUDIT_AKSI = java.util.List.of(
             AUDIT_SUSUN_ULANG, AUDIT_SEMUA, AUDIT_HARI_INI, AUDIT_GAGAL);
 
@@ -280,7 +289,7 @@ public class AcctxtGenerateService {
             if (!requests.kunciPenyusunan(KUNCI_ACCTXT)) return Result.fail(SEDANG_BERJALAN);
         List<GlExportRequest> isi = requests.findApprovedNotGenerated();
         if (isi.isEmpty())
-            return Result.fail("Tidak ada data di penampungan yang menunggu digenerate.");
+            return Result.fail(TIDAK_ADA_DATA);
 
         for (GlExportRequest req : isi) {
             gl.markExported(req.getId());

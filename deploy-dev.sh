@@ -19,7 +19,7 @@ TOKEN="${1:-}"
 GW=ssh.cyolo.io
 SSH=(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o BatchMode=yes "$GW" -l "$TOKEN")
 
-echo ">> [1/6] Build paket"
+echo ">> [1/7] Build paket"
 ZIP=target/app-dist.zip
 STAMP=target/app-dist.commit
 HEAD_NOW=$(git rev-parse HEAD)$(git status --porcelain | shasum -a 256 | cut -d" " -f1)
@@ -34,10 +34,10 @@ fi
 SUM=$(shasum -a 256 "$ZIP" | cut -d' ' -f1)
 echo "   $(ls -lh "$ZIP" | awk '{print $5}')  sha256=${SUM:0:16}…"
 
-echo ">> [2/6] Cek koneksi ke server"
+echo ">> [2/7] Cek koneksi ke server"
 "${SSH[@]}" 'hostname' || { echo "Token tidak valid / grant sudah habis — request akses lagi di portal."; exit 1; }
 
-echo ">> [3/6] Kirim paket (tanpa progress bar, tunggu 1-3 menit)"
+echo ">> [3/7] Kirim paket (tanpa progress bar, tunggu 1-3 menit)"
 REMOTE_SUM=$("${SSH[@]}" 'sha256sum /tmp/app-dist.zip 2>/dev/null | cut -d" " -f1' || true)
 if [ "$SUM" = "$REMOTE_SUM" ]; then
   echo "   paket identik sudah ada di server — transfer dilewati"
@@ -48,7 +48,7 @@ else
   echo "   checksum cocok"
 fi
 
-echo ">> [4/6] Pasang & restart service (minta password sudo ausyapp_dev)"
+echo ">> [4/7] Pasang & restart service (minta password sudo ausyapp_dev)"
 PW="${AUSY_SUDO_PASS:-}"
 if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
 "${SSH[@]}" "PW='$PW'; S() { sudo -S -p '' \"\$@\" <<< \"\$PW\"; }
@@ -58,7 +58,7 @@ if [ -z "$PW" ]; then read -rsp "   password sudo: " PW; echo; fi
   S chmod 600 /opt/ausy/.env
   S systemctl start ausy"
 
-echo ">> [5/6] Setelan penjadwal di .env server"
+echo ">> [5/7] Setelan penjadwal di .env server"
 # .env server sengaja TIDAK ikut ditimpa unzip, jadi setelan yang hanya ada di sana diurus di
 # sini. Idempoten: baris lama dibuang dulu, baru ditulis ulang — menjalankan ulang skrip ini
 # tidak menumpuk baris yang sama.
@@ -81,7 +81,52 @@ case "$SCHED" in on) VAL=true ;; off) VAL=false ;; *) echo "AUSY_SCHEDULER harus
   echo \"\$PW\" | sudo -S -p '' systemctl restart ausy"
 echo "   penjadwal: $SCHED (AUSY_SCHEDULER_ENABLED=$VAL)"
 
-echo ">> [6/6] Verifikasi"
+echo ">> [6/7] Tugas terjadwal (crontab)"
+# AUSY_CRON=off (bawaan) tidak menyentuh apa pun; AUSY_CRON=on memasang pemicu jam 23:00.
+#
+# Yang dipasang BUKAN baris cron yang memanggil java langsung, melainkan unit oneshot
+# ausy-acctxt.service. Alasannya: nilai di /opt/ausy/.env tidak dikutip dan sandi DB DEV
+# mengandung & dan #. Perintah "set -a && . ./.env" memotongnya di & lalu menganggap sisanya
+# komentar, jadi tugasnya mati di sambungan DB. systemd membaca EnvironmentFile tanpa shell —
+# setelannya dijamin sama persis dengan service web.
+CRON="${AUSY_CRON:-off}"
+case "$CRON" in on|off) ;; *) echo "AUSY_CRON harus on/off"; exit 1 ;; esac
+if [ "$CRON" = on ] && [ "$SCHED" = on ]; then
+  echo "GAGAL: AUSY_SCHEDULER=on dan AUSY_CRON=on sekaligus — dua penjadwal akan bertabrakan"
+  echo "       jam 23:00. Pilih salah satu."; exit 1
+fi
+if [ "$CRON" = off ]; then
+  echo "   dilewati (AUSY_CRON=off)"
+else
+  "${SSH[@]}" "PW='$PW'; S() { echo \"\$PW\" | sudo -S -p '' \"\$@\"; }
+    # Yang menjalankan /etc/cron.d adalah daemon-nya (crond di RHEL, cron di Debian).
+    # Kalau daemonnya mati, berkasnya tertulis tapi tidak pernah dijalankan — jadi dicek dulu.
+    systemctl is-active --quiet crond || systemctl is-active --quiet cron \
+      || { echo 'GAGAL: daemon cron tidak aktif di server (crond/cron)'; exit 1; }
+    S install -m 644 -o root -g root /opt/ausy/ausy-acctxt.service /etc/systemd/system/ausy-acctxt.service
+    # Grup nyata user ausy (di DEV: users). Nilai salah = status=216/GROUP.
+    S sed -i \"s/^Group=.*/Group=\$(id -gn ausy)/\" /etc/systemd/system/ausy-acctxt.service
+    S systemctl daemon-reload
+    # Pemicunya di /etc/cron.d supaya bisa menyebut user root — hanya root yang boleh
+    # systemctl start. Tugasnya sendiri tetap berjalan sebagai ausy (User= di unit).
+    S sh -c 'cat > /etc/cron.d/ausy-acctxt <<EOF
+# AUSY — susun berkas ACCTXT tiap malam. Dikelola deploy-dev.sh, jangan disunting tangan.
+CRON_TZ=Asia/Jakarta
+0 23 * * * root /usr/bin/systemctl start ausy-acctxt.service
+EOF
+chmod 644 /etc/cron.d/ausy-acctxt; chown root:root /etc/cron.d/ausy-acctxt'
+    # Dibuktikan, bukan diasumsikan.
+    S grep -q 'ausy-acctxt.service' /etc/cron.d/ausy-acctxt \
+      || { echo 'GAGAL: /etc/cron.d/ausy-acctxt tidak tertulis'; exit 1; }
+    S systemctl cat ausy-acctxt.service >/dev/null \
+      || { echo 'GAGAL: unit ausy-acctxt tidak dikenali systemd'; exit 1; }
+    echo \"   zona waktu server: \$(date '+%Z %z')  jam server: \$(date '+%H:%M')\"
+    echo '   isi /etc/cron.d/ausy-acctxt:'
+    S sed 's/^/     /' /etc/cron.d/ausy-acctxt"
+  echo "   pemicu jam 23:00 terpasang (unit ausy-acctxt.service)"
+fi
+
+echo ">> [7/7] Verifikasi"
 sleep 30
 JAR_LOCAL=$(shasum -a 256 target/ausy-*.jar | cut -d' ' -f1)
 JAR_REMOTE=$("${SSH[@]}" "PW='$PW'; echo \"\$PW\" | sudo -S -p '' sha256sum /opt/ausy/ausy-2.0.0.jar | cut -d' ' -f1")

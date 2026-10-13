@@ -1,0 +1,35 @@
+# ============================================================
+# AUSY — tugas sekali-jalan: susun berkas ACCTXT lalu keluar.
+# Pasang di /etc/systemd/system/ausy-acctxt.service
+#   sudo cp ausy-acctxt.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl start ausy-acctxt        # coba sekali
+#   sudo journalctl -u ausy-acctxt -n 50    # hasilnya
+#
+# Dipanggil crontab milik user ausy, BUKAN dijalankan langsung dari baris cron.
+# Alasannya: nilai di /opt/ausy/.env tidak dikutip, dan sandi DEV mengandung & dan #.
+# Perintah shell "set -a && . ./.env" akan memotongnya di & lalu menganggap sisanya komentar,
+# sehingga sambungan DB gagal. systemd membaca EnvironmentFile apa adanya tanpa shell,
+# persis seperti service utama — jadi tugas ini memakai setelan yang sama persis.
+#
+# JAR-nya satu-satunya: file yang sama dipakai service web, hanya argumennya beda.
+# ============================================================
+[Unit]
+Description=AUSY - susun berkas ACCTXT (tugas terjadwal)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ausy
+# Samakan dengan grup nyata user ausy — lihat catatan di ausy.service.
+#   sudo sed -i "s/^Group=.*/Group=$(id -gn ausy)/" /etc/systemd/system/ausy-acctxt.service
+Group=ausy
+WorkingDirectory=/opt/ausy
+EnvironmentFile=/opt/ausy/.env
+# Penjadwal internal dimatikan paksa untuk proses ini: yang menjadwalkan adalah crontab.
+# Tanpa ini, proses tugas ikut memasang penjadwalnya sendiri lalu mati sebelum sempat dipakai.
+Environment=AUSY_SCHEDULER_ENABLED=false
+ExecStart=/usr/bin/java -jar /opt/ausy/ausy-2.0.0.jar --ausy.task=generate-acctxt
+# Keluar 1 = penyusunan gagal; systemd menandainya "failed" supaya terlihat di systemctl status.
+ReadWritePaths=/opt/ausy
