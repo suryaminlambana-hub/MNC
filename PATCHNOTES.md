@@ -85,6 +85,29 @@ Dijalankan Flyway otomatis saat service start.
   jam 23:00 bersamaan, yang kalah mencatat `ACCTXT_GENERATE_GAGAL` di audit trail tanpa ada
   yang benar-benar salah.
 
+- **FTP 550 "being used by another process" saat mengirim ACCTXT** — di mesin QA, folder export
+  mesin itu ternyata folder yang sama dengan root server FTP-nya. Mengunggah berkas ke sana
+  berarti menimpa berkas yang sedang dibuka proses ini sendiri untuk dibaca, dan Windows menolak
+  salah satunya. Satu hari penyusunan gagal seluruhnya dan datanya kembali ke penampungan.
+
+  Tiga perbaikan:
+  - Sebelum mengunggah, dicek apakah folder FTP tujuan memang folder export mesin ini — dengan
+    membuat berkas penanda bernama acak lalu melihat apakah ia muncul di daftar isi folder FTP.
+    Kalau ya, berkasnya sudah berada di tujuan sejak ditulis dan unggahannya dilewati. Dibuktikan
+    begitu, bukan ditebak dari alamat IP, supaya tetap benar walau FTP-nya menunjuk localhost,
+    alamat LAN mesin sendiri, atau folder yang dibagikan lewat jaringan.
+  - Unggahan membaca dari **salinan** di folder sementara sistem, bukan dari berkas di folder
+    export. Berkas yang dijemput core banking tidak pernah lagi dipegang proses ini sesudah
+    ditulis.
+  - Unggahan yang ditolak karena berkasnya sedang dipegang **diulang 3 kali** (jeda 2 dan 5
+    detik). Pegangan semacam itu — pemindai virus, core banking yang menjemput — biasanya lepas
+    dalam hitungan detik, dan sekali coba lalu menyerah mengubah gangguan sesaat menjadi
+    kegagalan yang harus diulang orang. Kalau tetap gagal, pesannya menyebut sebabnya yang
+    paling mungkin, bukan hanya kode 550 mentah.
+
+  Diuji terhadap server FTP sungguhan lewat soket (`FtpServiceProbeTest`), termasuk kasus folder
+  sama, folder berbeda, terkunci lalu lepas, dan terkunci terus.
+
 - **Penyusunan ACCTXT dikunci antar-proses** (lanjutan REQ_AUSY_00058) memakai advisory lock
   Postgres. Kunci yang lama hanya berlaku dalam satu JVM, jadi tidak berarti apa-apa begitu
   berkasnya juga bisa disusun proses crontab.
