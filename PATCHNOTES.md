@@ -75,6 +75,9 @@ Dijalankan Flyway otomatis saat service start.
   Postgres. Kunci yang lama hanya berlaku dalam satu JVM, jadi tidak berarti apa-apa begitu
   berkasnya juga bisa disusun proses crontab.
 
+- **Jejak penyusunan ACCTXT masuk audit trail Admin Approval** (REQ_AUSY_00059). Berlaku untuk
+  penjadwal, tugas crontab, maupun tombol manual role EXECUTE — berhasil maupun gagal.
+
 ### Setelan server
 
 **Memasang rilis ini TANPA penjadwalnya hidup — ini jalur yang dipilih untuk rilis pertama.**

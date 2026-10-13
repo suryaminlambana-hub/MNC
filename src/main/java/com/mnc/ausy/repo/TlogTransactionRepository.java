@@ -56,4 +56,16 @@ public interface TlogTransactionRepository extends JpaRepository<TlogTransaction
                    "group by date_trunc('day',time_activity) order by date_trunc('day',time_activity)",
            nativeQuery = true)
     List<Object[]> dailyCounts();
+
+    /**
+     * Jejak penyusunan berkas ACCTXT, SIAPA PUN pelakunya (REQ_AUSY_00059).
+     *
+     * Sengaja tanpa join ke {@code users}. Penjadwal dan tugas crontab berjalan atas nama
+     * "scheduler" yang bukan akun manusia, sehingga join itu membuangnya diam-diam; dan role
+     * EXECUTE bukan group config, sehingga tidak pernah masuk saringan halaman Admin Approval.
+     * Padahal justru jejak inilah yang diminta terlihat di sana.
+     */
+    @Query(value = "select t.* from tlog_transaction t where t.name_activity in (:aksi) "
+                 + "order by t.time_activity desc", nativeQuery = true)
+    List<TlogTransaction> findByActions(@Param("aksi") Collection<String> aksi, Pageable page);
 }

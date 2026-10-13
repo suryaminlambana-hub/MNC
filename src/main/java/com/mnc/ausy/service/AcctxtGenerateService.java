@@ -91,6 +91,36 @@ public class AcctxtGenerateService {
      */
     private static final long KUNCI_ACCTXT = 8571001L;
 
+    /**
+     * Nama aksi audit untuk penyusunan berkas ACCTXT (REQ_AUSY_00059).
+     *
+     * Dikumpulkan di sini karena halaman audit Admin Approval menampilkan jejak ini TERLEPAS
+     * dari group pelakunya — penjadwal dan crontab berjalan tanpa akun manusia, dan role
+     * EXECUTE bukan group config. Dipakai sebagai penyaring di AuditController.
+     */
+    public static final String AUDIT_SUSUN_ULANG = "ACCTXT_GENERATE";
+    public static final String AUDIT_SEMUA       = "ACCTXT_GENERATE_SEMUA";
+    public static final String AUDIT_HARI_INI    = "ACCTXT_GENERATE_TODAY";
+    public static final String AUDIT_GAGAL       = "ACCTXT_GENERATE_GAGAL";
+
+    public static final java.util.List<String> AUDIT_AKSI = java.util.List.of(
+            AUDIT_SUSUN_ULANG, AUDIT_SEMUA, AUDIT_HARI_INI, AUDIT_GAGAL);
+
+    /**
+     * Catat kegagalan penyusunan ke audit trail (REQ_AUSY_00059).
+     *
+     * Pencatatan sukses terjadi di dalam publish(), yang tidak pernah tercapai kalau
+     * pengiriman FTP gagal atau penampungannya kosong — jadi dulu kegagalan tidak meninggalkan
+     * jejak audit sama sekali, padahal justru itu yang perlu ditelusuri.
+     *
+     * Transaksi baru, karena kegagalan FTP membatalkan transaksi penyusunan: kalau ikut di
+     * dalamnya, catatannya ikut terhapus.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void catatGagal(String pelaku, String sebab) {
+        audit.transaction(pelaku, AUDIT_GAGAL, "Penyusunan berkas ACCTXT GAGAL: " + sebab);
+    }
+
     private static final String SEDANG_BERJALAN =
             "Penyusunan berkas ACCTXT sedang berjalan (mungkin dipicu penjadwal). Tunggu sampai"
             + " selesai, lalu lihat hasilnya di Riwayat Penjadwal atau coba lagi.";
@@ -172,7 +202,7 @@ public class AcctxtGenerateService {
         // berkas tanggal itu, sehingga rentang yang sama bisa disusun ulang lagi kapan pun —
         // memang itu gunanya tombol ini — dan daftar "Menunggu digenerate" tidak ikut bergerak
         // sedikit pun, karena tidak ada yang dilepas maupun ditarik ke berkas lain.
-        Result r = publish(isi, me.getUsername(), "ACCTXT_GENERATE",
+        Result r = publish(isi, me.getUsername(), AUDIT_SUSUN_ULANG,
                 "Susun ulang " + rangeText(from, to) + " dari " + String.join(", ", sumber));
         if (!r.ok()) return r;
         return new Result(true, r.message() + " Digabung dari " + String.join(" + ", sumber) + ".",
@@ -257,7 +287,7 @@ public class AcctxtGenerateService {
             req.setFileName(todayFile());
             requests.save(req);
         }
-        return publish(isi, pelaku, "ACCTXT_GENERATE_SEMUA",
+        return publish(isi, pelaku, AUDIT_SEMUA,
                 "Generate seluruh penampungan yang menunggu (" + isi.size() + " catatan)");
         } finally {
             gembok.unlock();
@@ -297,7 +327,7 @@ public class AcctxtGenerateService {
             req.setFileName(todayFile());
             requests.save(req);
         }
-        return publish(isi, pelaku, "ACCTXT_GENERATE_TODAY",
+        return publish(isi, pelaku, AUDIT_HARI_INI,
                 "Generate export yang disetujui hari ini (" + isi.size() + " export)");
         } finally {
             gembok.unlock();

@@ -246,7 +246,11 @@ public class AcctxtSchedulerService {
             log.setFileName(r.fileName());
             log.setRowsCount(r.rows());
             if (r.ok()) LOG.info("Penjadwal ACCTXT: {}", r.message());
-            else        LOG.warn("Penjadwal ACCTXT tidak menghasilkan berkas: {}", r.message());
+            else {
+                // Sukses sudah dicatat di dalam penyusunannya; yang gagal belum (REQ_AUSY_00059).
+                acctxt.catatGagal(PELAKU, r.message());
+                LOG.warn("Penjadwal ACCTXT tidak menghasilkan berkas: {}", r.message());
+            }
         } catch (FtpGagalException e) {
             // Berkasnya tersusun, pengirimannya yang gagal. Nama berkas dan jumlah barisnya ikut
             // dicatat supaya riwayat tidak menampilkan "- / 0 baris" untuk sesuatu yang isinya
@@ -255,10 +259,12 @@ public class AcctxtSchedulerService {
             log.setPesan(e.pesan());
             log.setFileName(e.getFileName());
             log.setRowsCount(e.getRows());
+            acctxt.catatGagal(PELAKU, e.pesan());
             LOG.warn("Penjadwal ACCTXT: {}", e.pesan());
         } catch (Exception e) {
             log.setBerhasil(false);
             log.setPesan("Gagal: " + e.getMessage());
+            acctxt.catatGagal(PELAKU, String.valueOf(e.getMessage()));
             LOG.error("Penjadwal ACCTXT gagal", e);
         }
         return riwayat.save(log);

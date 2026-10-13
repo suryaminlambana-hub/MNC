@@ -89,7 +89,12 @@ public class AcctxtGenerateController {
                            @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         AcctxtGenerateService.Result r;
         try { r = acctxt.generate(from, to, me); }
-        catch (FtpGagalException e) { ra.addFlashAttribute("warn", e.pesan()); return "redirect:/admin/acctxt"; }
+        catch (FtpGagalException e) {
+            acctxt.catatGagal(me == null ? "-" : me.getUsername(), e.pesan());
+            ra.addFlashAttribute("warn", e.pesan());
+            return "redirect:/admin/acctxt";
+        }
+        if (!r.ok()) acctxt.catatGagal(me == null ? "-" : me.getUsername(), r.message());
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/admin/acctxt?from=" + from + "&to=" + to;
     }
@@ -103,7 +108,12 @@ public class AcctxtGenerateController {
     public String generateToday(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
         AcctxtGenerateService.Result r;
         try { r = acctxt.generateToday(me); }
-        catch (FtpGagalException e) { ra.addFlashAttribute("warn", e.pesan()); return "redirect:/admin/acctxt"; }
+        catch (FtpGagalException e) {
+            acctxt.catatGagal(me == null ? "-" : me.getUsername(), e.pesan());
+            ra.addFlashAttribute("warn", e.pesan());
+            return "redirect:/admin/acctxt";
+        }
+        if (!r.ok()) acctxt.catatGagal(me == null ? "-" : me.getUsername(), r.message());
         ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         return "redirect:/admin/acctxt";
     }

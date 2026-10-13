@@ -8,6 +8,7 @@ import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.NamaUserService;
 import com.mnc.ausy.service.AuditScopeService;
 import com.mnc.ausy.service.DataScopeService;
+import com.mnc.ausy.service.AcctxtGenerateService;
 import com.mnc.ausy.service.AuditService;
 import com.mnc.ausy.service.MncPdfService;
 import com.lowagie.text.Document;
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -90,7 +93,19 @@ public class AuditController {
             model.addAttribute("activities", act.findByUserIds(users, PageRequest.of(0, 100)));
         } else {
             List<Integer> groups = scope.groupsVisibleTo(me == null ? null : me.getIdGroup(), side);
-            model.addAttribute("transactions", tx.findByUserGroups(groups, PageRequest.of(0, 100)));
+            List<TlogTransaction> trx = new ArrayList<>(tx.findByUserGroups(groups, PageRequest.of(0, 100)));
+
+            // REQ_AUSY_00059: penyusunan berkas ACCTXT selalu ikut tampil di sisi Admin Approval,
+            // terlepas dari group pelakunya — penjadwal dan crontab berjalan tanpa akun manusia,
+            // dan role EXECUTE bukan group config, jadi saringan group di atas tidak pernah
+            // memuatnya. Digabung lalu diurutkan ulang supaya tetap satu daftar menurut waktu.
+            for (TlogTransaction t : tx.findByActions(AcctxtGenerateService.AUDIT_AKSI, PageRequest.of(0, 100)))
+                if (trx.stream().noneMatch(x -> x.getId() != null && x.getId().equals(t.getId()))) trx.add(t);
+            trx.sort(Comparator.comparing(TlogTransaction::getTimeActivity,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+            if (trx.size() > 100) trx = trx.subList(0, 100);
+
+            model.addAttribute("transactions", trx);
             model.addAttribute("activities", act.findByUserGroups(groups, PageRequest.of(0, 100)));
         }
         model.addAttribute("scoped", true);
@@ -113,8 +128,18 @@ public class AuditController {
         List<Integer> groups = users != null ? List.of()
                 : scope.groupsVisibleTo(me == null ? null : me.getIdGroup(), side);
 
-        List<TlogTransaction> txRows = users != null ? tx.findByUserIds(users, PageRequest.of(0, 5000))
-                                                    : tx.findByUserGroups(groups, PageRequest.of(0, 5000));
+        List<TlogTransaction> txRows;
+        if (users != null) {
+            txRows = tx.findByUserIds(users, PageRequest.of(0, 5000));
+        } else {
+            // Cetakan harus berisi hal yang sama dengan layar (REQ_AUSY_00059) — termasuk jejak
+            // penyusunan ACCTXT yang pelakunya di luar saringan group.
+            txRows = new ArrayList<>(tx.findByUserGroups(groups, PageRequest.of(0, 5000)));
+            for (TlogTransaction t : tx.findByActions(AcctxtGenerateService.AUDIT_AKSI, PageRequest.of(0, 5000)))
+                if (txRows.stream().noneMatch(x -> x.getId() != null && x.getId().equals(t.getId()))) txRows.add(t);
+            txRows.sort(Comparator.comparing(TlogTransaction::getTimeActivity,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+        }
         List<TlogActivity> actRows = users != null ? act.findByUserIds(users, PageRequest.of(0, 5000))
                                                    : act.findByUserGroups(groups, PageRequest.of(0, 5000));
 
