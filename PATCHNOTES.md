@@ -81,6 +81,10 @@ jadwal bawaan dan peringatannya muncul di layar.
 1. **Pasang ulang unit systemd** — `Restart=` berubah dari `on-failure` menjadi `always`:
    ```
    sudo cp /opt/ausy/ausy.service /etc/systemd/system/
+   # WAJIB: berkas di repo berisi Group=ausy, sedangkan grup nyata user ausy di server DEV
+   # adalah "users". Tanpa baris ini service gagal dengan status=216/GROUP — persis yang
+   # terjadi saat deploy pertama (4 Sep 2026).
+   sudo sed -i "s/^Group=.*/Group=$(id -gn ausy)/" /etc/systemd/system/ausy.service
    sudo systemctl daemon-reload && sudo systemctl restart ausy
    sudo systemctl status ausy        # harus active (running) DAN enabled
    ```
