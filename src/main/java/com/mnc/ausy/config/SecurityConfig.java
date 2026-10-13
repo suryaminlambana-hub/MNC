@@ -5,6 +5,7 @@ import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.MenuService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.CredentialsExpiredException;
@@ -12,11 +13,13 @@ import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
+// Hanya berlaku saat aplikasi berjalan sebagai web. Mode tugas (--ausy.task=..., REQ_AUSY_00058)
+// berjalan tanpa Tomcat, sehingga bean khas web seperti HttpSecurity tidak ada dan konfigurasi
+// ini akan menggagalkan start kalau tetap dimuat.
+@ConditionalOnWebApplication
 @Configuration
 public class SecurityConfig {
 
@@ -26,11 +29,6 @@ public class SecurityConfig {
     public SecurityConfig(AccessService access, MenuService menuService) {
         this.access = access;
         this.menuService = menuService;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();   // accepts legacy $2y$ hashes from the PHP app
     }
 
     /**

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
@@ -30,6 +31,10 @@ import java.io.IOException;
  * Ruas alamat dan query dibawa serta, sehingga tautan yang dibagikan tanpa {@code /ausy}
  * (misalnya {@code localhost:8080/admin/acctxt}) tetap mendarat di tempat yang benar.
  */
+// Hanya berlaku saat aplikasi berjalan sebagai web. Mode tugas (--ausy.task=..., REQ_AUSY_00058)
+// berjalan tanpa Tomcat, sehingga bean khas web seperti HttpSecurity tidak ada dan konfigurasi
+// ini akan menggagalkan start kalau tetap dimuat.
+@ConditionalOnWebApplication
 @Configuration
 public class RootRedirectConfig {
 

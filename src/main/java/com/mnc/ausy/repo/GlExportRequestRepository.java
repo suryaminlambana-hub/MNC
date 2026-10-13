@@ -41,4 +41,21 @@ public interface GlExportRequestRepository extends JpaRepository<GlExportRequest
     List<GlExportRequest> findApprovedNotGeneratedBetween(@Param("from") LocalDateTime from,
                                                           @Param("until") LocalDateTime until);
 
+
+    /**
+     * Kunci antar-PROSES untuk penyusunan berkas ACCTXT (REQ_AUSY_00058).
+     *
+     * Kunci di dalam aplikasi hanya berlaku satu JVM. Begitu berkasnya juga bisa disusun oleh
+     * proses lain — JAR mode tugas yang dipanggil crontab — kunci itu tidak berarti apa-apa:
+     * dua proses sama-sama membaca "belum digenerate", sama-sama menulis ACCTXT tanggal itu,
+     * dan yang belakangan menimpa yang duluan tanpa satu pun pesan.
+     *
+     * Dipakai versi _xact_: kuncinya terlepas sendiri saat transaksi selesai, baik commit
+     * maupun rollback. Kunci yang harus dilepas manual akan menggantung selamanya kalau
+     * prosesnya mati di tengah jalan.
+     *
+     * @return true kalau kunci didapat; false berarti ada proses lain yang sedang menyusun.
+     */
+    @Query(value = "select pg_try_advisory_xact_lock(:kunci)", nativeQuery = true)
+    boolean kunciPenyusunan(@Param("kunci") long kunci);
 }

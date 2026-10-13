@@ -85,6 +85,12 @@ public class AcctxtGenerateService {
      */
     private final java.util.concurrent.locks.ReentrantLock gembok = new java.util.concurrent.locks.ReentrantLock();
 
+    /**
+     * Angka kunci advisory Postgres untuk penyusunan ACCTXT. Nilai tetap dan khas supaya tidak
+     * bertabrakan dengan kunci lain yang mungkin dipakai di basis data yang sama.
+     */
+    private static final long KUNCI_ACCTXT = 8571001L;
+
     private static final String SEDANG_BERJALAN =
             "Penyusunan berkas ACCTXT sedang berjalan (mungkin dipicu penjadwal). Tunggu sampai"
             + " selesai, lalu lihat hasilnya di Riwayat Penjadwal atau coba lagi.";
@@ -130,6 +136,9 @@ public class AcctxtGenerateService {
     public Result generate(LocalDate from, LocalDate to, AusyUserDetails me) {
         if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
         try {
+            // Kunci antar-proses: gembok di atas hanya menjaga JVM ini, sedangkan berkasnya
+            // juga bisa disusun JAR mode tugas yang dipanggil crontab (REQ_AUSY_00058).
+            if (!requests.kunciPenyusunan(KUNCI_ACCTXT)) return Result.fail(SEDANG_BERJALAN);
         if (from == null || to == null) return Result.fail("Tanggal awal dan tanggal akhir wajib diisi.");
         if (to.isBefore(from)) return Result.fail("Tanggal akhir tidak boleh lebih awal dari tanggal awal.");
 
@@ -236,6 +245,9 @@ public class AcctxtGenerateService {
     public Result generateSemuaMenunggu(String pelaku) {
         if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
         try {
+            // Kunci antar-proses: gembok di atas hanya menjaga JVM ini, sedangkan berkasnya
+            // juga bisa disusun JAR mode tugas yang dipanggil crontab (REQ_AUSY_00058).
+            if (!requests.kunciPenyusunan(KUNCI_ACCTXT)) return Result.fail(SEDANG_BERJALAN);
         List<GlExportRequest> isi = requests.findApprovedNotGenerated();
         if (isi.isEmpty())
             return Result.fail("Tidak ada data di penampungan yang menunggu digenerate.");
@@ -266,6 +278,9 @@ public class AcctxtGenerateService {
     public Result generateToday(String pelaku) {
         if (!gembok.tryLock()) return Result.fail(SEDANG_BERJALAN);
         try {
+            // Kunci antar-proses: gembok di atas hanya menjaga JVM ini, sedangkan berkasnya
+            // juga bisa disusun JAR mode tugas yang dipanggil crontab (REQ_AUSY_00058).
+            if (!requests.kunciPenyusunan(KUNCI_ACCTXT)) return Result.fail(SEDANG_BERJALAN);
         LocalDate today = LocalDate.now();
         // Persis isi daftar "Menunggu digenerate": disetujui hari ini DAN belum pernah dibuatkan
         // berkas (BUG_AUSY_00178). Yang sudah ikut generate sebelumnya tidak diambil lagi, jadi

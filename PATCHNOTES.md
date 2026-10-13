@@ -50,6 +50,31 @@ Dijalankan Flyway otomatis saat service start.
 - `V50` tabel setelan penjadwal (satu baris, **aktif sejak awal**) dan tabel riwayatnya.
 - `V51`, `V52` baris ACTION untuk tombol nyala/mati dan Jalankan Sekarang (role EXECUTE).
 
+- **JAR bisa dijalankan sebagai tugas sekali-jalan** (REQ_AUSY_00058), supaya penjadwalannya
+  boleh dipegang crontab milik server:
+  ```
+  cd /opt/ausy && set -a && . ./.env && set +a && \
+    java -jar ausy-2.0.0.jar --ausy.task=generate-acctxt
+  ```
+  JAR yang sama, bukan aplikasi kedua — konfigurasi, aturan, dan pencatatan riwayat tetap satu
+  tempat. Tomcat tidak dinyalakan pada mode ini, jadi tidak berebut port 8080 dengan aplikasi
+  web yang sedang jalan. Kode keluar **0** bila berkasnya terbit, **1** bila tidak, sehingga
+  crontab atau pemantau mengenali kegagalan tanpa membaca log.
+
+  Contoh baris crontab (cron memakai **5 kolom**, berbeda dari ekspresi Spring yang 6):
+  ```cron
+  CRON_TZ=Asia/Jakarta
+  0 23 * * *  cd /opt/ausy && set -a && . ./.env && set +a && \
+              /usr/bin/java -jar ausy-2.0.0.jar --ausy.task=generate-acctxt \
+              >> /opt/ausy/logs/cron-acctxt.log 2>&1
+  ```
+  Kalau crontab dipakai, **biarkan `AUSY_SCHEDULER_ENABLED=false`** — penjadwal internal yang
+  ikut hidup akan menembak jam yang sama.
+
+- **Penyusunan ACCTXT dikunci antar-proses** (lanjutan REQ_AUSY_00058) memakai advisory lock
+  Postgres. Kunci yang lama hanya berlaku dalam satu JVM, jadi tidak berarti apa-apa begitu
+  berkasnya juga bisa disusun proses crontab.
+
 ### Setelan server
 
 **Memasang rilis ini TANPA penjadwalnya hidup — ini jalur yang dipilih untuk rilis pertama.**
