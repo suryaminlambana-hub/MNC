@@ -45,6 +45,21 @@ public class AcctxtSchedulerService {
     @Value("${ausy.scheduler-cron:" + CRON_BAWAAN + "}")
     private String cronSetelan;
 
+    /**
+     * Saklar tingkat server (REQ_AUSY_00061).
+     *
+     * Berbeda dari tombol nyala/mati di layar, yang tersimpan di basis data dan bisa diubah
+     * petugas. Yang ini diputuskan saat memasang aplikasi: dipakai ketika sebuah rilis ingin
+     * dipasang TANPA penjadwalnya hidup — fiturnya ikut terpasang, tapi dormant sampai
+     * setelannya diubah dan aplikasi dinyalakan ulang.
+     *
+     * Ketika false: tugas terjadwalnya tidak didaftarkan sama sekali, susulan tidak dikerjakan,
+     * dan tombol-tombolnya hilang dari layar — supaya tidak ada yang mengira bisa
+     * menyalakannya dari sana.
+     */
+    @Value("${ausy.scheduler-enabled:true}")
+    private boolean diizinkanServer;
+
     private final AcctxtSchedulerRepository setelan;
     private final AcctxtSchedulerLogRepository riwayat;
     private final AcctxtGenerateService acctxt;
@@ -65,7 +80,14 @@ public class AcctxtSchedulerService {
         });
     }
 
-    public boolean aktif() { return setelan().isAktif(); }
+    /** Saklar server: false = penjadwal dormant, apa pun isi tombol di layar. */
+    public boolean diizinkanServer() { return diizinkanServer; }
+
+    /** Benar-benar akan berjalan: diizinkan server DAN dinyalakan di layar. */
+    public boolean aktif() { return diizinkanServer && setelan().isAktif(); }
+
+    /** Isi tombol di layar, terlepas dari saklar server — untuk ditampilkan apa adanya. */
+    public boolean aktifDiLayar() { return setelan().isAktif(); }
 
     @Transactional
     public boolean ubahAktif(boolean nyala, String olehSiapa) {
@@ -159,6 +181,11 @@ public class AcctxtSchedulerService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void susulSaatStart() {
+        if (!diizinkanServer) {
+            LOG.info("Penjadwal ACCTXT dimatikan lewat setelan server (ausy.scheduler-enabled=false)"
+                    + " — susulan tidak dikerjakan.");
+            return;
+        }
         if (!aktif()) {
             LOG.info("Penjadwal ACCTXT sedang dimatikan — pemeriksaan jalan terlewat dilewati.");
             return;

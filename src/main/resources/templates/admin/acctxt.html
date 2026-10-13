@@ -180,17 +180,20 @@
   <h2 class="h6 text-uppercase text-muted mt-4 mb-2">Penjadwal otomatis</h2>
   <div class="ausy-card mb-3" style="padding:20px 22px">
     <div class="d-flex flex-wrap align-items-center gap-3">
-      <span th:if="${schedulerAktif}" class="badge bg-success-subtle text-success">
+      <span th:unless="${schedulerDiizinkan}" class="badge bg-secondary-subtle text-secondary">
+        <i class="fa-solid fa-plug-circle-xmark"></i> DIMATIKAN DI SERVER
+      </span>
+      <span th:if="${schedulerDiizinkan and schedulerAktif}" class="badge bg-success-subtle text-success">
         <i class="fa-solid fa-circle-check"></i> AKTIF
       </span>
-      <span th:unless="${schedulerAktif}" class="badge bg-secondary-subtle text-secondary">
+      <span th:if="${schedulerDiizinkan and not schedulerAktif}" class="badge bg-secondary-subtle text-secondary">
         <i class="fa-solid fa-circle-pause"></i> TIDAK AKTIF
       </span>
       <span class="text-muted small">
         Yang dibuatkan file: <strong>seluruh isi penampungan</strong> yang belum pernah
         digenerate — otorisasi upload maupun perubahan dari Kelola Data GL, tanpa batas tanggal.
       </span>
-      <form method="post" th:action="@{/admin/acctxt/scheduler}" class="ms-auto"
+      <form th:if="${schedulerDiizinkan}" method="post" th:action="@{/admin/acctxt/scheduler}" class="ms-auto"
             th:attr="onsubmit=${schedulerAktif}
                      ? 'return confirm(\'Matikan penjadwal? Berkas ACCTXT tidak lagi dibuat otomatis jam 23:00.\')'
                      : 'return confirm(\'Nyalakan penjadwal otomatis jam 23:00?\')'">
@@ -201,7 +204,7 @@
       </form>
       <!--/* Pembuktian tanpa menunggu tengah malam: yang dikerjakan persis sama dengan
              yang dikerjakan jam 23:00, dan hasilnya masuk riwayat yang sama. */-->
-      <form method="post" th:action="@{/admin/acctxt/scheduler/jalankan}"
+      <form th:if="${schedulerDiizinkan}" method="post" th:action="@{/admin/acctxt/scheduler/jalankan}"
             onsubmit="return confirm('Jalankan penjadwal sekarang? Seluruh isi penampungan yang menunggu akan dibuatkan file ACCTXT.');">
         <button type="submit" class="btn btn-sm btn-outline-primary">
           <i class="fa-solid fa-play"></i> Jalankan Sekarang
@@ -210,7 +213,16 @@
     </div>
     <!--/* Jadwal yang berlaku + kapan jalan berikutnya. Ada supaya "penjadwalnya tidak jalan"
            bisa DILIHAT, bukan ditebak dari gejala. */-->
-    <div class="mt-3">
+    <div class="mt-3" th:unless="${schedulerDiizinkan}">
+      <small class="text-muted">
+        Penjadwal otomatis <strong>tidak dipasang</strong> pada server ini
+        (<code>AUSY_SCHEDULER_ENABLED=false</code> di <code>.env</code>). Berkas ACCTXT hanya
+        dibuat lewat tombol <em>Generate File ACCTXT Hari Ini</em> dan <em>Susun Ulang</em> di
+        atas. Untuk menyalakannya: ubah setelan itu lalu nyalakan ulang aplikasi.
+      </small>
+    </div>
+
+    <div class="mt-3" th:if="${schedulerDiizinkan}">
       <div>
         <small class="text-muted">
           Jadwal: <code th:text="${schedulerCron}">0 0 23 * * *</code> (zona Asia/Jakarta).

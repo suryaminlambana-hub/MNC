@@ -32,6 +32,11 @@ public class SchedulingConfig implements SchedulingConfigurer {
 
     @Override
     public void configureTasks(ScheduledTaskRegistrar registrar) {
+        if (!scheduler.diizinkanServer()) {
+            LOG.warn("Penjadwal ACCTXT TIDAK dipasang: ausy.scheduler-enabled=false."
+                    + " Berkas ACCTXT hanya dibuat lewat tombol di halaman Generate File ACCTXT.");
+            return;
+        }
         if (!scheduler.cronSah())
             LOG.warn("Jadwal penjadwal ACCTXT tidak sah: \"{}\". Dipakai jadwal bawaan {}."
                     + " Ekspresi Spring berisi 6 kolom (detik menit jam tanggal bulan hari).",

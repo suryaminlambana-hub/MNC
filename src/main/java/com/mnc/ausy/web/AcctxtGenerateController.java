@@ -61,6 +61,8 @@ public class AcctxtGenerateController {
         // REQ_AUSY_00061: status penjadwal + riwayat jalannya, supaya "kenapa berkas hari itu
         // tidak terbit" bisa dibaca, bukan ditebak.
         model.addAttribute("schedulerAktif", scheduler.aktif());
+        model.addAttribute("schedulerDiizinkan", scheduler.diizinkanServer());
+        model.addAttribute("schedulerAktifDiLayar", scheduler.aktifDiLayar());
         model.addAttribute("schedulerSetelan", scheduler.setelan());
         model.addAttribute("schedulerRiwayat", scheduler.riwayatTerakhir(10));
         // Jadwal yang BENAR-BENAR berlaku + kapan jalan berikutnya. Tanpa ini "penjadwalnya
@@ -113,6 +115,12 @@ public class AcctxtGenerateController {
     @PostMapping("/admin/acctxt/scheduler")
     public String ubahScheduler(@RequestParam boolean aktif,
                                 @AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        // Saklar server menang atas tombol di layar; diperiksa lagi di sini karena alamatnya
+        // bisa ditembak langsung.
+        if (!scheduler.diizinkanServer()) {
+            ra.addFlashAttribute("warn", "Penjadwal dimatikan lewat setelan server — tombol ini tidak berlaku.");
+            return "redirect:/admin/acctxt";
+        }
         scheduler.ubahAktif(aktif, me == null ? "-" : me.getUsername());
         ra.addFlashAttribute("ok", aktif
                 ? "Penjadwal otomatis DINYALAKAN — berkas ACCTXT dibuat setiap hari jam 23:00."
@@ -130,6 +138,12 @@ public class AcctxtGenerateController {
      */
     @PostMapping("/admin/acctxt/scheduler/jalankan")
     public String jalankanScheduler(@AuthenticationPrincipal AusyUserDetails me, RedirectAttributes ra) {
+        // Saklar server menang atas tombol di layar; diperiksa lagi di sini karena alamatnya
+        // bisa ditembak langsung.
+        if (!scheduler.diizinkanServer()) {
+            ra.addFlashAttribute("warn", "Penjadwal dimatikan lewat setelan server — tidak bisa dijalankan dari sini.");
+            return "redirect:/admin/acctxt";
+        }
         var log = scheduler.jalankan();
         ra.addFlashAttribute(log.isBerhasil() ? "ok" : "warn",
                 "Penjadwal dijalankan manual: " + log.getPesan());

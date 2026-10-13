@@ -51,6 +51,22 @@ Dijalankan Flyway otomatis saat service start.
 - `V51`, `V52` baris ACTION untuk tombol nyala/mati dan Jalankan Sekarang (role EXECUTE).
 
 ### Setelan server
+
+**Memasang rilis ini TANPA penjadwalnya hidup** — tambahkan di `/opt/ausy/.env`:
+
+```
+AUSY_SCHEDULER_ENABLED=false
+```
+
+Penjadwal tidak dipasang sama sekali: tidak ada jalan otomatis jam 23:00, tidak ada susulan
+saat start, dan tombol nyala/mati serta Jalankan Sekarang hilang dari layar. Tombol
+**Generate File ACCTXT Hari Ini** dan **Susun Ulang** tetap bekerja seperti biasa, jadi berkas
+ACCTXT tetap bisa dibuat manual. Untuk menyalakannya nanti: hapus baris itu (atau isi `true`)
+lalu `sudo systemctl restart ausy`.
+
+Dengan setelan ini, langkah 2-4 di bawah tidak berlaku — panel penjadwal akan menampilkan
+badge **DIMATIKAN DI SERVER**.
+
 Opsional, hanya kalau jadwalnya mau diubah dari jam 23:00:
 
 ```

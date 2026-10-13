@@ -44,6 +44,10 @@ ausy:
   # di log saat start: "File hasil export ditulis ke ...".
   txt-dir: ${AUSY_TXT_DIR:}
   export-dir: ${AUSY_EXPORT_DIR:}
+  # REQ_AUSY_00061 — saklar penjadwal tingkat server. false = penjadwal tidak dipasang sama
+  # sekali: tidak ada jalan otomatis, tidak ada susulan, dan tombolnya hilang dari layar.
+  # Dipakai saat sebuah rilis ingin dipasang tanpa penjadwalnya hidup dulu.
+  scheduler-enabled: ${AUSY_SCHEDULER_ENABLED:true}
   # REQ_AUSY_00061 — kapan berkas ACCTXT dibuat otomatis. Bawaan: tiap hari jam 23:00 WIB.
   # Penjadwalnya masih bisa dimatikan dari halaman Generate File ACCTXT tanpa mengubah ini.
   scheduler-cron: ${AUSY_SCHEDULER_CRON:0 0 23 * * *}
