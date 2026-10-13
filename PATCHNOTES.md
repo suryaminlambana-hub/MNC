@@ -52,7 +52,8 @@ Dijalankan Flyway otomatis saat service start.
 
 ### Setelan server
 
-**Memasang rilis ini TANPA penjadwalnya hidup** — tambahkan di `/opt/ausy/.env`:
+**Memasang rilis ini TANPA penjadwalnya hidup — ini jalur yang dipilih untuk rilis pertama.**
+Tambahkan di `/opt/ausy/.env`:
 
 ```
 AUSY_SCHEDULER_ENABLED=false
@@ -64,8 +65,12 @@ saat start, dan tombol nyala/mati serta Jalankan Sekarang hilang dari layar. Tom
 ACCTXT tetap bisa dibuat manual. Untuk menyalakannya nanti: hapus baris itu (atau isi `true`)
 lalu `sudo systemctl restart ausy`.
 
-Dengan setelan ini, langkah 2-4 di bawah tidak berlaku — panel penjadwal akan menampilkan
-badge **DIMATIKAN DI SERVER**.
+Dengan setelan ini seluruh langkah penjadwal di bawah tidak berlaku — panel penjadwal
+menampilkan badge **DIMATIKAN DI SERVER**, dan `ausy.service` tidak perlu diganti. Deploy-nya
+menjadi: kirim JAR, tambah satu baris di `.env`, `systemctl restart ausy`.
+
+Migrasi `V50`-`V52` tetap jalan dan membuat tabel serta baris menunya, tetapi tidak dipakai
+selama saklarnya `false` — tidak ada perubahan perilaku bagi siapa pun.
 
 Opsional, hanya kalau jadwalnya mau diubah dari jam 23:00:
 
@@ -78,7 +83,12 @@ bukan `59 22 * * *` seperti crontab biasa. Salah tulis tidak lagi menjatuhkan ap
 jadwal bawaan dan peringatannya muncul di layar.
 
 ### Setelah deploy
-1. **Pasang ulang unit systemd** — `Restart=` berubah dari `on-failure` menjadi `always`:
+1. **Hanya kalau penjadwal dihidupkan.** Dengan `AUSY_SCHEDULER_ENABLED=false`, LEWATI langkah
+   ini — `ausy.service` tidak perlu disentuh sama sekali, dan risiko `Group=` di bawah tidak
+   berlaku. Cukup pasang JAR baru lalu `sudo systemctl restart ausy`.
+
+   `Restart=` berubah dari `on-failure` menjadi `always` karena penjadwal hanya menyala kalau
+   prosesnya hidup. Tanpa penjadwal, `on-failure` yang sudah terpasang sudah memadai:
    ```
    sudo cp /opt/ausy/ausy.service /etc/systemd/system/
    # WAJIB: berkas di repo berisi Group=ausy, sedangkan grup nyata user ausy di server DEV
