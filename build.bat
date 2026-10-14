@@ -18,7 +18,12 @@ powershell -NoProfile -Command "Start-Sleep -Seconds 3"
 
 echo.
 echo Build (sekitar 1-2 menit)...
-call "%~dp0mvnw.cmd" clean package
+REM maven.clean.failOnError=false: folder target yang sedang "ditempati" jendela CMD / File
+REM Explorer tidak bisa dihapus foldernya, walau isinya sudah bersih. Itu tidak boleh
+REM menggagalkan build - isinya dibuat ulang di bawah. JAR yang terkunci tetap ketahuan saat package.
+REM Keluaran tes (mis. skenario "GAGAL" yang memang diuji) disimpan di target\surefire-reports,
+REM bukan di layar, supaya tidak terbaca sebagai kegagalan build.
+call "%~dp0mvnw.cmd" clean package -Dmaven.clean.failOnError=false -Dmaven.test.redirectTestOutputToFile=true
 set "KODE=%ERRORLEVEL%"
 
 echo.
