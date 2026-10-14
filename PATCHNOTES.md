@@ -74,6 +74,13 @@ Commit `9c5b149`. DB naik dari v49 ke **v52**.
     keterangan "Generate otomatis" (status pemicu JAR); riwayat jalannya tetap tampil.
   - Mode `--ausy.task=generate-acctxt` pada JAR aplikasi tetap ada, tetapi pemicu yang dipakai
     adalah `ausy-trigger.jar`.
+  - Tanpa `--env`, `.env` dicari sendiri: folder kerja dan satu di atasnya, lalu folder JAR dan
+    satu di atasnya — jadi `java -jar target\ausy-2.0.0-trigger.jar` dari mana pun memakai `.env`
+    proyeknya. Alamat bawaan mengikuti `SERVER_PORT`/`CONTEXT_PATH` di `.env` itu. Pesan gagal
+    menyebut berkas `.env` mana yang perlu diisi.
+  - **Windows:** `ausy-trigger.bat` di folder proyek bisa di-double-click (jendela ditahan supaya
+    hasilnya terbaca; dari Task Scheduler pakai `ausy-trigger.bat /nopause`). Double-click
+    langsung pada file JAR memang tidak menampilkan apa pun.
 
 ### Migrasi DB
 Dijalankan Flyway otomatis saat service start.

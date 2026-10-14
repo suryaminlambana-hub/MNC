@@ -50,19 +50,52 @@ public final class AusyTrigger {
         System.exit(jalankan(args, System.getenv()));
     }
 
-    /** Setelan yang sudah diputuskan dari argumen, lingkungan, dan berkas .env. */
-    record Setelan(String url, String token) {}
+    /** Setelan yang sudah diputuskan dari argumen, lingkungan, dan berkas .env (null = tidak ada). */
+    record Setelan(String url, String token, Path envFile) {}
 
     static Setelan setelan(String[] args, Map<String, String> env) throws IOException {
+        return setelan(args, env, Path.of(""), folderJar());
+    }
+
+    static Setelan setelan(String[] args, Map<String, String> env, Path folderKerja, Path folderJar) throws IOException {
         Map<String, String> arg = new HashMap<>();
         for (String a : args)
             if (a.startsWith("--") && a.contains("=")) arg.put(a.substring(2, a.indexOf('=')), a.substring(a.indexOf('=') + 1));
 
-        Map<String, String> berkas = bacaEnv(Path.of(arg.getOrDefault("env", ".env")), arg.containsKey("env"));
-        String url = pilih(arg.get("url"), env.get("AUSY_TRIGGER_URL"), berkas.get("AUSY_TRIGGER_URL"), URL_BAWAAN);
+        // .env yang dipakai: yang disebut lewat --env, atau dicari sendiri di tempat yang sama dengan
+        // aplikasinya (folder kerja dan satu di atasnya) ditambah folder JAR ini dan satu di atasnya —
+        // jadi "java -jar target\ausy-2.0.0-trigger.jar" dari folder proyek, atau dari mana pun,
+        // menemukan .env proyeknya tanpa harus menyebut path.
+        Path envFile = null;
+        Map<String, String> berkas = new HashMap<>();
+        if (arg.containsKey("env")) {
+            envFile = Path.of(arg.get("env"));
+            berkas = bacaEnv(envFile, true);
+        } else {
+            List<Path> calon = new java.util.ArrayList<>(List.of(folderKerja.resolve(".env"), folderKerja.resolve("..").resolve(".env")));
+            if (folderJar != null) { calon.add(folderJar.resolve(".env")); calon.add(folderJar.resolve("..").resolve(".env")); }
+            for (Path p : calon)
+                if (Files.isRegularFile(p)) { envFile = p.toAbsolutePath().normalize(); berkas = bacaEnv(p, true); break; }
+        }
+
+        // Alamat bawaan mengikuti port & context path aplikasinya sendiri (SERVER_PORT, CONTEXT_PATH di .env).
+        String port = pilih(env.get("SERVER_PORT"), berkas.get("SERVER_PORT"), "8080");
+        String ctx = berkas.containsKey("CONTEXT_PATH") ? berkas.get("CONTEXT_PATH") : "/ausy";
+        String urlBawaan = "http://127.0.0.1:" + port + (ctx.isBlank() || ctx.startsWith("/") ? ctx : "/" + ctx);
+        String url = pilih(arg.get("url"), env.get("AUSY_TRIGGER_URL"), berkas.get("AUSY_TRIGGER_URL"), urlBawaan);
         String token = pilih(arg.get("token"), env.get("AUSY_TRIGGER_TOKEN"), berkas.get("AUSY_TRIGGER_TOKEN"), "");
         while (url.endsWith("/")) url = url.substring(0, url.length() - 1);
-        return new Setelan(url, token);
+        return new Setelan(url, token, envFile);
+    }
+
+    /** Folder tempat berkas JAR ini berada (null bila tidak bisa diketahui, mis. saat tes). */
+    static Path folderJar() {
+        try {
+            Path p = Path.of(AusyTrigger.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            return Files.isRegularFile(p) ? p.getParent() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     static int jalankan(String[] args, Map<String, String> env) {
@@ -70,9 +103,12 @@ public final class AusyTrigger {
         try { s = setelan(args, env); }
         catch (IOException e) { tulis("GAGAL - " + e.getMessage()); return 2; }
         if (s.token().isEmpty()) {
-            tulis("GAGAL - AUSY_TRIGGER_TOKEN belum diisi (argumen --token, variabel lingkungan, atau .env).");
+            tulis("GAGAL - AUSY_TRIGGER_TOKEN belum diisi. " + (s.envFile() == null
+                    ? "Berkas .env tidak ditemukan di folder ini maupun folder proyek; sebutkan dengan --env=<path .env>."
+                    : "Tambahkan baris AUSY_TRIGGER_TOKEN=... di " + s.envFile() + " (nilainya sama dengan .env aplikasi)."));
             return 2;
         }
+        tulis("memanggil " + s.url() + (s.envFile() == null ? "" : " (setelan dari " + s.envFile() + ")"));
 
         HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
         HttpRequest req = HttpRequest.newBuilder(URI.create(s.url() + PATH))

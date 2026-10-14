@@ -51,6 +51,10 @@ GENERATE FILE ACCTXT TERJADWAL (ausy-trigger.jar)
        sudo crontab -u ausy -e
        0 23 * * * java -jar /opt/ausy/ausy-trigger.jar --env=/opt/ausy/.env >> /opt/ausy/logs/trigger.log 2>&1
 
+  - Windows (mis. laptop QA, dari folder proyek): double-click
+    ausy-trigger.bat, atau  java -jar target\ausy-2.0.0-trigger.jar
+    .env dan port aplikasinya ditemukan sendiri — tidak perlu --env.
+    Path /opt/ausy/... di atas hanya untuk server Linux.
   - Aplikasi web harus sedang jalan saat JAR dipanggil.
   - Bila JAR dijalankan di mesin lain, isi juga AUSY_TRIGGER_URL
     (mis. http://10.5.99.24:8080/ausy) — lewat .env, variabel

@@ -38,6 +38,26 @@ class AusyTriggerTest {
     }
 
     @Test
+    void envDicariSendiriDiFolderProyekDariJar() throws Exception {
+        // susunan seperti di laptop: <proyek>\.env dan <proyek>\target\ausy-2.0.0-trigger.jar
+        Path proyek = Files.createDirectories(dir.resolve("AUSY-MNC-JAVA"));
+        Path target = Files.createDirectories(proyek.resolve("target"));
+        Files.writeString(proyek.resolve(".env"), "SERVER_PORT=9090\nCONTEXT_PATH=/ausy\nAUSY_TRIGGER_TOKEN=tok\n");
+        // folder kerja di luar proyek, supaya yang ditemukan memang lewat folder JAR
+        Path lain = Files.createDirectories(dir.resolve("lain").resolve("dalam"));
+        AusyTrigger.Setelan s = AusyTrigger.setelan(new String[0], Map.of(), lain, target);
+        assertEquals("tok", s.token());
+        assertEquals("http://127.0.0.1:9090/ausy", s.url());          // ikut SERVER_PORT aplikasinya
+        assertEquals(proyek.resolve(".env").toAbsolutePath().normalize(), s.envFile());
+    }
+
+    @Test
+    void contextPathKosongBerartiRoot() throws Exception {
+        Files.writeString(dir.resolve(".env"), "CONTEXT_PATH=\nAUSY_TRIGGER_TOKEN=tok\n");
+        assertEquals("http://127.0.0.1:8080", AusyTrigger.setelan(new String[]{"--env=" + dir.resolve(".env")}, Map.of()).url());
+    }
+
+    @Test
     void berkasEnvYangDisebutTapiTidakAda() {
         assertThrows(java.io.IOException.class,
                 () -> AusyTrigger.setelan(new String[]{"--env=" + dir.resolve("tidak-ada.env")}, Map.of()));
