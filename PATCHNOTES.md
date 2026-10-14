@@ -16,9 +16,21 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261014-1 — 14-10-2026 16:12
 
-Commit `9c5b149`. DB naik dari v49 ke **v52**.
+Commit `1146174`. DB tetap **v52** — V50–V52 sudah terpasang oleh deploy 13-10-2026 11:07 yang
+tidak tercatat di sini (JAR-nya disimpan sebagai `/opt/ausy/backup/ausy-2.0.0.jar.sebelum-20261014`).
+
+Saat deploy:
+- `/opt/ausy/.env` ditambah `AUSY_TRIGGER_TOKEN` (48 karakter acak, dibuat di server).
+  `AUSY_SCHEDULER_ENABLED=false` sudah ada. Backup: `/opt/ausy/.env.bak-20261014`.
+- `ausy-trigger.jar` terpasang di `/opt/ausy/`. **Crontab belum dipasang** — jadwalnya diatur MNC
+  sendiri (`sudo crontab -u ausy -e`, contoh di README). Hanya user `ausy` yang bisa membaca
+  `/opt/ausy`, jadi crontab harus milik user itu.
+- `ausy.service` tidak disentuh.
+- Diverifikasi: JAR & ausy-trigger.jar sama dengan build, service aktif, start tanpa error,
+  endpoint scheduler menolak token salah (HTTP 401), `ausy-trigger.jar` sebagai user `ausy`
+  membaca `.env` dan terhubung. Generate sungguhan TIDAK dijalankan saat deploy.
 
 ### Perubahan
 - **Transaction Account dicocokkan ke master Kode GL saat upload** (REQ_AUSY_00059). Diperiksa
