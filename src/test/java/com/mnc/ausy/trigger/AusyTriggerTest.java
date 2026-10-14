@@ -82,6 +82,13 @@ class AusyTriggerTest {
     }
 
     @Test
+    void hanyaTandaPisahYangDiganti() {
+        assertEquals("Token salah - samakan", AusyTrigger.ascii("Token salah — samakan"));
+        // angka (mis. nomor CR, tahun) tidak boleh ikut berubah
+        assertEquals("CR#2014 disetujui 14-10-2026", AusyTrigger.ascii("CR#2014 disetujui 14-10-2026"));
+    }
+
+    @Test
     void aplikasiTidakBisaDihubungi() {
         // port 9 (discard) di localhost: tidak ada yang mendengar → koneksi ditolak
         assertEquals(2, AusyTrigger.jalankan(new String[]{"--url=http://127.0.0.1:9/ausy", "--token=x"}, Map.of()));

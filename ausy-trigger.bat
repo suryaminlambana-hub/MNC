@@ -1,6 +1,6 @@
 @echo off
 REM ==========================================================================
-REM  AUSY - pemicu Generate File ACCTXT (REQ_AUSY_00058), untuk Windows.
+REM  AUSY - scheduler Generate File ACCTXT Hari Ini (REQ_AUSY_00058), untuk Windows.
 REM  Cukup di-double-click. Menjalankan target\ausy-2.0.0-trigger.jar; setelan
 REM  (AUSY_TRIGGER_TOKEN, port) dibaca otomatis dari .env di folder ini.
 REM  Aplikasi AUSY harus sedang jalan.

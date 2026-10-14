@@ -177,6 +177,11 @@ public final class AusyTrigger {
 
     private static void tulis(String s) {
         System.out.println(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                + " AUSY pemicu Generate ACCTXT: " + s.replace("2014", "-"));   // konsol Windows/cron tidak selalu UTF-8
+                + " AUSY scheduler Generate ACCTXT: " + ascii(s));
+    }
+
+    /** Tanda pisah panjang jadi "-": konsol Windows / log cron tidak selalu UTF-8. Isi lain tidak diubah. */
+    static String ascii(String s) {
+        return s.replace('—', '-');
     }
 }

@@ -33,7 +33,7 @@ import java.security.MessageDigest;
 @RestController
 public class AcctxtTriggerController {
 
-    public static final String PELAKU = "jar-pemicu";
+    public static final String PELAKU = "scheduler";   // REQ_AUSY_00061: istilahnya "scheduler"
     public static final String HEADER = "X-AUSY-Token";
     public static final String PATH = "/api/acctxt/generate";
 
@@ -50,10 +50,10 @@ public class AcctxtTriggerController {
     public ResponseEntity<String> generate(@RequestHeader(value = HEADER, required = false) String diberikan) {
         if (token.isEmpty())
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("GAGAL\nPemicu JAR belum diaktifkan: AUSY_TRIGGER_TOKEN kosong di .env server.");
+                    .body("GAGAL\nScheduler belum diaktifkan: AUSY_TRIGGER_TOKEN kosong di .env server.");
         if (!sama(token, diberikan))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("GAGAL\nToken pemicu salah — samakan AUSY_TRIGGER_TOKEN dengan .env server.");
+                    .body("GAGAL\nToken scheduler salah - samakan AUSY_TRIGGER_TOKEN dengan .env server.");
 
         AcctxtSchedulerLog hasil = scheduler.jalankanHariIni(PELAKU);
         boolean kosong = !hasil.isBerhasil() && (AcctxtGenerateService.TIDAK_ADA_HARI_INI.equals(hasil.getPesan())

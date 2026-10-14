@@ -8,7 +8,7 @@ ISI PAKET
   setup-db.sql       Bikin database + user (jalankan sekali)
   .env.example       Template konfigurasi
   start.sh           Menjalankan aplikasi (auto-setup DB kalau belum ada)
-  ausy-trigger.jar   Pemicu tombol Generate File ACCTXT, dijadwalkan sendiri (lihat bawah)
+  ausy-trigger.jar   Scheduler: menjalankan tombol Generate File ACCTXT Hari Ini (lihat bawah)
   README.txt         Berkas ini
 
 PRASYARAT (sekali saja)
@@ -36,11 +36,11 @@ CATATAN
   - Skema tabel & data awal dibuat OTOMATIS oleh aplikasi saat start
     pertama (Flyway). Tidak perlu import SQL skema manual.
 
-GENERATE FILE ACCTXT TERJADWAL (ausy-trigger.jar)
+SCHEDULER GENERATE FILE ACCTXT (ausy-trigger.jar)
   ausy-trigger.jar "menekan" tombol Generate File ACCTXT Hari Ini di
   aplikasi yang sedang jalan: export yang disetujui HARI INI dan belum digenerate
   dibuatkan file ACCTXT, dikirim ke FTP, dan dicatat di Riwayat serta
-  audit trail (pelaku: jar-pemicu). Jam jalannya diatur sendiri.
+  audit trail (pelaku: scheduler). Jam jalannya diatur sendiri.
 
   1. Isi token di .env (acak & panjang), lalu restart aplikasi:
        AUSY_TRIGGER_TOKEN=<hasil: openssl rand -hex 24>
