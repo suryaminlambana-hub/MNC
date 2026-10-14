@@ -37,8 +37,8 @@ CATATAN
     pertama (Flyway). Tidak perlu import SQL skema manual.
 
 GENERATE FILE ACCTXT TERJADWAL (ausy-trigger.jar)
-  ausy-trigger.jar "menekan" tombol Generate File ACCTXT di aplikasi
-  yang sedang jalan: seluruh isi penampungan yang belum digenerate
+  ausy-trigger.jar "menekan" tombol Generate File ACCTXT Hari Ini di
+  aplikasi yang sedang jalan: export yang disetujui HARI INI dan belum digenerate
   dibuatkan file ACCTXT, dikirim ke FTP, dan dicatat di Riwayat serta
   audit trail (pelaku: jar-pemicu). Jam jalannya diatur sendiri.
 

@@ -63,7 +63,8 @@ Commit `9c5b149`. DB naik dari v49 ke **v52**.
   penjelasan tim: "file .jar-nya hanya untuk menekan tombol generate, jadwalnya mereka atur sendiri").
   - JAR kecil terpisah (±6 KB, hanya JDK). Saat dijalankan, ia memanggil aplikasi yang sedang
     jalan (`POST /api/acctxt/generate`, dijaga token `AUSY_TRIGGER_TOKEN`), yang mengerjakan
-    persis yang dikerjakan "Jalankan Sekarang": seluruh isi penampungan dibuatkan file ACCTXT,
+    persis yang dikerjakan tombol **Generate File ACCTXT Hari Ini**: export yang disetujui HARI INI
+    dan belum digenerate dibuatkan file ACCTXT (bukan seluruh penampungan lintas tanggal),
     dikirim ke FTP, dicatat di Riwayat dan audit trail dengan pelaku `jar-pemicu`.
   - Terbentuk otomatis tiap `mvn package` (`target/ausy-2.0.0-trigger.jar`) dan ikut paket deploy
     sebagai `/opt/ausy/ausy-trigger.jar`. Cara pakai + contoh crontab: `packaging/README.txt`.

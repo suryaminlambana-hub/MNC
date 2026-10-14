@@ -240,15 +240,25 @@ public class AcctxtSchedulerService {
         return jalankan(PELAKU);
     }
 
-    /**
-     * Sama dengan {@link #jalankan()}, dengan nama pelaku sendiri di audit trail — mis. JAR pemicu
-     * yang dijadwalkan MNC ({@link com.mnc.ausy.web.AcctxtTriggerController}).
-     */
+    /** Sama dengan {@link #jalankan()}, dengan nama pelaku sendiri di audit trail. */
     public AcctxtSchedulerLog jalankan(String pelaku) {
+        return catatJalan(pelaku, () -> acctxt.generateSemuaMenunggu(pelaku));
+    }
+
+    /**
+     * Seperti tombol "Generate File ACCTXT Hari Ini": hanya export yang disetujui HARI INI dan
+     * belum digenerate, dicatat di riwayat yang sama. Dipakai JAR pemicu yang dijadwalkan MNC
+     * ({@link com.mnc.ausy.web.AcctxtTriggerController}, REQ_AUSY_00058).
+     */
+    public AcctxtSchedulerLog jalankanHariIni(String pelaku) {
+        return catatJalan(pelaku, () -> acctxt.generateToday(pelaku));
+    }
+
+    private AcctxtSchedulerLog catatJalan(String pelaku, java.util.function.Supplier<AcctxtGenerateService.Result> kerja) {
         AcctxtSchedulerLog log = new AcctxtSchedulerLog();
         log.setMulai(LocalDateTime.now());
         try {
-            AcctxtGenerateService.Result r = acctxt.generateSemuaMenunggu(pelaku);
+            AcctxtGenerateService.Result r = kerja.get();
             log.setBerhasil(r.ok());
             log.setPesan(r.message());
             log.setFileName(r.fileName());

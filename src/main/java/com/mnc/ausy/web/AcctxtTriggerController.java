@@ -18,8 +18,9 @@ import java.security.MessageDigest;
  * Tombol Generate ACCTXT yang "ditekan" oleh file {@code ausy-trigger.jar} (REQ_AUSY_00058).
  * <p>
  * MNC menjadwalkan JAR itu sendiri (crontab, jam berapa pun yang mereka mau). JAR-nya hanya
- * memanggil alamat ini; yang dikerjakan di sini persis sama dengan tombol "Jalankan Sekarang" —
- * seluruh isi penampungan yang belum digenerate disusun jadi berkas ACCTXT, dikirim ke FTP,
+ * memanggil alamat ini; yang dikerjakan di sini persis sama dengan tombol "Generate File ACCTXT
+ * Hari Ini" — export yang disetujui HARI INI dan belum digenerate disusun jadi berkas ACCTXT,
+ * dikirim ke FTP,
  * dicatat di Riwayat dan audit trail dengan pelaku {@value #PELAKU}.
  * <p>
  * Dijaga token rahasia {@code AUSY_TRIGGER_TOKEN} di .env (header {@value #HEADER}), karena
@@ -54,8 +55,9 @@ public class AcctxtTriggerController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("GAGAL\nToken pemicu salah — samakan AUSY_TRIGGER_TOKEN dengan .env server.");
 
-        AcctxtSchedulerLog hasil = scheduler.jalankan(PELAKU);
-        boolean kosong = !hasil.isBerhasil() && AcctxtGenerateService.TIDAK_ADA_DATA.equals(hasil.getPesan());
+        AcctxtSchedulerLog hasil = scheduler.jalankanHariIni(PELAKU);
+        boolean kosong = !hasil.isBerhasil() && (AcctxtGenerateService.TIDAK_ADA_HARI_INI.equals(hasil.getPesan())
+                || AcctxtGenerateService.TIDAK_ADA_DATA.equals(hasil.getPesan()));
         String status = hasil.isBerhasil() ? "BERHASIL" : kosong ? "KOSONG" : "GAGAL";
         String pesan = hasil.getPesan() == null ? "" : hasil.getPesan();
         return ResponseEntity.status(hasil.isBerhasil() || kosong ? HttpStatus.OK : HttpStatus.INTERNAL_SERVER_ERROR)

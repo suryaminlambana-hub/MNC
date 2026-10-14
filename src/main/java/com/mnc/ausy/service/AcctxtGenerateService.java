@@ -112,6 +112,11 @@ public class AcctxtGenerateService {
     public static final String TIDAK_ADA_DATA =
             "Tidak ada data di penampungan yang menunggu digenerate.";
 
+    /** Pesan "Generate Hari Ini" saat tidak ada yang disetujui hari ini (bukan kegagalan). */
+    public static final String TIDAK_ADA_HARI_INI =
+            "Tidak ada export yang disetujui hari ini dan belum digenerate."
+            + " Daftar \"Menunggu digenerate\" sedang kosong untuk hari ini.";
+
     public static final java.util.List<String> AUDIT_AKSI = java.util.List.of(
             AUDIT_SUSUN_ULANG, AUDIT_SEMUA, AUDIT_HARI_INI, AUDIT_GAGAL);
 
@@ -328,8 +333,7 @@ public class AcctxtGenerateService {
         List<GlExportRequest> isi = requests.findApprovedNotGeneratedBetween(
                 today.atStartOfDay(), today.plusDays(1).atStartOfDay());
         if (isi.isEmpty())
-            return Result.fail("Tidak ada export yang disetujui hari ini dan belum digenerate."
-                    + " Daftar \"Menunggu digenerate\" sedang kosong untuk hari ini.");
+            return Result.fail(TIDAK_ADA_HARI_INI);
 
         for (GlExportRequest req : isi) {
             gl.markExported(req.getId());
