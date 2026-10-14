@@ -59,6 +59,21 @@ Commit `9c5b149`. DB naik dari v49 ke **v52**.
     mati). Request dengan sesi yang sudah habis diantar ke login dengan pesan yang sama.
   - Halaman login yang dibiarkan terbuka dimuat ulang sendiri sebelum token form-nya kedaluwarsa.
   - Lamanya bisa diatur lewat `AUSY_SESSION_IDLE` di `.env` (bawaan `10m`).
+- **File `ausy-trigger.jar`: pemicu tombol Generate File ACCTXT** (REQ_AUSY_00058, sesuai
+  penjelasan tim: "file .jar-nya hanya untuk menekan tombol generate, jadwalnya mereka atur sendiri").
+  - JAR kecil terpisah (±6 KB, hanya JDK). Saat dijalankan, ia memanggil aplikasi yang sedang
+    jalan (`POST /api/acctxt/generate`, dijaga token `AUSY_TRIGGER_TOKEN`), yang mengerjakan
+    persis yang dikerjakan "Jalankan Sekarang": seluruh isi penampungan dibuatkan file ACCTXT,
+    dikirim ke FTP, dicatat di Riwayat dan audit trail dengan pelaku `jar-pemicu`.
+  - Terbentuk otomatis tiap `mvn package` (`target/ausy-2.0.0-trigger.jar`) dan ikut paket deploy
+    sebagai `/opt/ausy/ausy-trigger.jar`. Cara pakai + contoh crontab: `packaging/README.txt`.
+  - Kode keluar 0 (file terbit / penampungan kosong), 1 (penyusunan gagal), 2 (aplikasi tidak bisa
+    dihubungi, token salah, `.env` tidak ditemukan) — bisa dipantau dari crontab.
+  - **Penjadwal 23:00 di dalam aplikasi kini bawaannya mati** (`AUSY_SCHEDULER_ENABLED=false`):
+    jadwalnya diatur MNC lewat JAR ini. Panelnya di halaman Generate File ACCTXT diganti
+    keterangan "Generate otomatis" (status pemicu JAR); riwayat jalannya tetap tampil.
+  - Mode `--ausy.task=generate-acctxt` pada JAR aplikasi tetap ada, tetapi pemicu yang dipakai
+    adalah `ausy-trigger.jar`.
 
 ### Migrasi DB
 Dijalankan Flyway otomatis saat service start.
@@ -132,7 +147,18 @@ Dijalankan Flyway otomatis saat service start.
 
 ### Setelan server
 
+**Pemicu `ausy-trigger.jar` (REQ_AUSY_00058).** Tambahkan di `/opt/ausy/.env` lalu restart:
+
+```
+AUSY_TRIGGER_TOKEN=<acak & panjang, mis. hasil openssl rand -hex 24>
+```
+
+Tanpa token, pemicu JAR mati (halaman Generate menulis "PEMICU JAR BELUM DIAKTIFKAN"). Jadwalnya
+dipasang MNC sendiri, mis. `sudo crontab -u ausy -e` lalu
+`0 23 * * * java -jar /opt/ausy/ausy-trigger.jar --env=/opt/ausy/.env >> /opt/ausy/logs/trigger.log 2>&1`.
+
 **Memasang rilis ini TANPA penjadwalnya hidup — ini jalur yang dipilih untuk rilis pertama.**
+(Sejak pemicu JAR, `AUSY_SCHEDULER_ENABLED` bawaannya sudah `false`.)
 Tambahkan di `/opt/ausy/.env`:
 
 ```

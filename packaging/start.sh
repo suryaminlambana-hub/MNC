@@ -32,7 +32,7 @@ if [ "${JV:-0}" -lt 21 ]; then
 fi
 
 # --- 3. cari JAR ---
-JAR=$(ls ausy-*.jar 2>/dev/null | head -1 || true)
+JAR=$(ls ausy-*.jar 2>/dev/null | grep -v '^ausy-trigger' | head -1 || true)   # ausy-trigger.jar bukan aplikasinya
 if [ -z "$JAR" ]; then echo "ERROR: file JAR aplikasi tidak ditemukan di folder ini."; exit 1; fi
 
 # --- 4. pastikan DB bisa diakses; kalau belum, jalankan setup-db.sql otomatis ---

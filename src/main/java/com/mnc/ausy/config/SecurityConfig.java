@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Configuration;
+import com.mnc.ausy.web.AcctxtTriggerController;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authorization.AuthorizationDecision;
@@ -56,6 +58,9 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/webjars/**", "/css/**", "/js/**", "/img/**", "/favicon.ico").permitAll()
+                // REQ_AUSY_00058: dipanggil ausy-trigger.jar, bukan user yang login — dijaga
+                // token AUSY_TRIGGER_TOKEN di controllernya sendiri.
+                .requestMatchers(HttpMethod.POST, AcctxtTriggerController.PATH).permitAll()
                 // Segregation of Duties tidak lagi di-hardcode per group id: hak akses dibaca dari
                 // group_menu (Access Menu) lewat AccessService, supaya group buatan admin bisa
                 // membuka menu yang diberikan padanya (BUG_AUSY_00113) dan admin yang mengaturnya.
@@ -101,6 +106,8 @@ public class SecurityConfig {
             // REQ_AUSY_00060: request yang membawa sesi yang sudah habis (idle) diantar ke halaman
             // login dengan pesan "sesi berakhir", bukan sekadar halaman login kosong.
             .sessionManagement(s -> s.invalidSessionUrl("/login?expired"))
+            // Pemanggil JAR tidak punya sesi/form, jadi tidak membawa token CSRF; penjaganya token pemicu.
+            .csrf(c -> c.ignoringRequestMatchers(AcctxtTriggerController.PATH))
             // Never show the whitelabel 403 (e.g. a stale CSRF token from a cached tab):
             // bounce anonymous users to a fresh login, authenticated users back to the dashboard.
             .exceptionHandling(ex -> ex.accessDeniedHandler((req, res, e) -> {

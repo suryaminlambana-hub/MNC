@@ -128,7 +128,7 @@ fi
 
 echo ">> [7/7] Verifikasi"
 sleep 30
-JAR_LOCAL=$(shasum -a 256 target/ausy-*.jar | cut -d' ' -f1)
+JAR_LOCAL=$(shasum -a 256 $(ls target/ausy-*.jar | grep -v -- '-trigger.jar$' | head -1) | cut -d' ' -f1)
 JAR_REMOTE=$("${SSH[@]}" "PW='$PW'; echo \"\$PW\" | sudo -S -p '' sha256sum /opt/ausy/ausy-2.0.0.jar | cut -d' ' -f1")
 if [ "$JAR_LOCAL" = "$JAR_REMOTE" ]; then echo "   jar di server = build ini"; else
   echo "GAGAL: jar di server BUKAN build ini (lokal=${JAR_LOCAL:0:12} server=${JAR_REMOTE:0:12})"; exit 1; fi

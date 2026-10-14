@@ -237,10 +237,18 @@ public class AcctxtSchedulerService {
      * kegagalan yang paling perlu dilihat justru yang paling tidak meninggalkan jejak.
      */
     public AcctxtSchedulerLog jalankan() {
+        return jalankan(PELAKU);
+    }
+
+    /**
+     * Sama dengan {@link #jalankan()}, dengan nama pelaku sendiri di audit trail — mis. JAR pemicu
+     * yang dijadwalkan MNC ({@link com.mnc.ausy.web.AcctxtTriggerController}).
+     */
+    public AcctxtSchedulerLog jalankan(String pelaku) {
         AcctxtSchedulerLog log = new AcctxtSchedulerLog();
         log.setMulai(LocalDateTime.now());
         try {
-            AcctxtGenerateService.Result r = acctxt.generateSemuaMenunggu(PELAKU);
+            AcctxtGenerateService.Result r = acctxt.generateSemuaMenunggu(pelaku);
             log.setBerhasil(r.ok());
             log.setPesan(r.message());
             log.setFileName(r.fileName());
@@ -248,7 +256,7 @@ public class AcctxtSchedulerService {
             if (r.ok()) LOG.info("Penjadwal ACCTXT: {}", r.message());
             else {
                 // Sukses sudah dicatat di dalam penyusunannya; yang gagal belum (REQ_AUSY_00059).
-                acctxt.catatGagal(PELAKU, r.message());
+                acctxt.catatGagal(pelaku, r.message());
                 LOG.warn("Penjadwal ACCTXT tidak menghasilkan berkas: {}", r.message());
             }
         } catch (FtpGagalException e) {
@@ -259,12 +267,12 @@ public class AcctxtSchedulerService {
             log.setPesan(e.pesan());
             log.setFileName(e.getFileName());
             log.setRowsCount(e.getRows());
-            acctxt.catatGagal(PELAKU, e.pesan());
+            acctxt.catatGagal(pelaku, e.pesan());
             LOG.warn("Penjadwal ACCTXT: {}", e.pesan());
         } catch (Exception e) {
             log.setBerhasil(false);
             log.setPesan("Gagal: " + e.getMessage());
-            acctxt.catatGagal(PELAKU, String.valueOf(e.getMessage()));
+            acctxt.catatGagal(pelaku, String.valueOf(e.getMessage()));
             LOG.error("Penjadwal ACCTXT gagal", e);
         }
         return riwayat.save(log);

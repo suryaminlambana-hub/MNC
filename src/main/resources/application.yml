@@ -50,8 +50,11 @@ ausy:
   export-dir: ${AUSY_EXPORT_DIR:}
   # REQ_AUSY_00061 — saklar penjadwal tingkat server. false = penjadwal tidak dipasang sama
   # sekali: tidak ada jalan otomatis, tidak ada susulan, dan tombolnya hilang dari layar.
-  # Dipakai saat sebuah rilis ingin dipasang tanpa penjadwalnya hidup dulu.
-  scheduler-enabled: ${AUSY_SCHEDULER_ENABLED:true}
+  # Bawaan false: jadwal generate diatur MNC sendiri lewat ausy-trigger.jar (REQ_AUSY_00058).
+  scheduler-enabled: ${AUSY_SCHEDULER_ENABLED:false}
+  # REQ_AUSY_00058 — token rahasia yang dibawa ausy-trigger.jar saat "menekan" tombol Generate
+  # ACCTXT (POST /api/acctxt/generate). Kosong = pemicu JAR dimatikan.
+  trigger-token: ${AUSY_TRIGGER_TOKEN:}
   # REQ_AUSY_00061 — kapan berkas ACCTXT dibuat otomatis. Bawaan: tiap hari jam 23:00 WIB.
   # Penjadwalnya masih bisa dimatikan dari halaman Generate File ACCTXT tanpa mengubah ini.
   scheduler-cron: ${AUSY_SCHEDULER_CRON:0 0 23 * * *}

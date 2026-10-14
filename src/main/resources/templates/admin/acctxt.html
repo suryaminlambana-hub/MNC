@@ -177,6 +177,29 @@
   <!--/* REQ_AUSY_00061: penjadwal otomatis. Tombol manual di atas TIDAK diganti — keduanya
          berdampingan, dan status serta riwayat jalannya ditulis di layar supaya "kenapa berkas
          hari itu tidak terbit" bisa dibaca, bukan ditebak. */-->
+  <!--/* REQ_AUSY_00058: jadwal generate diatur MNC sendiri lewat ausy-trigger.jar. Saat penjadwal
+         bawaan tidak dipasang di server (bawaan), panelnya diganti keterangan pemicu JAR. */-->
+  <th:block th:unless="${schedulerDiizinkan}">
+  <h2 class="h6 text-uppercase text-muted mt-4 mb-2">Generate otomatis</h2>
+  <div class="ausy-card mb-3" style="padding:20px 22px">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <span th:if="${triggerAktif}" class="badge bg-success-subtle text-success">
+        <i class="fa-solid fa-circle-check"></i> PEMICU JAR AKTIF</span>
+      <span th:unless="${triggerAktif}" class="badge bg-secondary-subtle text-secondary">
+        <i class="fa-solid fa-circle-pause"></i> PEMICU JAR BELUM DIAKTIFKAN</span>
+      <span class="text-muted small">
+        File <code>ausy-trigger.jar</code> "menekan" tombol Generate: <strong>seluruh isi penampungan</strong>
+        yang belum digenerate dibuatkan file ACCTXT dan dikirim ke FTP. Jadwalnya diatur MNC (crontab).
+      </span>
+    </div>
+    <div class="mt-2" th:unless="${triggerAktif}">
+      <small class="text-muted">Isi <code>AUSY_TRIGGER_TOKEN</code> di <code>.env</code> server lalu nyalakan ulang
+        aplikasi supaya pemicu JAR bisa dipakai.</small>
+    </div>
+  </div>
+  </th:block>
+
+  <th:block th:if="${schedulerDiizinkan}">
   <h2 class="h6 text-uppercase text-muted mt-4 mb-2">Penjadwal otomatis</h2>
   <div class="ausy-card mb-3" style="padding:20px 22px">
     <div class="d-flex flex-wrap align-items-center gap-3">
@@ -252,8 +275,10 @@
       </small>
     </div>
   </div>
+  </th:block>
 
-  <h2 class="h6 text-uppercase text-muted mb-2">Riwayat penjadwal</h2>
+  <h2 class="h6 text-uppercase text-muted mb-2"
+      th:text="${schedulerDiizinkan} ? 'Riwayat penjadwal' : 'Riwayat generate otomatis (ausy-trigger.jar)'">Riwayat penjadwal</h2>
   <div class="ausy-card">
     <table class="table align-middle mb-0">
       <thead><tr><th>Waktu</th><th>Hasil</th><th>File</th><th class="text-end">Baris</th><th>Keterangan</th></tr></thead>

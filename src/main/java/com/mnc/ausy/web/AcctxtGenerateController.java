@@ -5,6 +5,7 @@ import com.mnc.ausy.security.AusyUserDetails;
 import com.mnc.ausy.service.AcctxtGenerateService;
 import com.mnc.ausy.service.AcctxtSchedulerService;
 import com.mnc.ausy.service.FtpGagalException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -29,7 +30,12 @@ public class AcctxtGenerateController {
     private final AcctxtGenerateService acctxt;
     private final AcctxtSchedulerService scheduler;
 
-    public AcctxtGenerateController(AcctxtGenerateService acctxt, AcctxtSchedulerService scheduler) {
+    /** Pemicu ausy-trigger.jar aktif (token terisi di .env) — REQ_AUSY_00058. */
+    private final boolean triggerAktif;
+
+    public AcctxtGenerateController(AcctxtGenerateService acctxt, AcctxtSchedulerService scheduler,
+                                    @Value("${ausy.trigger-token:}") String triggerToken) {
+        this.triggerAktif = triggerToken != null && !triggerToken.isBlank();
         this.acctxt = acctxt;
         this.scheduler = scheduler;
     }
@@ -62,6 +68,7 @@ public class AcctxtGenerateController {
         // tidak terbit" bisa dibaca, bukan ditebak.
         model.addAttribute("schedulerAktif", scheduler.aktif());
         model.addAttribute("schedulerDiizinkan", scheduler.diizinkanServer());
+        model.addAttribute("triggerAktif", triggerAktif);
         model.addAttribute("schedulerAktifDiLayar", scheduler.aktifDiLayar());
         model.addAttribute("schedulerSetelan", scheduler.setelan());
         model.addAttribute("schedulerRiwayat", scheduler.riwayatTerakhir(10));
