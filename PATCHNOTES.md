@@ -81,6 +81,10 @@ Commit `9c5b149`. DB naik dari v49 ke **v52**.
   - **Windows:** `ausy-trigger.bat` di folder proyek bisa di-double-click (jendela ditahan supaya
     hasilnya terbaca; dari Task Scheduler pakai `ausy-trigger.bat /nopause`). Double-click
     langsung pada file JAR memang tidak menampilkan apa pun.
+  - **Windows: `build.bat`** di folder proyek (double-click) menghentikan dulu aplikasi AUSY yang
+    masih jalan dari folder itu, lalu `mvnw clean package`. Tanpa itu build gagal dengan
+    "Failed to delete ...\target" karena Windows mengunci JAR yang sedang dijalankan. Yang
+    dihentikan hanya proses Java AUSY (`ausy-*.jar` / `com.mnc.ausy`), Java lain tidak.
 
 ### Migrasi DB
 Dijalankan Flyway otomatis saat service start.
