@@ -93,8 +93,14 @@ public class SecurityConfig {
             .logout(logout -> logout
                 .logoutUrl("/logout")
                 .logoutSuccessUrl("/login?logout")
+                // Cookie sesi ikut dibuang: tanpa ini halaman "Anda telah keluar" datang membawa
+                // cookie sesi yang sudah mati dan dibaca sebagai sesi kedaluwarsa (lihat di bawah).
+                .deleteCookies("JSESSIONID")
                 .permitAll()
             )
+            // REQ_AUSY_00060: request yang membawa sesi yang sudah habis (idle) diantar ke halaman
+            // login dengan pesan "sesi berakhir", bukan sekadar halaman login kosong.
+            .sessionManagement(s -> s.invalidSessionUrl("/login?expired"))
             // Never show the whitelabel 403 (e.g. a stale CSRF token from a cached tab):
             // bounce anonymous users to a fresh login, authenticated users back to the dashboard.
             .exceptionHandling(ex -> ex.accessDeniedHandler((req, res, e) -> {

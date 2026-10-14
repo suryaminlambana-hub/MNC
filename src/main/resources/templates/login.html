@@ -17,7 +17,9 @@
 
     <div th:if="${param.error}" class="alert alert-danger py-2">Username atau password salah.</div>
     <div th:if="${param.logout}" class="alert alert-success py-2">Anda telah keluar.</div>
-    <div th:if="${param.expired}" class="alert alert-warning py-2">Sesi berakhir, silakan login lagi.</div>
+    <!--/* REQ_AUSY_00060: sesi berakhir setelah 10 menit tanpa aktivitas. */-->
+    <div th:if="${param.expired}" class="alert alert-warning py-2">Sesi Anda telah berakhir karena tidak ada
+        aktivitas. Silakan login kembali.</div>
     <!--/* BUG_AUSY_00190: password benar, tapi masa berlakunya habis. Disebut tegas berikut apa
            yang harus dilakukan — tanpa itu orangnya hanya tahu "gagal" dan mencoba terus. */-->
     <div th:if="${param.passexpired}" class="alert alert-danger py-2 text-start">
@@ -54,6 +56,18 @@
 <div class="ausy-copyright ausy-login-copyright">Copyright &copy; Hak Cipta <span th:text="${#dates.year(#dates.createNow())}">2026</span>
     PT. Bank MNC Internasional Tbk. Berizin dan Diawasi oleh Otoritas Jasa Keuangan serta
     merupakan peserta penjaminan Lembaga Penjamin Simpanan.</div>
+<script th:inline="javascript">
+    // REQ_AUSY_00060: sesi (beserta token CSRF form ini) ikut berakhir setelah idle. Halaman login
+    // yang dibiarkan terbuka dimuat ulang sebelum itu, selama belum diisi — supaya login tidak
+    // ditolak dengan pesan "sesi berakhir" begitu akhirnya dipakai.
+    (function(){
+        var idle = /*[[${sessionIdleSeconds}]]*/ 600;
+        setInterval(function(){
+            var u = document.getElementById('username'), p = document.getElementById('password');
+            if (u && p && !u.value && !p.value) location.replace(location.pathname);
+        }, Math.max(60, idle - 60) * 1000);
+    })();
+</script>
 <script>
     (function(){
         var pw=document.getElementById('password'), tg=document.getElementById('pwToggle');

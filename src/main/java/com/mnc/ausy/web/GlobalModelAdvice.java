@@ -16,9 +16,12 @@ public class GlobalModelAdvice {
     private final MenuService menuService;
     private final AccessService access;
     private final ApprovalService approval;
+    private final SessionIdle sessionIdle;
 
-    public GlobalModelAdvice(MenuService menuService, AccessService access, ApprovalService approval) {
+    public GlobalModelAdvice(MenuService menuService, AccessService access, ApprovalService approval,
+                             SessionIdle sessionIdle) {
         this.menuService = menuService; this.access = access; this.approval = approval;
+        this.sessionIdle = sessionIdle;
     }
 
     /**
@@ -49,6 +52,12 @@ public class GlobalModelAdvice {
     @ModelAttribute("currentUser")
     public AusyUserDetails currentUser(@AuthenticationPrincipal AusyUserDetails user) {
         return user;
+    }
+
+    /** Batas idle login dalam detik, untuk timer di layout (REQ_AUSY_00060). */
+    @ModelAttribute("sessionIdleSeconds")
+    public long sessionIdleSeconds() {
+        return sessionIdle.idleSeconds();
     }
 
     /**

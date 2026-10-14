@@ -217,5 +217,81 @@
   tick(); setInterval(tick, 1000);
 })();
 </script>
+
+<!--/* REQ_AUSY_00060: login berakhir setelah 10 menit tanpa aktivitas. Peringatan 1 menit sebelumnya. */-->
+<div th:if="${currentUser != null}" class="modal fade" id="idleModal" tabindex="-1" data-bs-backdrop="static" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="fa-solid fa-clock"></i> Sesi akan berakhir</h5></div>
+      <div class="modal-body">
+        Sesi Anda akan berakhir dalam <b id="idleSisa">60</b> detik karena tidak ada aktivitas.
+        Klik <b>Tetap Login</b> untuk melanjutkan.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="idleKeluar">Keluar</button>
+        <button type="button" class="btn btn-primary" id="idleLanjut">Tetap Login</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script th:if="${currentUser != null}" th:inline="javascript">
+(function(){
+  var IDLE = /*[[${sessionIdleSeconds}]]*/ 600, WARN = 60;
+  var pingUrl = /*[[@{/session/ping}]]*/ '/session/ping',
+      logoutUrl = /*[[@{/logout}]]*/ '/logout',
+      loginUrl = /*[[@{/login}]]*/ '/login';
+  var KEY = 'ausy-last-activity';   // dibagi antar tab: aktif di satu tab = aktif di semua tab
+  var mem = Date.now(), lastPing = Date.now(), selesai = false;
+  function baca(){ try { var v = Number(localStorage.getItem(KEY)); return v > mem ? v : mem; } catch(e) { return mem; } }
+  function tulis(t){ mem = t; try { localStorage.setItem(KEY, String(t)); } catch(e) {} }
+  tulis(Date.now());
+
+  var el = document.getElementById('idleModal'), modal = el ? new bootstrap.Modal(el) : null, tampil = false;
+  function tutup(){ if (tampil && modal) { modal.hide(); tampil = false; } }
+
+  // Sesi server diperpanjang lewat ping selama user aktif, paling sering tiap 30 detik.
+  function ping(){
+    lastPing = Date.now();
+    fetch(pingUrl, { credentials: 'same-origin', cache: 'no-store' }).then(function(r){
+      if (r.redirected || /\/login/.test(r.url)) habis();   // sesi server sudah tidak ada
+    }).catch(function(){});
+  }
+
+  function aktif(){
+    if (selesai) return;
+    var now = Date.now();
+    if (now - mem > 1000) tulis(now);
+    tutup();
+    if (now - lastPing > 30000) ping();
+  }
+  ['click', 'keydown', 'scroll', 'wheel', 'touchstart', 'input', 'submit'].forEach(function(ev){
+    window.addEventListener(ev, aktif, { capture: true, passive: true });
+  });
+
+  // tujuan: '?expired' (habis karena idle) atau '?logout' (keluar sendiri dari peringatan).
+  function habis(tujuan){
+    if (selesai) return;
+    selesai = true;
+    var h = {}, tok = document.querySelector('meta[name="_csrf"]'), hdr = document.querySelector('meta[name="_csrf_header"]');
+    if (tok && hdr) h[hdr.content] = tok.content;
+    fetch(logoutUrl, { method: 'POST', headers: h, credentials: 'same-origin', redirect: 'manual' })
+      .catch(function(){}).then(function(){ location.replace(loginUrl + (tujuan || '?expired')); });
+  }
+
+  setInterval(function(){
+    if (selesai) return;
+    var diam = (Date.now() - baca()) / 1000;
+    if (diam >= IDLE) { tutup(); habis(); return; }
+    if (diam >= IDLE - WARN) {
+      document.getElementById('idleSisa').textContent = Math.max(0, Math.ceil(IDLE - diam));
+      if (!tampil && modal) { modal.show(); tampil = true; }
+    } else tutup();
+  }, 1000);
+
+  var lanjut = document.getElementById('idleLanjut'), keluar = document.getElementById('idleKeluar');
+  if (lanjut) lanjut.addEventListener('click', function(){ tulis(Date.now()); ping(); tutup(); });
+  if (keluar) keluar.addEventListener('click', function(){ habis('?logout'); });
+})();
+</script>
 </body>
 </html>

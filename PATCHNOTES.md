@@ -44,6 +44,21 @@ Commit `9c5b149`. DB naik dari v49 ke **v52**.
   digenerate" tetap commit walau pengiriman gagal, padahal pesannya berbunyi "export tetap
   menunggu" — satu batch hilang tiap kali. Sekarang transaksinya dibatalkan dan datanya benar
   kembali ke penampungan.
+- **Login berakhir setelah 10 menit tanpa aktivitas** (REQ_AUSY_00060 di tracker QA 12-10-2026,
+  "Login expired belum dikonfigurasi menjadi 10 menit idle"). Dulu bawaan Tomcat 30 menit, dan
+  dihitung dari request terakhir, bukan dari aktivitas user.
+  - Klik, scroll, ketik, input, dan submit mengatur ulang timernya, di semua halaman. Aktivitas
+    di satu tab browser berlaku untuk tab lain.
+  - 1 menit sebelum habis muncul peringatan "Sesi Anda akan berakhir dalam N detik" dengan
+    tombol **Tetap Login** / **Keluar**.
+  - Saat habis, user di-logout dan diantar ke halaman login: "Sesi Anda telah berakhir karena
+    tidak ada aktivitas. Silakan login kembali."
+  - Selama user aktif, browser memanggil `/session/ping` (paling sering tiap 30 detik) supaya
+    sesi server ikut diperpanjang walau aktivitasnya tidak memicu request (mis. mengisi form).
+  - Sesi server diberi batas idle + 1 menit sebagai pengaman (tetap habis walau JavaScript
+    mati). Request dengan sesi yang sudah habis diantar ke login dengan pesan yang sama.
+  - Halaman login yang dibiarkan terbuka dimuat ulang sendiri sebelum token form-nya kedaluwarsa.
+  - Lamanya bisa diatur lewat `AUSY_SESSION_IDLE` di `.env` (bawaan `10m`).
 
 ### Migrasi DB
 Dijalankan Flyway otomatis saat service start.

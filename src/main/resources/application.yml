@@ -38,6 +38,10 @@ spring:
           no-cache: true        # always revalidate CSS/JS so UI changes show without a hard refresh
 
 ausy:
+  # REQ_AUSY_00060 — login berakhir setelah sekian lama TANPA aktivitas (klik, scroll, ketik,
+  # submit). Timer di browser yang menghitungnya dan me-logout; sesi di server diberi lebih
+  # 1 menit sebagai pengaman (SessionIdle). Format Duration: 10m, 600s, ...
+  session-idle: ${AUSY_SESSION_IDLE:10m}
   # Folder tempat file ACCTXT hasil export ditulis; core banking mengambilnya dari sana.
   # Arahkan ke root FTP lokal mesin ini (mis. C:/inetpub/ftproot). Kosong / tidak bisa dipakai
   # = bawaan: C:/inetpub/ftproot di Windows, data/txt di OS lain. Folder yang berlaku disebut
