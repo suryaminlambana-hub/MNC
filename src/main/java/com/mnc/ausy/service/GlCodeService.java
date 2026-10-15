@@ -143,10 +143,10 @@ public class GlCodeService {
                 line++;
                 if (row.isBlank()) continue;
                 if (line == 1 && row.toLowerCase().contains("nogl")) continue;   // header
-                String[] c = row.split(",", -1);
-                String code = GlTextRule.trim(c.length > 0 ? c[0] : "");
-                String desc = GlTextRule.trim(c.length > 1 ? c[1] : "");
-                if (isSisaKolomDc(desc)) desc = GlTextRule.trim(c.length > 2 ? c[2] : "");
+                List<String> c = pisahCsv(row);
+                String code = GlTextRule.trim(c.size() > 0 ? c.get(0) : "");
+                String desc = GlTextRule.trim(c.size() > 1 ? c.get(1) : "");
+                if (isSisaKolomDc(desc)) desc = GlTextRule.trim(c.size() > 2 ? c.get(2) : "");
                 if (code.isEmpty() || !validCode(code)) { bad++; continue; }
                 if (glCodes.existsByCode(code) || listed(rows, code)) { dup++; continue; }
                 Map<String,String> m = new LinkedHashMap<>();
@@ -155,6 +155,41 @@ public class GlCodeService {
             }
         }
         return new CsvParse(rows, dup, bad);
+    }
+
+    /**
+     * Pisahkan satu baris CSV menjadi kolom-kolomnya, menghormati tanda kutip ganda.
+     *
+     * {@code split(",")} biasa tidak cukup: daftar Kode GL MNC memuat deskripsi yang di dalamnya
+     * ada koma — "GPBL - UNION BANK OF CALIFORNIA, N.A", "BBN KEND-TOL, PARKIR",
+     * "BBN KOM-SWIFT, TELEX & FAX". Dipisah mentah, deskripsinya terpotong diam-diam di koma itu
+     * dan yang tersimpan tinggal separuh nama, tanpa ada yang menandai bahwa data hilang.
+     *
+     * Aturannya seperti CSV pada umumnya: kolom boleh dibungkus tanda kutip ganda, koma di dalam
+     * bungkus itu bagian dari isinya, dan dua tanda kutip berturut-turut di dalamnya berarti satu
+     * tanda kutip harfiah. Berkas tanpa tanda kutip sama sekali terbaca persis seperti dulu.
+     */
+    static List<String> pisahCsv(String row) {
+        List<String> out = new ArrayList<>();
+        StringBuilder isi = new StringBuilder();
+        boolean dalamKutip = false;
+        for (int i = 0; i < row.length(); i++) {
+            char ch = row.charAt(i);
+            if (dalamKutip) {
+                if (ch != '"') { isi.append(ch); continue; }
+                // "" di dalam bungkus = satu tanda kutip harfiah; selain itu bungkusnya tutup.
+                if (i + 1 < row.length() && row.charAt(i + 1) == '"') { isi.append('"'); i++; }
+                else dalamKutip = false;
+            } else if (ch == '"' && isi.isEmpty()) {
+                dalamKutip = true;                 // hanya di awal kolom
+            } else if (ch == ',') {
+                out.add(isi.toString()); isi.setLength(0);
+            } else {
+                isi.append(ch);
+            }
+        }
+        out.add(isi.toString());
+        return out;
     }
 
     /** Kolom kedua berisi bekas penanda Debit/Credit, bukan deskripsi. */

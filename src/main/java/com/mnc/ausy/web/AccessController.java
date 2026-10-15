@@ -48,7 +48,9 @@ public class AccessController {
     @GetMapping
     public String index(@RequestParam(required=false) String user, Model model,
                         @AuthenticationPrincipal AusyUserDetails me) {
-        // Hak akses user dari role yang mengotorisasi kita tidak boleh diubah dari sini (BUG_AUSY_00133)
+        // Dipakai untuk menyaring CENTANGAN menu saja (BUG_AUSY_00136, di bawah), bukan untuk
+        // menyaring daftar user-nya: sejak REQ_AUSY_00063 Admin boleh mengatur user ber-role
+        // CONFIG APPROVER, yang tidak boleh berpindah tangan hanyalah menu Admin Approval.
         boolean iAmConfigApprover = approval.configAuthorizer(me == null ? null : me.getIdGroup());
         Map<Integer,String> roleName = new HashMap<>();
         for (var g : groups.findAllByOrderByNamaGroupAsc()) roleName.put(g.getIdGroup(), g.getNamaGroup());
@@ -57,6 +59,12 @@ public class AccessController {
         // memegang satu hal — Generate File ACCTXT — dan haknya datang dari cetakan rolenya,
         // bukan dari pengaturan per user. Menampilkannya hanya membuat daftar ini panjang
         // tanpa ada yang bisa diatur.
+        //
+        // User ber-role penyetuju config juga tidak ditampilkan (BUG_AUSY_00133). REQ_AUSY_00063
+        // membuka halaman User untuk mereka — ubah dan hapus kini boleh — tetapi halaman ini
+        // tetap tertutup, karena role itu hanya memegang menu section Admin Approval dan section
+        // itu disembunyikan dari role di bawahnya (BUG_AUSY_00136). Ditampilkan pun yang didapat
+        // Admin hanya daftar centangan kosong.
         List<User> selectable = users.findAll().stream()
                 .filter(u -> iAmConfigApprover || !approval.configAuthorizer(u.getIdGroup()))
                 .filter(u -> !access.isExecuteRole(u.getIdGroup()))

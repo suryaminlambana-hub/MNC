@@ -157,11 +157,12 @@ public class ConfigChangeService {
         if (note==null || note.isBlank()) return "Alasan (reason) wajib diisi.";
         { if (!approval.hasActiveApproverForConfig(me.getIdGroup())) return ApprovalService.NO_APPROVER; }
         if (invalidEmail(email)) return "Format email tidak valid.";
-        // Mengangkat user menjadi CONFIG APPROVER kini diperbolehkan (BUG_AUSY_00194); yang tetap
-        // di luar wewenang Admin adalah menyentuh user yang SUDAH menjadi penyetujunya (di bawah).
+        // Role tujuan maupun role yang sudah dipegang tidak lagi membatasi: Admin boleh mengubah
+        // user ber-role CONFIG APPROVER (REQ_AUSY_00063), sebagaimana ia sudah boleh membuatnya
+        // (BUG_AUSY_00194). Pengamannya bukan larangan ini, melainkan otorisasi Admin Approval
+        // yang tetap harus dilewati setiap pengajuan.
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
-        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
         if (isPending("USER", userId)) return pendingMsg("USER");
         Map<String,String> after = new LinkedHashMap<>();
         after.put("userId", n(u.getUserId())); after.put("nama", n(nama)); after.put("email", n(email));
@@ -185,9 +186,13 @@ public class ConfigChangeService {
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
         if (userId.equalsIgnoreCase(me.getUsername())) return "Tidak bisa mengajukan hapus akun sendiri.";
-        // Akun bawaan sistem: tanpa keduanya tidak ada lagi yang bisa mengonfigurasi maupun
-        // mengotorisasi konfigurasi (BUG_AUSY_00131). Akun buatan admin tetap bisa dihapus.
-        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
+        // Role yang dipegang tidak lagi menghalangi (REQ_AUSY_00063): user ber-role CONFIG
+        // APPROVER pun bisa diajukan hapus oleh Admin.
+        //
+        // Yang menjaga sistem dari kehabisan penyetuju bukan larangan itu, melainkan penanda
+        // Akun Utama di bawah: mncsuperadmin memegang role CONFIG APPROVER dan tidak bisa
+        // dihapus siapa pun (BUG_AUSY_00131), jadi selalu tersisa satu penyetuju dan pengajuan
+        // config tidak pernah mati kunci.
         if (u.isProtectedAccount())
             return "Akun '" + userId + "' adalah akun utama sistem dan tidak dapat dihapus."
                  + " Akun lain yang dibuat Admin tetap bisa dihapus.";
@@ -316,7 +321,7 @@ public class ConfigChangeService {
         if (userId==null||userId.isBlank()) return "User belum dipilih.";
         User u = users.findByUserId(userId).orElse(null);
         if (u == null) return "User tidak ditemukan.";
-        { String no = aboveMe(u.getIdGroup(), me); if (no != null) return no; }
+        { String no = hakPenyetujuConfig(u.getIdGroup(), me); if (no != null) return no; }
         if (isPending("ACCESS", userId)) return pendingMsg("ACCESS");
         Set<Integer> want = menuIds==null? new HashSet<>() : new HashSet<>(menuIds);
         // hak yang berlaku sekarang untuk user ini
@@ -433,21 +438,24 @@ public class ConfigChangeService {
     }
 
     /**
-     * Role penyetuju config berada DI ATAS admin: admin diotorisasi olehnya, jadi admin tidak boleh
-     * mengubah user yang sudah memegang role itu (BUG_AUSY_00132) dan tidak boleh mengubah hak
-     * aksesnya (BUG_AUSY_00133). Yang boleh hanya role penyetuju config itu sendiri.
+     * Halaman Access User: hak akses user ber-role penyetuju config tidak diatur dari sini
+     * (BUG_AUSY_00133).
      *
-     * <p>Yang TIDAK lagi dihalangi: mengajukan user baru dengan role CONFIG APPROVER, atau
-     * mengangkat user biasa ke role itu (BUG_AUSY_00194) — pengajuannya tetap harus diotorisasi
-     * Admin Approval, jadi tidak ada seorang pun yang mengangkat approver sendirian. Tanpa itu,
-     * begitu satu-satunya approver non-aktif seluruh pengajuan config mati kunci.
+     * <p>Sejak REQ_AUSY_00063 larangan ini TIDAK lagi berlaku untuk mengubah maupun menghapus
+     * user-nya — Admin boleh keduanya. Yang tersisa hanya halaman hak akses, dan alasannya
+     * bukan lagi soal wewenang melainkan karena halamannya memang tidak punya isi: role
+     * penyetuju config hanya memegang menu section Admin Approval, dan seluruh section itu
+     * disembunyikan dari role di bawahnya (BUG_AUSY_00136). Dibuka pun Admin hanya menemukan
+     * daftar centangan kosong, jadi pesan ini lebih jujur daripada halaman yang tidak bisa
+     * diapa-apakan.
+     *
      * @return alasan penolakan, atau null kalau boleh.
      */
-    private String aboveMe(Integer targetGroup, AusyUserDetails me) {
+    private String hakPenyetujuConfig(Integer targetGroup, AusyUserDetails me) {
         if (targetGroup == null || !approval.configAuthorizer(targetGroup)) return null;
         if (approval.configAuthorizer(me == null ? null : me.getIdGroup())) return null;
-        return "Role '" + groupName(targetGroup) + "' adalah role yang mengotorisasi Anda —"
-             + " di luar wewenang Anda untuk mengubahnya.";
+        return "Hak akses role '" + groupName(targetGroup) + "' hanya diatur oleh role itu sendiri."
+             + " Data user-nya tetap bisa Anda ubah atau hapus dari halaman User.";
     }
 
     /**

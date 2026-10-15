@@ -16,6 +16,36 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+- **Admin bisa mengubah dan menghapus user ber-role CONFIG APPROVER** (REQ_AUSY_00063).
+  Larangan lama (BUG_AUSY_00132) dicabut: sejak ada permintaan membuat user dengan role itu
+  (BUG_AUSY_00194), aturan "admin tidak boleh menyentuh penyetujunya" tidak berlaku lagi.
+
+  Yang tetap berdiri:
+  - setiap pengajuan masih lewat otorisasi Admin Approval — admin tidak bisa jalan sendiri;
+  - `mncsuperadmin` memegang role itu dan tidak bisa dihapus siapa pun (BUG_AUSY_00131), jadi
+    selalu tersisa satu penyetuju dan pengajuan config tidak pernah mati kunci;
+  - halaman **Access User** tetap tertutup untuk role itu (BUG_AUSY_00133). Alasannya bukan lagi
+    soal wewenang melainkan karena halamannya memang tidak punya isi: role penyetuju config hanya
+    memegang menu section Admin Approval, dan section itu disembunyikan dari role di bawahnya
+    (BUG_AUSY_00136) — dibuka pun Admin hanya menemukan daftar centangan kosong.
+
+- **Import Kode GL menghormati tanda kutip CSV** (ditemukan saat REQ_AUSY_00062). Pemisah kolom
+  dulu `split(",")` mentah, padahal daftar Kode GL MNC memuat deskripsi berkoma:
+  `GPBL - UNION BANK OF CALIFORNIA, N.A`, `BBN KEND-TOL, PARKIR`, `BBN KOM-SWIFT, TELEX & FAX`.
+  Ketiganya tersimpan separuh nama tanpa peringatan apa pun. Berkas tanpa tanda kutip terbaca
+  persis seperti dulu.
+
+- **REQ_AUSY_00062 — daftar Kode GL MNC** disiapkan dari `COA dari user Harris.xlsx` menjadi CSV
+  siap unggah: **1.067 kode unik** dari 1.243 baris sumber. Selisihnya 175 baris berkode kembar —
+  23 kode dipakai berulang, baris pertama nama GL-nya dan sisanya label sub-produk, sedangkan
+  `gl_code.code` unik. Dua hal masih menunggu konfirmasi MNC: kode `20201122` dan `20201123`
+  tidak punya baris induk sehingga yang terpakai label sub-produk (`CORP inv`,
+  `MORTGAGE DIRECT`), dan kode `100010890011420` panjangnya 15 digit sendirian di antara 8 digit.
+
+---
+
 ## dev-20261014-1 — 14-10-2026 16:12
 
 Commit `1146174`. DB tetap **v52** — V50–V52 sudah terpasang oleh deploy 13-10-2026 11:07 yang
