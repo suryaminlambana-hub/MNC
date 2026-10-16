@@ -25,6 +25,9 @@ Tidak ada migrasi DB.
   Excel: `Transaction Account "<kode>" tidak terdaftar pada Manajemen Kode GL.`
   - **Kelola Data GL**: Tambah, Ubah data yang dikembalikan, dan Ubah pengajuan yang masih
     menunggu checker. Diperiksa setiap kali diajukan/diubah, juga bila kodenya tidak diganti.
+  - **Saat checker meng-approve** pengajuan Tambah/Ubah, kodenya diperiksa lagi — pengajuan
+    lama yang dibuat sebelum validasi ini (atau kodenya dihapus dari master sesudah diajukan)
+    tidak bisa di-approve; checker diminta menolaknya supaya maker memperbaiki.
   - **Bulk Edit data upload** (List Data GL) sudah tercakup karena memakai pemeriksaan Upload
     Excel yang sama; ditolak per baris dan tidak ada data yang berubah.
 

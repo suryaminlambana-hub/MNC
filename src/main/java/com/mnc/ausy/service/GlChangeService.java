@@ -1016,6 +1016,15 @@ public class GlChangeService {
     }
 
     private String applyGlRow(GlChangeRequest c) {
+        // REQ_AUSY_00056: diperiksa lagi saat di-approve — pengajuan yang dibuat sebelum validasi
+        // ini ada (atau kodenya dihapus dari master sesudah diajukan) tidak boleh lolos ke data GL.
+        if ("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) {
+            Map<String, String> a = parse(c.getAfterJson());
+            Res tidakTerdaftar = cekKodeTerdaftar(a == null ? "" : a.get("gltrac"));
+            if (tidakTerdaftar != null)
+                return "Tidak dapat di-approve: " + tidakTerdaftar.message()
+                        + " Tolak pengajuan ini supaya maker memperbaikinya.";
+        }
         switch (c.getOp()) {
             // ID baris baru dicatat di permintaannya supaya bisa langsung dimasukkan ke
             // penampungan EXECUTE setelah approve (REQ_AUSY_00046).
