@@ -16,7 +16,12 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261016-1 — 16-10-2026 09:44
+
+Commit `098dff7`. DB tetap **v52** (tidak ada migrasi). `.env` tidak diubah (token scheduler sudah
+ada). JAR sebelumnya: `/opt/ausy/backup/ausy-2.0.0.jar.dev-20261014-1`; `.env.bak-20261016`.
+Diverifikasi: JAR & ausy-trigger.jar sama dengan build, service aktif, start tanpa error,
+scheduler sebagai user `ausy` terhubung dan menolak token salah.
 
 - **Admin bisa mengubah dan menghapus user ber-role CONFIG APPROVER** (REQ_AUSY_00063).
   Larangan lama (BUG_AUSY_00132) dicabut: sejak ada permintaan membuat user dengan role itu
