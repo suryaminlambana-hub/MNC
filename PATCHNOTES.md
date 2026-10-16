@@ -20,6 +20,14 @@ Setiap entri memuat:
 
 Tidak ada migrasi DB.
 
+- **Rekapitulasi checker sama dengan sisi maker pasangannya** (BUG_AUSY_00193). Dulu checker
+  melihat seluruh GL aktif yang sudah diotorisasi (Batch 01, 02, … sejak awal), jadi isinya tidak
+  sinkron dengan maker dan terlalu banyak. Sekarang checker melihat data yang **belum di-approve**
+  (Menunggu Otorisasi / Dikembalikan / Rejected, Batch Upload + Kelola Data GL) dari **gabungan
+  seluruh maker pasangannya** — persis yang dilihat masing-masing maker — dengan kolom **Maker**,
+  filter, jumlah per status, dan Export Excel yang sama. Maker tetap melihat datanya sendiri.
+  Rekap lama (GL aktif per batch) dicabut.
+
 - **Transaction Account divalidasi juga saat data diubah** (lanjutan REQ_AUSY_00056, tambahan
   QA). Kode GL wajib terdaftar di Manajemen Kode GL — aturan dan pesan yang sama dengan Upload
   Excel: `Transaction Account "<kode>" tidak terdaftar pada Manajemen Kode GL.`

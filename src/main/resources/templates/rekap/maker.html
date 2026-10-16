@@ -7,7 +7,9 @@
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
     <div>
       <h1 class="ausy-page-title">Rekapitulasi</h1>
-      <p class="text-muted mb-0">Data Batch Upload dan Kelola Data GL Anda yang belum di-approve checker.</p>
+      <!--/* BUG_AUSY_00193: checker melihat gabungan data seluruh maker pasangannya, sama dengan sisi maker. */-->
+      <p class="text-muted mb-0" th:unless="${tampilMaker}">Data Batch Upload dan Kelola Data GL Anda yang belum di-approve checker.</p>
+      <p class="text-muted mb-0" th:if="${tampilMaker}">Data Batch Upload dan Kelola Data GL maker pasangan Anda yang belum di-approve — sama dengan yang dilihat masing-masing maker.</p>
     </div>
     <a class="btn btn-outline-success" th:href="@{/rekap/export(sumber=${fSumber},status=${fStatus})}">
       <i class="fa-solid fa-file-excel"></i> Export Excel</a>
@@ -41,7 +43,7 @@
 
   <div class="ausy-card p-3">
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Sumber</th><th>Data</th><th>Tanggal</th><th class="text-end">Jml</th>
+      <thead><tr><th>Sumber</th><th>Data</th><th th:if="${tampilMaker}">Maker</th><th>Tanggal</th><th class="text-end">Jml</th>
         <th class="text-end">Debit</th><th class="text-end">Credit</th><th>Status</th><th>Catatan Checker</th></tr></thead>
       <tbody>
       <tr th:each="i : ${items}">
@@ -50,6 +52,7 @@
                   th:text="${i.sumber}"></span></td>
         <td><div th:text="${i.data}"></div>
           <div class="small text-muted" th:if="${!#strings.isEmpty(i.detail)}" th:text="${i.detail}"></div></td>
+        <td th:if="${tampilMaker}" th:text="${@nama.of(i.maker)}"></td>
         <td class="text-nowrap small" th:text="${#strings.isEmpty(i.waktu) ? '-' : i.waktu}"></td>
         <td class="text-end" th:text="${i.jml}"></td>
         <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(i.debit,1,'POINT',2,'COMMA')}"></td>
@@ -64,11 +67,11 @@
         </td>
         <td class="small text-muted" th:text="${i.status == 'Menunggu Otorisasi' ? '-' : i.catatan}"></td>
       </tr>
-      <tr th:if="${items.isEmpty()}"><td colspan="8" class="text-center text-muted py-3">Tidak ada data yang belum di-approve.</td></tr>
+      <tr th:if="${items.isEmpty()}"><td th:attr="colspan=${tampilMaker ? 9 : 8}" class="text-center text-muted py-3">Tidak ada data yang belum di-approve.</td></tr>
       </tbody>
       <tfoot th:unless="${items.isEmpty()}">
         <tr class="fw-semibold border-top">
-          <td colspan="3">TOTAL</td>
+          <td th:attr="colspan=${tampilMaker ? 4 : 3}">TOTAL</td>
           <td class="text-end" th:text="${totJml}"></td>
           <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(totDebit,1,'POINT',2,'COMMA')}"></td>
           <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(totCredit,1,'POINT',2,'COMMA')}"></td>

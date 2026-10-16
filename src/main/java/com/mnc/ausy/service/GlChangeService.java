@@ -346,16 +346,25 @@ public class GlChangeService {
      * Kunci: crId (kosong bila tidak ada pengajuan), glId, op, jenis, status, diajukan + kolom FIELDS.
      */
     public List<Map<String, String>> pengajuanOf(AusyUserDetails me) {
+        return me == null ? new ArrayList<>() : pengajuanUntuk(Set.of(me.getUsername()));
+    }
+
+    /**
+     * Sama dengan {@link #pengajuanOf}, untuk sekumpulan maker (null = semua maker) — dipakai
+     * Rekapitulasi checker atas seluruh maker pasangannya (BUG_AUSY_00193). Kunci tambahan: maker.
+     */
+    public List<Map<String, String>> pengajuanUntuk(Set<String> makers) {
         List<Map<String, String>> out = new ArrayList<>();
-        if (me == null) return out;
         Set<Long> adaPengajuan = new HashSet<>();
         for (GlChangeRequest c : cr.findByStatusOrderByCreatedAtDesc("PENDING")) {
             if (!T_GL_ROW.equals(c.getTarget() == null ? T_GL_ROW : c.getTarget())) continue;
-            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) || !me.getUsername().equals(c.getMaker())) continue;
+            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp()))) continue;
+            if (makers != null && !makers.contains(c.getMaker())) continue;
             Map<String, String> a = parse(c.getAfterJson());
             if (a == null) continue;
             Map<String, String> m = new LinkedHashMap<>(a);
             m.put("crId", String.valueOf(c.getId()));
+            m.put("maker", n(c.getMaker()));
             m.put("glId", c.getGlId() == null ? "" : String.valueOf(c.getGlId()));
             m.put("op", c.getOp());
             m.put("jenis", "ADD".equals(c.getOp()) ? "Tambah"
@@ -369,10 +378,11 @@ public class GlChangeService {
         }
         // Data dikembalikan yang pengajuan ulangnya ditolak checker: tetap di tabel yang sama supaya
         // bisa diperbaiki lalu diajukan lagi, atau dihapus.
-        for (GlTabel g : gl.findReturnedManual(List.of(me.getUsername()))) {
+        for (GlTabel g : gl.findReturnedManual(makers)) {
             if (adaPengajuan.contains(g.getId())) continue;
             Map<String, String> m = new LinkedHashMap<>(rowMap(g));
             m.put("crId", "");
+            m.put("maker", n(g.getGltrus()));
             m.put("glId", String.valueOf(g.getId()));
             m.put("op", "EDIT");
             m.put("jenis", "Dikembalikan");
@@ -394,16 +404,22 @@ public class GlChangeService {
      * {@link #pengajuanOf}; "catatan" berisi alasan penolakan.
      */
     public List<Map<String, String>> rejectedOf(AusyUserDetails me) {
+        return me == null ? new ArrayList<>() : rejectedUntuk(Set.of(me.getUsername()));
+    }
+
+    /** Sama dengan {@link #rejectedOf}, untuk sekumpulan maker (null = semua maker) — BUG_AUSY_00193. */
+    public List<Map<String, String>> rejectedUntuk(Set<String> makers) {
         List<Map<String, String>> out = new ArrayList<>();
-        if (me == null) return out;
         LocalDateTime batas = LocalDateTime.now().minusDays(REKAP_REJECTED_DAYS);
         for (GlChangeRequest c : cr.findByStatusAndTarget("REJECTED", T_GL_ROW)) {
-            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp())) || !me.getUsername().equals(c.getMaker())) continue;
+            if (!("ADD".equals(c.getOp()) || "EDIT".equals(c.getOp()))) continue;
+            if (makers != null && !makers.contains(c.getMaker())) continue;
             if (c.getDecidedAt() == null || c.getDecidedAt().isBefore(batas)) continue;
             Map<String, String> a = parse(c.getAfterJson());
             if (a == null) continue;
             Map<String, String> m = new LinkedHashMap<>(a);
             m.put("crId", String.valueOf(c.getId()));
+            m.put("maker", n(c.getMaker()));
             m.put("glId", c.getGlId() == null ? "" : String.valueOf(c.getGlId()));
             m.put("op", c.getOp());
             m.put("jenis", "ADD".equals(c.getOp()) ? "Tambah" : "Ubah");
