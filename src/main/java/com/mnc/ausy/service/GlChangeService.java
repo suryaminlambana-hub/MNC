@@ -162,6 +162,7 @@ public class GlChangeService {
         String lock = batchLockReason(n(f.get("noPaket")));      // BUG_AUSY_00106
         if (lock != null) return new Res(false, lock);
         Res badCode = checkGlCodeInput(f.get("gltrac"));         // BUG_AUSY_00104
+        if (badCode == null) badCode = cekKodeTerdaftar(f.get("gltrac"));   // REQ_AUSY_00056
         if (badCode != null) return badCode;
         GlChangeRequest c = base("ADD", T_GL_ROW, null, me, note);
         c.setNoPaket(n(f.get("noPaket")));
@@ -187,6 +188,8 @@ public class GlChangeService {
             Res badCode = checkGlCodeInput(newCode);
             if (badCode != null) return badCode;
         }
+        Res tidakTerdaftar = cekKodeTerdaftar(newCode);          // REQ_AUSY_00056
+        if (tidakTerdaftar != null) return tidakTerdaftar;
         Map<String,String> before = normRow(rowMap(g)), after = normRow(formMap(f));
         // Data dikembalikan yang pengajuan ulangnya ditolak boleh diajukan lagi tanpa perubahan
         // (REQ_AUSY_00046 feedback) — penolakannya bisa saja soal hal lain, bukan isi datanya.
@@ -212,6 +215,20 @@ public class GlChangeService {
         if (blank(code)) return new Res(false, "GL Code wajib diisi.");
         if (!GlCodeService.validCode(code))
             return new Res(false, "GL Code hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
+        return null;
+    }
+
+    /**
+     * REQ_AUSY_00056 — GL Code (Transaction Account) wajib terdaftar di Manajemen Kode GL, aturan
+     * dan pesan yang sama dengan Upload Excel / Bulk Edit ({@link UploadService#baca}). Diperiksa
+     * setiap kali data diajukan atau diubah — juga bila kodenya tidak diganti, supaya data yang
+     * sampai ke checker dan berkas ACCTXT hanya memakai kode yang valid.
+     * @return penolakannya, atau null bila kodenya terdaftar.
+     */
+    private Res cekKodeTerdaftar(String code) {
+        String k = n(code).trim();
+        if (!glCodeService.exists(k))
+            return new Res(false, "Transaction Account \"" + k + "\" tidak terdaftar pada Manajemen Kode GL.");
         return null;
     }
 
@@ -448,6 +465,8 @@ public class GlChangeService {
             Res badCode = checkGlCodeInput(code);
             if (badCode != null) return badCode;
         }
+        Res tidakTerdaftar = cekKodeTerdaftar(code);             // REQ_AUSY_00056
+        if (tidakTerdaftar != null) return tidakTerdaftar;
         if (blank(baru.get("gltram")) || amt(baru.get("gltram")).signum() < 0)
             return new Res(false, "Amount wajib diisi dengan angka 0 atau lebih.");
         Map<String, String> lamaN = normRow(lama), baruN = normRow(baru);

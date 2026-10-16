@@ -16,6 +16,20 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Tidak ada migrasi DB.
+
+- **Transaction Account divalidasi juga saat data diubah** (lanjutan REQ_AUSY_00056, tambahan
+  QA). Kode GL wajib terdaftar di Manajemen Kode GL — aturan dan pesan yang sama dengan Upload
+  Excel: `Transaction Account "<kode>" tidak terdaftar pada Manajemen Kode GL.`
+  - **Kelola Data GL**: Tambah, Ubah data yang dikembalikan, dan Ubah pengajuan yang masih
+    menunggu checker. Diperiksa setiap kali diajukan/diubah, juga bila kodenya tidak diganti.
+  - **Bulk Edit data upload** (List Data GL) sudah tercakup karena memakai pemeriksaan Upload
+    Excel yang sama; ditolak per baris dan tidak ada data yang berubah.
+
+---
+
 ## dev-20261016-1 — 16-10-2026 09:44
 
 Commit `098dff7`. DB tetap **v52** (tidak ada migrasi). `.env` tidak diubah (token scheduler sudah
