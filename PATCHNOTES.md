@@ -20,6 +20,21 @@ Setiap entri memuat:
 
 Tidak ada migrasi DB.
 
+- **Daftar Kode GL MNC siap unggah** (REQ_AUSY_00062): `docs/kode-gl-mnc.csv`, dari
+  `COA dari user Harris.xlsx` versi 19-10-2026 (1 sheet, kode + nama GL, tanpa judul kolom).
+  **1.070 kode unik** dari 1.245 baris; 175 baris dibuang karena kodenya kembar (23 kode — baris
+  pertama nama GL-nya, sisanya label sub-produk). Kolomnya `NoGL,Description`, sesuai template
+  Upload Kode GL.
+  - Diuji lewat Upload Kode GL: diterima sebagai **satu pengajuan IMPORT 1.070 kode**, 0 duplikat,
+    0 tidak valid; 3 nama berkoma terbaca utuh.
+  - **Cara memuat:** maker membuka Upload Kode GL, memilih berkas ini, lalu pengajuan disetujui
+    di antrian otorisasi. Belum dimuat ke DB mana pun. Tanpa daftar ini semua Upload Excel dan
+    Tambah data Kelola Data GL ditolak (Transaction Account harus terdaftar).
+  - Masih menunggu konfirmasi MNC (sama seperti catatan sebelumnya): `20201122` dan `20201123`
+    tidak punya baris induk sehingga yang terpakai label sub-produk (`CORP inv`,
+    `MORTGAGE DIRECT`), dan `100010890011420` panjangnya 15 digit sendirian di antara 8 digit
+    (muat di kolom akun ACCTXT yang 19 karakter).
+
 - **User bisa mengganti password sendiri** (REQ_AUSY_00064). Tombol kunci di header (sebelah
   Logout) membuka pop-up **Ganti Password**, tersedia untuk semua role.
   - Isian: password lama (untuk verifikasi), password baru, konfirmasi.
