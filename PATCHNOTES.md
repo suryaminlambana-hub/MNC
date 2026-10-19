@@ -16,7 +16,18 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261019-2 — 19-10-2026 16:39
+
+Commit `71bc806`. Migrasi DB: **V53** (diterapkan otomatis, DB kini **v53**). `.env` tidak ditimpa.
+Diverifikasi: JAR & ausy-trigger.jar sama dengan build, service aktif sejak 16:39:31, start tanpa
+error, scheduler sebagai user `ausy` menolak token salah (exit 2).
+
+Operasional:
+- V53 menyelaraskan GL Name **791 dari 4.822 baris** data GL di DEV dengan master Kode GL (mis.
+  `CORPORATE` → `KORPORASI`, `KAS-ATM    1` → `KAS ATM 1`). Sesudahnya 0 baris berbeda dari master.
+  24 baris berkode tidak terdaftar dibiarkan apa adanya.
+- Nilai GL Name sebelum V53 dicadangkan di `/opt/ausy/backup/gl_name-sebelum-V53-20261019.csv`
+  (id, gltrac, gl_name). JAR sebelumnya: `backup/ausy-2.0.0.jar.dev-20261019-1`.
 
 Migrasi DB: **V53** (`gl_tabel.gl_name` dilebarkan ke 255 + diselaraskan dengan master Kode GL).
 
