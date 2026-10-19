@@ -20,6 +20,22 @@ Setiap entri memuat:
 
 Tidak ada migrasi DB.
 
+- **User bisa mengganti password sendiri** (REQ_AUSY_00064). Tombol kunci di header (sebelah
+  Logout) membuka pop-up **Ganti Password**, tersedia untuk semua role.
+  - Isian: password lama (untuk verifikasi), password baru, konfirmasi.
+  - Validasi (di server; pop-up menampilkan syarat yang terpenuhi secara langsung): password lama
+    harus benar; baru = konfirmasi; **minimal 8 karakter, kombinasi huruf dan angka** (simbol
+    dianjurkan, tidak wajib); tidak boleh sama dengan password lama; tidak boleh memuat username.
+  - Berhasil: notifikasi sukses, lalu user **otomatis keluar** dan login ulang dengan password
+    baru. Masa berlaku password 30 hari (REQ_AUSY_00009) dihitung ulang dari saat itu.
+  - Salah password lama 5 kali berturut-turut dalam satu sesi: sesinya diakhiri.
+  - Audit trail mencatat `PASSWORD_CHANGE` / `PASSWORD_CHANGE_GAGAL`; isi password tidak pernah
+    ikut tercatat.
+  - Beda dengan reset oleh Admin (yang lewat Admin Approval): ini pemilik akunnya sendiri,
+    dibuktikan dengan password lama, jadi tidak lewat otorisasi.
+  - Syarat password baru ada di satu tempat (`AccountPasswordService.cekKekuatan`) bila kebijakan
+    perlu diubah.
+
 - **Rekapitulasi checker sama dengan sisi maker pasangannya** (BUG_AUSY_00193). Dulu checker
   melihat seluruh GL aktif yang sudah diotorisasi (Batch 01, 02, … sejak awal), jadi isinya tidak
   sinkron dengan maker dan terlalu banyak. Sekarang checker melihat data yang **belum di-approve**

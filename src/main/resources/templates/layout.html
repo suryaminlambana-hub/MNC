@@ -56,6 +56,9 @@
                 <button class="ausy-iconbtn" id="themeToggle" type="button" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
                 <span class="ausy-user-name" th:text="${currentUser != null ? currentUser.nama : ''}">User</span>
                 <span class="ausy-role" th:text="${currentUser != null ? currentUser.level : ''}">ROLE</span>
+                <!--/* REQ_AUSY_00064: user mengganti password sendiri lewat pop-up. */-->
+                <button class="ausy-iconbtn" id="btnGantiPassword" type="button" th:if="${currentUser != null}"
+                        title="Ganti Password" aria-label="Ganti Password"><i class="fa-solid fa-key"></i></button>
                 <form th:action="@{/logout}" method="post" class="d-inline">
                     <button class="ausy-iconbtn" type="submit" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
                 </form>
@@ -215,6 +218,102 @@
     txt.textContent = p.day + '-' + p.month + '-' + p.year + ' ' + jam + ':' + p.minute + ':' + p.second + ' WIB';
   }
   tick(); setInterval(tick, 1000);
+})();
+</script>
+
+<!--/* REQ_AUSY_00064: pop-up Ganti Password. Divalidasi di server (AccountPasswordService); di sini hanya
+       pemeriksaan cepat supaya user tidak menunggu untuk kesalahan yang jelas. */-->
+<div th:if="${currentUser != null}" class="modal fade" id="pwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="pwForm" autocomplete="off" novalidate>
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-key"></i> Ganti Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger py-2 d-none" id="pwError" role="alert"></div>
+        <div class="alert alert-success py-2 d-none" id="pwOk" role="status"></div>
+        <div class="mb-3">
+          <label class="form-label" for="pwLama">Password lama</label>
+          <input type="password" class="form-control" id="pwLama" autocomplete="current-password" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="pwBaru">Password baru</label>
+          <input type="password" class="form-control" id="pwBaru" autocomplete="new-password" required>
+          <ul class="small text-muted ps-3 mt-2 mb-0" id="pwSyarat">
+            <li data-r="len">Minimal 8 karakter</li>
+            <li data-r="mix">Kombinasi huruf dan angka (simbol dianjurkan)</li>
+            <li data-r="diff">Berbeda dari password lama dan tidak memuat username</li>
+          </ul>
+        </div>
+        <div class="mb-1">
+          <label class="form-label" for="pwKonf">Konfirmasi password baru</label>
+          <input type="password" class="form-control" id="pwKonf" autocomplete="new-password" required>
+          <div class="small text-danger d-none mt-1" id="pwBeda">Konfirmasi belum sama dengan password baru.</div>
+        </div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="pwLihat">
+          <label class="form-check-label small" for="pwLihat">Tampilkan password</label>
+        </div>
+        <p class="small text-muted mt-2 mb-0">Setelah berhasil, Anda akan keluar dan perlu login kembali dengan password baru.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary" id="pwSimpan">Simpan Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script th:if="${currentUser != null}" th:inline="javascript">
+(function(){
+  var url = /*[[@{/account/password}]]*/ '/account/password',
+      loginUrl = /*[[@{/login}]]*/ '/login', user = /*[[${currentUser.username}]]*/ '';
+  var el = document.getElementById('pwModal'), btn = document.getElementById('btnGantiPassword');
+  if (!el || !btn) return;
+  var modal = new bootstrap.Modal(el), form = document.getElementById('pwForm');
+  function $(id){ return document.getElementById(id); }
+  function tampilError(t){ var e = $('pwError'); e.textContent = t; e.classList.toggle('d-none', !t); }
+  function reset(){ form.reset(); tampilError(''); $('pwOk').classList.add('d-none'); $('pwBeda').classList.add('d-none');
+    ['pwLama','pwBaru','pwKonf'].forEach(function(i){ $(i).type = 'password'; }); cek(); $('pwSimpan').disabled = false; }
+  btn.addEventListener('click', function(){ reset(); modal.show(); });
+  el.addEventListener('shown.bs.modal', function(){ $('pwLama').focus(); });
+  $('pwLihat').addEventListener('change', function(){
+    ['pwLama','pwBaru','pwKonf'].forEach(function(i){ $(i).type = $('pwLihat').checked ? 'text' : 'password'; }); });
+
+  // Syarat yang sama dengan server (AccountPasswordService.cekKekuatan); server tetap yang memutuskan.
+  function cek(){
+    var b = $('pwBaru').value, l = $('pwLama').value;
+    var r = { len: b.length >= 8, mix: /[A-Za-z]/.test(b) && /[0-9]/.test(b),
+              diff: b !== '' && b !== l && !(user && b.toLowerCase().indexOf(user.toLowerCase()) >= 0) };
+    document.querySelectorAll('#pwSyarat li').forEach(function(li){
+      var ok = r[li.dataset.r]; li.classList.toggle('text-success', ok && b !== ''); li.classList.toggle('text-muted', !(ok && b !== '')); });
+    var k = $('pwKonf').value; $('pwBeda').classList.toggle('d-none', k === '' || k === b);
+    return r.len && r.mix && r.diff && k === b;
+  }
+  ['pwLama','pwBaru','pwKonf'].forEach(function(i){ $(i).addEventListener('input', cek); });
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault(); tampilError('');
+    if (!$('pwLama').value) { tampilError('Password lama wajib diisi.'); return; }
+    if (!cek()) { tampilError('Password baru belum memenuhi syarat atau konfirmasinya belum sama.'); return; }
+    var h = { 'Content-Type': 'application/x-www-form-urlencoded' },
+        tok = document.querySelector('meta[name="_csrf"]'), hdr = document.querySelector('meta[name="_csrf_header"]');
+    if (tok && hdr) h[hdr.content] = tok.content;
+    $('pwSimpan').disabled = true;
+    fetch(url, { method: 'POST', credentials: 'same-origin', headers: h,
+      body: 'lama=' + encodeURIComponent($('pwLama').value) + '&baru=' + encodeURIComponent($('pwBaru').value)
+          + '&konfirmasi=' + encodeURIComponent($('pwKonf').value) })
+      .then(function(r){ if (r.status === 401 || r.redirected) { location.replace(loginUrl + '?expired'); return null; } return r.json(); })
+      .then(function(j){
+        if (!j) return;
+        if (j.ok) {
+          $('pwOk').textContent = j.pesan; $('pwOk').classList.remove('d-none'); form.querySelectorAll('input').forEach(function(i){ i.disabled = true; });
+          setTimeout(function(){ location.replace(loginUrl + '?pwchanged'); }, 1800);
+        } else if (j.logout) { location.replace(loginUrl + '?expired'); }
+        else { tampilError(j.pesan); $('pwSimpan').disabled = false; }
+      })
+      .catch(function(){ tampilError('Gagal menghubungi server. Coba lagi.'); $('pwSimpan').disabled = false; });
+  });
 })();
 </script>
 

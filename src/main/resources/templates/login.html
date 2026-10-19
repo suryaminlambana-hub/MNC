@@ -17,6 +17,8 @@
 
     <div th:if="${param.error}" class="alert alert-danger py-2">Username atau password salah.</div>
     <div th:if="${param.logout}" class="alert alert-success py-2">Anda telah keluar.</div>
+    <!--/* REQ_AUSY_00064: sesudah user mengganti passwordnya sendiri. */-->
+    <div th:if="${param.pwchanged}" class="alert alert-success py-2">Password berhasil diubah. Silakan login dengan password baru.</div>
     <!--/* REQ_AUSY_00060: sesi berakhir setelah 10 menit tanpa aktivitas. */-->
     <div th:if="${param.expired}" class="alert alert-warning py-2">Sesi Anda telah berakhir karena tidak ada
         aktivitas. Silakan login kembali.</div>
