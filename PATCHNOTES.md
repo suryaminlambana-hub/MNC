@@ -28,9 +28,16 @@ Catatan deploy:
   lain. Diperkirakan build dari commit `a09560e`, yang seluruhnya sudah ada di rilis ini. JAR itu
   disimpan sebagai `/opt/ausy/backup/ausy-2.0.0.jar.sebelum-20261019`; `.env` sebelumnya:
   `.env.bak-20261019`. Setelan access log tidak hilang.
-- **Daftar Kode GL belum dimuat** ke DEV: login akun QA `user` ditolak (password diganti / akun
-  tidak ada), sehingga upload belum bisa dilakukan lewat alur maker → checker. CSV sudah ada di
-  `/tmp/kode-gl-mnc.csv` di server DEV, dan skrip pemuatnya di `/tmp/muat-kode-gl.sh`.
+- **Daftar Kode GL dimuat ke DEV, 19-10-2026 ± 14:00, LANGSUNG ke tabel `gl_code`** (bukan lewat Upload
+  Kode GL). Alasannya: tidak ada akun maker/checker AUSY yang bisa dipakai (login QA `user` ditolak).
+  Atas permintaan, dengan role database aplikasi sendiri (`ausy_user`), satu transaksi, dry-run
+  (rollback) dulu lalu commit.
+  - Hasil: **1.685 kode** terisi, semua aktif, 0 kode kembar, `created_by = 'migrasi-REQ00062'`.
+    Master DEV sebelumnya kosong, jadi tidak ada yang tertimpa.
+  - **Tidak ada pengajuan maker/approval checker dan tidak ada catatan audit trail** untuk
+    pemuatan ini — itu konsekuensi jalur langsung. Barisnya bisa dikenali dari `created_by`.
+  - Satu kode tanpa nama: `10809009`.
+  - File sementara di `/tmp` server (CSV dan skrip) sudah dihapus.
 
 - **Daftar Kode GL MNC siap unggah** (REQ_AUSY_00062): `docs/kode-gl-mnc.csv`, dari
   `COA buat bantu accounting(list gl lbh lengkap).xlsx` (revisi 19-10-2026 12:04, menggantikan
@@ -39,7 +46,7 @@ Catatan deploy:
   - Diuji lewat Upload Kode GL: diterima sebagai **satu pengajuan IMPORT 1.685 kode**, 0 duplikat,
     0 tidak valid; 2 nama berkoma terbaca utuh.
   - **Cara memuat:** maker membuka Upload Kode GL, memilih berkas ini, lalu pengajuan disetujui
-    di antrian otorisasi. Belum dimuat ke DB mana pun. Tanpa daftar ini semua Upload Excel dan
+    di antrian otorisasi. Sudah dimuat ke DEV (lihat di atas). Tanpa daftar ini semua Upload Excel dan
     Tambah data Kelola Data GL ditolak (Transaction Account harus terdaftar).
   - Dibanding versi sebelumnya (1.070 kode): **+688 kode baru**, nama GL dirapikan (mis.
     `PYMAD KYD-MODAL KERJA - KORPORASI`), dan label sub-produk sudah tidak ada. Dua kode yang dulu
