@@ -17,8 +17,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Locale;
 
 @Service
@@ -146,6 +146,8 @@ public class UploadService {
     private static final int KOLOM_CURRENCY = 11;
     /** Kolom E — Transaction Account, dicocokkan ke master Kode GL (REQ_AUSY_00059). */
     private static final int KOLOM_AKUN = 4;
+    /** Kolom F — Gl_Name. Diabaikan: namanya diambil dari master Kode GL (REQ_AUSY_00065). */
+    private static final int KOLOM_GL_NAME = 5;
 
     /**
      * Kolom kode yang hanya boleh berisi angka 0-9 — tanda petik satu pun tidak
@@ -252,9 +254,11 @@ public class UploadService {
             return b;
         }
         int last = sh.getLastRowNum();
-        // REQ_AUSY_00059: master kode GL dibaca sekali untuk seluruh berkas.
-        Set<String> kodeGl = new HashSet<>();
-        for (GlCode c : glCodes.findAll()) if (c.getCode() != null) kodeGl.add(c.getCode().trim());
+        // REQ_AUSY_00059: master kode GL dibaca sekali untuk seluruh berkas — sekaligus namanya,
+        // karena GL Name diambil dari master, bukan dari kolom F (REQ_AUSY_00065).
+        Map<String, String> namaGl = new HashMap<>();
+        for (GlCode c : glCodes.findAll())
+            if (c.getCode() != null) namaGl.put(c.getCode().trim(), c.getDescription() == null ? "" : GlTextRule.trim(c.getDescription()));
 
         // Pass 1: validate posting date (col A) == tanggalPosting
         for (int r = 1; r <= last; r++) {
@@ -325,6 +329,9 @@ public class UploadService {
             // jadi yang tersimpan adalah baris GL dengan NAMA GL KOSONG, dan begitulah ia
             // terbawa ke berkas ACCTXT. Sekarang berkasnya ditolak dan sebabnya disebut.
             for (int c = 0; c < LABEL_KOLOM.length; c++) {
+                // Kolom F [Gl_Name] tidak dibaca lagi (REQ_AUSY_00065), jadi #N/A di sana tidak
+                // menggagalkan berkas — kode akunnya sendiri tetap diperiksa terhadap master.
+                if (c == KOLOM_GL_NAME) continue;
                 String galat = galatExcel(row, c);
                 if (galat != null)
                     b.errors.add(new String[]{ baris, LABEL_KOLOM[c] + " bernilai " + galat
@@ -337,7 +344,7 @@ public class UploadService {
             // saat berkas ACCTXT ditolak core. Daftar kodenya dibaca SEKALI di luar perulangan,
             // bukan satu query per baris: berkas 167 baris akan menanyakan hal yang sama 167 kali.
             String akun = GlTextRule.trim(cell(row, KOLOM_AKUN));
-            if (!kodeGl.contains(akun))
+            if (!namaGl.containsKey(akun))
                 b.errors.add(new String[]{ baris, "Transaction Account \"" + akun + "\" tidak terdaftar"
                         + " pada Manajemen Kode GL." });
 
@@ -398,9 +405,12 @@ public class UploadService {
             g.setGltrfy(GlTextRule.trim(cell(row, 12)));
             g.setGltrcd(dc);
             g.setGlprdc(GlTextRule.trim(cell(row, 2)));
-            g.setGltrac(GlTextRule.trim(cell(row, 4)));
+            String akun = GlTextRule.trim(cell(row, 4));
+            g.setGltrac(akun);
             g.setGltrpd(ddmmyy);
-            g.setGlName(GlTextRule.trim(cell(row, 5)));
+            // REQ_AUSY_00065: GL Name selalu dari Manajemen Kode GL. Isian kolom F diabaikan —
+            // user bisa saja mengubahnya di Sheet1, dan nama yang tersimpan tidak boleh ikut berubah.
+            g.setGlName(namaGl.getOrDefault(akun, ""));
             String desc = GlTextRule.trim(cell(row, 6));
             if (desc.length() > 40) desc = desc.substring(0, 40);   // lebar kolom ACCTXT
             g.setGltrds(desc);

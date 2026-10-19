@@ -112,6 +112,9 @@ public class GlCodeService {
         }
         g.setModifiedBy(by); g.setModifiedDate(LocalDateTime.now());
         glCodes.save(g);
+        // REQ_AUSY_00065: master adalah sumber GL Name — perubahan nama ikut ke data GL yang
+        // memakai kode ini (kode yang sudah dipakai tidak bisa diganti nomornya, hanya namanya).
+        glTabel.syncGlName(g.getCode(), desc == null ? "" : desc);
         return null;
     }
 

@@ -1151,6 +1151,9 @@ public class GlChangeService {
         gl.findById(glId).ifPresent(g -> {
             BigDecimal amount = amt(a.get("gltram"));
             g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
+            // REQ_AUSY_00065: akun boleh diganti, maka namanya ikut diambil ulang dari master —
+            // dulu nama akun lama tetap menempel pada akun yang baru.
+            g.setGlName(GlTextRule.trim(glCodeService.descriptionOf(a.get("gltrac"))));
             g.setGltram(amount); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
             // Ketiga kolom nominal dipakai berkas ACCTXT. Dulu hanya gltram yang ikut berubah,
             // sehingga nominal ekuivalen di berkas tetap angka lama.
@@ -1173,6 +1176,7 @@ public class GlChangeService {
             gl.findById(id).ifPresent(g -> {
                 BigDecimal amount = amt(a.get("gltram"));
                 g.setGltrac(a.get("gltrac")); g.setGltrcd(a.get("gltrcd"));
+                g.setGlName(GlTextRule.trim(glCodeService.descriptionOf(a.get("gltrac"))));   // REQ_AUSY_00065
                 g.setGltram(amount); g.setGltrds(GlTextRule.trim(a.get("gltrds")));
                 g.setGleqam(amount); g.setGlotam(amount);     // nominal ACCTXT ikut sama
                 g.setNoPaket(a.get("noPaket"));

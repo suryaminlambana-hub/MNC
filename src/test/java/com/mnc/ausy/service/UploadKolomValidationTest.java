@@ -101,6 +101,13 @@ class UploadKolomValidationTest {
      * dan bukan diam-diam memakai jawaban kosong.
      */
     private static GlCodeRepository masterKode(java.util.Set<String> kode) {
+        java.util.Map<String, String> m = new java.util.LinkedHashMap<>();
+        for (String k : kode) m.put(k, "NAMA " + k);
+        return masterKode(m);
+    }
+
+    /** Sama, dengan nama GL per kode — untuk menguji GL Name dari master (REQ_AUSY_00065). */
+    private static GlCodeRepository masterKode(java.util.Map<String, String> kode) {
         return (GlCodeRepository) java.lang.reflect.Proxy.newProxyInstance(
                 GlCodeRepository.class.getClassLoader(),
                 new Class<?>[]{ GlCodeRepository.class },
@@ -108,7 +115,7 @@ class UploadKolomValidationTest {
                     if (!"findAll".equals(method.getName()) || (args != null && args.length > 0))
                         throw new UnsupportedOperationException("tak terduga: " + method.getName());
                     java.util.List<GlCode> out = new java.util.ArrayList<>();
-                    for (String k : kode) { GlCode c = new GlCode(); c.setCode(k); out.add(c); }
+                    kode.forEach((k, nama) -> { GlCode c = new GlCode(); c.setCode(k); c.setDescription(nama); out.add(c); });
                     return out;
                 });
     }
@@ -229,16 +236,41 @@ class UploadKolomValidationTest {
      * nilainya; yang rusak adalah VLOOKUP-nya, yang lalu menghasilkan #N/A di Gl_Name.
      */
     @Test
-    void gagalVlookupDitolak() throws Exception {
+    void gagalVlookupDiGlNameTidakLagiMenolak() throws Exception {
+        // REQ_AUSY_00065: kolom F tidak dibaca lagi — namanya dari master — jadi #N/A di sana
+        // tidak relevan. Yang menjaga tetap ada: akunnya sendiri harus terdaftar.
         String[] b = barisSah();
         b[4] = "10911513";      // tersimpan sebagai teks, persis seperti hasil ketik '10911513
         b[5] = GALAT;           // maka Gl_Name = #N/A
-        UploadResult res = proses(b);
+        assertEquals("", pesanBaris(currencyAtauKolomLain(b), 2), pesanBaris(currencyAtauKolomLain(b), 2));
+    }
 
+    @Test
+    void gagalVlookupDenganAkunTidakTerdaftarTetapDitolak() throws Exception {
+        String[] b = barisSah(); b[4] = "10911513"; b[5] = GALAT;
+        UploadResult res = proses(java.util.Set.of("1010100001"), b);
         assertFalse(res.success);
-        assertEquals(0, res.rows, "tidak satu baris pun boleh tersimpan");
-        assertTrue(pesanBaris(res, 2).contains("Gl_Name"), pesanBaris(res, 2));
-        assertTrue(pesanBaris(res, 2).contains("#N/A"), pesanBaris(res, 2));
+        assertTrue(pesanBaris(res, 2).contains("tidak terdaftar"), pesanBaris(res, 2));
+    }
+
+    // ---- REQ_AUSY_00065: GL Name diambil dari Manajemen Kode GL, bukan kolom F ----
+
+    private static UploadService.Bacaan baca(java.util.Map<String, String> master, String[]... baris) throws Exception {
+        try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(berkas(baris)))) {
+            return new UploadService(null, null, null, null, masterKode(master))
+                    .baca(wb, LocalDate.now(), "hari ini");
+        }
+    }
+
+    @Test
+    void glNameDiambilDariMasterBukanKolomF() throws Exception {
+        String[] b = barisSah(); b[5] = "NAMA DIUBAH USER";
+        String[] c = barisSah(); c[1] = "C"; c[4] = "20100001"; c[5] = "";
+        UploadService.Bacaan h = baca(java.util.Map.of("1010100001", "KAS BESAR", "20100001", "GIRO RUPIAH"), b, c);
+
+        assertTrue(h.ok(), "berkas sah: " + h.message + " " + h.errors);
+        assertEquals("KAS BESAR", h.rows.get(0).getGlName(), "isian kolom F harus diabaikan");
+        assertEquals("GIRO RUPIAH", h.rows.get(1).getGlName(), "kolom F kosong pun tetap dapat nama master");
     }
 
     @Test

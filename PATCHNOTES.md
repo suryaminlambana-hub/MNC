@@ -16,6 +16,24 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Migrasi DB: **V53** (`gl_tabel.gl_name` dilebarkan ke 255 + diselaraskan dengan master Kode GL).
+
+- **GL Name selalu dari Manajemen Kode GL** (REQ_AUSY_00065). Master Kode GL menjadi satu-satunya
+  sumber GL Name.
+  - **Upload Excel & Bulk Edit:** kolom F [Gl_Name] tidak dibaca lagi; namanya diambil dari master
+    berdasarkan Transaction Account. Nama yang diubah user di Sheet1 diabaikan, dan `#N/A` di
+    kolom F tidak lagi menggagalkan berkas (akunnya sendiri tetap wajib terdaftar).
+  - **Kelola Data GL (Ubah & Bulk Edit):** kalau Transaction Account diganti, GL Name ikut diambil
+    ulang dari master. Dulu nama akun lama tetap menempel pada akun baru.
+  - **Ubah nama di Manajemen Kode GL:** setelah di-approve, GL Name di semua data GL berkode itu
+    ikut diperbarui. GL Name tidak masuk berkas ACCTXT, jadi data yang sudah terkirim tetap aman.
+  - **V53:** data GL yang sudah ada diselaraskan dengan master (hanya kode yang terdaftar). Kolom
+    dilebarkan dari 100 ke 255 mengikuti panjang nama di master.
+
+---
+
 ## dev-20261019-1 — 19-10-2026 13:36
 
 Commit `7a55252`. DB tetap **v52** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &

@@ -285,6 +285,15 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     @Query("update GlTabel g set g.statusPrint='SUDAH UPLOAD' where g.exportReqId=:rid")
     int markExported(@Param("rid") Long reqId);
 
+    /**
+     * GL Name semua baris berakun {@code code} diselaraskan dengan nama di master Kode GL
+     * (REQ_AUSY_00065). GL Name tidak masuk berkas ACCTXT, jadi baris yang sudah terkirim pun aman
+     * ikut diperbarui.
+     */
+    @Modifying @Transactional
+    @Query("update GlTabel g set g.glName=:nama where g.gltrac=:code and coalesce(g.glName,'') <> :nama")
+    int syncGlName(@Param("code") String code, @Param("nama") String nama);
+
     /** Reject export: kembalikan baris agar bisa diajukan lagi. */
     @Modifying @Transactional
     @Query("update GlTabel g set g.statusPrint='BELUM UPLOAD', g.exportReqId=null where g.exportReqId=:rid")
