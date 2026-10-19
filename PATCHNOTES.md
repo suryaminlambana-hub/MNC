@@ -21,19 +21,22 @@ Setiap entri memuat:
 Tidak ada migrasi DB.
 
 - **Daftar Kode GL MNC siap unggah** (REQ_AUSY_00062): `docs/kode-gl-mnc.csv`, dari
-  `COA dari user Harris.xlsx` versi 19-10-2026 (1 sheet, kode + nama GL, tanpa judul kolom).
-  **1.070 kode unik** dari 1.245 baris; 175 baris dibuang karena kodenya kembar (23 kode — baris
-  pertama nama GL-nya, sisanya label sub-produk). Kolomnya `NoGL,Description`, sesuai template
-  Upload Kode GL.
-  - Diuji lewat Upload Kode GL: diterima sebagai **satu pengajuan IMPORT 1.070 kode**, 0 duplikat,
-    0 tidak valid; 3 nama berkoma terbaca utuh.
+  `COA buat bantu accounting(list gl lbh lengkap).xlsx` (revisi 19-10-2026 12:04, menggantikan
+  `COA dari user Harris.xlsx`; 1 sheet, kode + nama GL, tanpa judul kolom). **1.685 kode unik**,
+  tanpa kode kembar. Kolomnya `NoGL,Description`, sesuai template Upload Kode GL.
+  - Diuji lewat Upload Kode GL: diterima sebagai **satu pengajuan IMPORT 1.685 kode**, 0 duplikat,
+    0 tidak valid; 2 nama berkoma terbaca utuh.
   - **Cara memuat:** maker membuka Upload Kode GL, memilih berkas ini, lalu pengajuan disetujui
     di antrian otorisasi. Belum dimuat ke DB mana pun. Tanpa daftar ini semua Upload Excel dan
     Tambah data Kelola Data GL ditolak (Transaction Account harus terdaftar).
-  - Masih menunggu konfirmasi MNC (sama seperti catatan sebelumnya): `20201122` dan `20201123`
-    tidak punya baris induk sehingga yang terpakai label sub-produk (`CORP inv`,
-    `MORTGAGE DIRECT`), dan `100010890011420` panjangnya 15 digit sendirian di antara 8 digit
-    (muat di kolom akun ACCTXT yang 19 karakter).
+  - Dibanding versi sebelumnya (1.070 kode): **+688 kode baru**, nama GL dirapikan (mis.
+    `PYMAD KYD-MODAL KERJA - KORPORASI`), dan label sub-produk sudah tidak ada. Dua kode yang dulu
+    dipertanyakan (`20201122`, `20201123`) kini punya nama GL sendiri.
+  - Perlu dikonfirmasi ke yang merevisi: **73 kode dari versi sebelumnya tidak ada lagi** (mis.
+    `10201002 GIRO PADA BANK INDONESIA - BI FAST`, `20202110 TAX INCOME PAYABLE - TAX ART 21`,
+    `100010890011420 REKENING KHUSUS`) — sengaja dihapus atau terlewat? Kode yang tidak ada di
+    daftar akan ditolak saat Upload Excel / Kelola Data GL. Satu kode tanpa nama: `10809009`
+    (tetap diimpor dengan deskripsi kosong).
 
 - **User bisa mengganti password sendiri** (REQ_AUSY_00064). Tombol kunci di header (sebelah
   Logout) membuka pop-up **Ganti Password**, tersedia untuk semua role.
