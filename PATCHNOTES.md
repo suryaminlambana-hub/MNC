@@ -16,9 +16,21 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261019-1 — 19-10-2026 13:36
 
-Tidak ada migrasi DB.
+Commit `7a55252`. DB tetap **v52** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &
+ausy-trigger.jar sama dengan build, service aktif sejak 13:36:17, start tanpa error, scheduler
+sebagai user `ausy` terhubung dan menolak token salah.
+
+Catatan deploy:
+- Sebelum deploy, JAR di server **bukan** hasil deploy 16-10 09:44: ada deploy lain 16-10 18:53
+  (build 11:53Z) dan `.env` diubah 18:59 (menambah setelan `SERVER_TOMCAT_ACCESSLOG_*`) oleh pihak
+  lain. Diperkirakan build dari commit `a09560e`, yang seluruhnya sudah ada di rilis ini. JAR itu
+  disimpan sebagai `/opt/ausy/backup/ausy-2.0.0.jar.sebelum-20261019`; `.env` sebelumnya:
+  `.env.bak-20261019`. Setelan access log tidak hilang.
+- **Daftar Kode GL belum dimuat** ke DEV: login akun QA `user` ditolak (password diganti / akun
+  tidak ada), sehingga upload belum bisa dilakukan lewat alur maker → checker. CSV sudah ada di
+  `/tmp/kode-gl-mnc.csv` di server DEV, dan skrip pemuatnya di `/tmp/muat-kode-gl.sh`.
 
 - **Daftar Kode GL MNC siap unggah** (REQ_AUSY_00062): `docs/kode-gl-mnc.csv`, dari
   `COA buat bantu accounting(list gl lbh lengkap).xlsx` (revisi 19-10-2026 12:04, menggantikan
