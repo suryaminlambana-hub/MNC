@@ -262,6 +262,33 @@ class UploadKolomValidationTest {
         }
     }
 
+    // ---- Sisa pecahan floating-point dari rumus Excel tidak boleh membuat berkas tidak balance ----
+
+    @Test
+    void sisaPecahanRumusExcelTetapBalance() throws Exception {
+        // Persis laporan QA 21-10-2026: "Total Debit 97.129.888,89 tidak sama dengan total Credit
+        // 97.129.888,89 (selisih 0,00)". Nilai hasil rumus terbaca dengan ekor floating-point.
+        String[] d1 = barisSah(); d1[13] = "32376629.629999999";
+        String[] d2 = barisSah(); d2[13] = "64753259.260000005";
+        String[] c  = barisSah(); c[1] = "C"; c[13] = "97129888.89";
+        UploadService.Bacaan h = baca(java.util.Map.of("1010100001", "KAS BESAR"), d1, d2, c);
+
+        assertTrue(h.ok(), "harus balance: " + h.message + " " + java.util.Arrays.deepToString(h.errors.toArray()));
+        assertEquals(new java.math.BigDecimal("32376629.63"), h.rows.get(0).getGltram(), "tersimpan 2 desimal");
+        assertEquals(0, h.debit.compareTo(h.credit));
+    }
+
+    @Test
+    void selisihSatuSenTetapDitolak() throws Exception {
+        String[] d = barisSah(); d[13] = "1000000.01";
+        String[] c = barisSah(); c[1] = "C"; c[13] = "1000000";
+        UploadService.Bacaan h = baca(java.util.Map.of("1010100001", "KAS BESAR"), d, c);
+
+        assertFalse(h.ok());
+        String total = h.errors.stream().filter(e -> e[0].equals("Total")).map(e -> e[1]).findFirst().orElse("");
+        assertTrue(total.contains("selisih 0,01"), "pesan: " + total);
+    }
+
     @Test
     void glNameDiambilDariMasterBukanKolomF() throws Exception {
         String[] b = barisSah(); b[5] = "NAMA DIUBAH USER";

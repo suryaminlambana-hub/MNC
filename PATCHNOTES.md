@@ -16,6 +16,19 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Tidak ada migrasi DB.
+
+- **Upload Excel menolak berkas yang sebenarnya balance** (laporan QA 21-10-2026: "Total Debit
+  97.129.888,89 tidak sama dengan total Credit 97.129.888,89 (selisih 0,00)"). Nominal hasil rumus
+  Excel terbaca dengan sisa pecahan floating-point (mis. 32376629.629999999) dan nilai mentah itu
+  yang dijumlahkan. Kini tiap nominal dibulatkan ke 2 desimal saat dibaca — sama dengan yang
+  tersimpan di DB dan dikirim di ACCTXT — sebelum dijumlahkan. Selisih nyata (≥ 0,01) tetap
+  ditolak. Berlaku juga untuk Bulk Edit.
+
+---
+
 ## dev-20261019-2 — 19-10-2026 16:39
 
 Commit `71bc806`. Migrasi DB: **V53** (diterapkan otomatis, DB kini **v53**). `.env` tidak ditimpa.

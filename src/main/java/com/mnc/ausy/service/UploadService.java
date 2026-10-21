@@ -119,7 +119,20 @@ public class UploadService {
 
     private static BigDecimal amount(String s) {
         if (s == null || s.isBlank()) return BigDecimal.ZERO;
-        try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return BigDecimal.ZERO; }
+        try { return sen(new BigDecimal(s.replace(",", "").trim())); } catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    /**
+     * Nominal dibulatkan ke 2 desimal (sen), persis seperti yang tersimpan di kolom NUMERIC(17,2)
+     * dan yang dikirim di berkas ACCTXT.
+     *
+     * Nominal hasil rumus Excel membawa sisa pecahan floating-point — 32376629.63 tersimpan sebagai
+     * 32376629.629999999. Dulu nilai mentah itu yang dijumlahkan, sehingga berkas yang balance
+     * ditolak dengan pesan "Total Debit 97.129.888,89 tidak sama dengan total Credit
+     * 97.129.888,89 (selisih 0,00)". Yang dibandingkan kini angka yang benar-benar akan dikirim.
+     */
+    static BigDecimal sen(BigDecimal v) {
+        return v.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     /** Kolom N — Transaction_Amount. */
@@ -132,7 +145,7 @@ public class UploadService {
      */
     static BigDecimal nominalAtauNull(String s) {
         if (s == null || s.isBlank()) return BigDecimal.ZERO;
-        try { return new BigDecimal(s.replace(",", "").trim()); } catch (Exception e) { return null; }
+        try { return sen(new BigDecimal(s.replace(",", "").trim())); } catch (Exception e) { return null; }
     }
 
     /**
