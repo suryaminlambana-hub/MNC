@@ -16,9 +16,15 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261021-1 — 21-10-2026 16:29
 
-Tidak ada migrasi DB.
+Commit `8e297c5`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &
+ausy-trigger.jar sama dengan build, service aktif sejak 16:29:22, start tanpa error, login 200,
+scheduler sebagai user `ausy` menolak token salah (exit 2). JAR sebelumnya:
+`backup/ausy-2.0.0.jar.dev-20261019-2`.
+
+Catatan deploy: token Safous kini hanya hidup beberapa menit, jadi paket dikirim utuh dalam satu
+koneksi (cek sha256 + cek JAR server, lalu install terlepas dari sesi SSH), bukan per potongan.
 
 - **Upload Excel menolak berkas yang sebenarnya balance** (laporan QA 21-10-2026: "Total Debit
   97.129.888,89 tidak sama dengan total Credit 97.129.888,89 (selisih 0,00)"). Nominal hasil rumus
