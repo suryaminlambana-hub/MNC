@@ -48,12 +48,11 @@ public class UploadService {
     private final GlTabelRepository gl;
     private final GlCodeRepository glCodes;
     private final TUploadRepository tUploads;
-    private final SequenceService seq;
     private final AuditService audit;
 
-    public UploadService(GlTabelRepository gl, TUploadRepository tUploads, SequenceService seq, AuditService audit, GlCodeRepository glCodes) {
+    public UploadService(GlTabelRepository gl, TUploadRepository tUploads, AuditService audit, GlCodeRepository glCodes) {
         this.glCodes = glCodes;
-        this.gl = gl; this.tUploads = tUploads; this.seq = seq; this.audit = audit;
+        this.gl = gl; this.tUploads = tUploads; this.audit = audit;
     }
 
     /**
@@ -161,6 +160,21 @@ public class UploadService {
     private static final int KOLOM_AKUN = 4;
     /** Kolom F — Gl_Name. Diabaikan: namanya diambil dari master Kode GL (REQ_AUSY_00065). */
     private static final int KOLOM_GL_NAME = 5;
+
+    /**
+     * {kolom, lebar maksimal} — lebar kolom gl_tabel tempat isian itu disimpan (REQ_AUSY_00067).
+     * Kolom E dijaga master Kode GL, kolom G dipotong ke 40, Currency wajib IDR.
+     */
+    private static final int[][] KOLOM_LEBAR = {
+            {2, 20},    // C Product Code        -> glprdc
+            {7, 10},    // H Branch              -> gltrbr
+            {8, 100},   // I Branch_Name         -> br_name
+            {9, 10},    // J Cost_Center         -> gltrcc
+            {10, 100},  // K Cost_Center_Name    -> cs_name
+            {12, 5},    // M Foreign_Curr        -> gltrfy
+            {14, 5},    // O Flag                -> glflag
+            {15, 10},   // P Responding_Branch   -> glresp
+    };
 
     /**
      * Kolom kode yang hanya boleh berisi angka 0-9 — tanda petik satu pun tidak
@@ -385,6 +399,23 @@ public class UploadService {
                             + " hanya boleh berisi angka (0-9) dan tanda petik satu (') — saat ini \""
                             + v + "\"." });
             }
+
+            // REQ_AUSY_00067 — D/C hanya D atau C. Dulu isian lain diam-diam dihitung Credit,
+            // dan "Debit" menggagalkan penyimpanan dengan galat SQL mentah (kolomnya 1 karakter).
+            String dcTeks = cell(row, 1);
+            if (!dcTeks.equalsIgnoreCase("D") && !dcTeks.equalsIgnoreCase("C"))
+                b.errors.add(new String[]{ baris, "Kolom B [D/C] wajib diisi \"D\" atau \"C\""
+                        + (dcTeks.isBlank() ? " (saat ini kosong)." : " (saat ini \"" + dcTeks + "\").") });
+
+            // REQ_AUSY_00067 — isian yang lebih panjang dari kolomnya di basis data disebut di sini,
+            // per baris dan kolom, bukan lolos lalu gagal saat disimpan dengan galat SQL mentah.
+            for (int[] col : KOLOM_LEBAR) {
+                String v = cell(row, col[0]);
+                if (col[0] == 9) v = v.replace(".", "").replace(",", "");   // cost centre disimpan begitu
+                if (v.length() > col[1])
+                    b.errors.add(new String[]{ baris, LABEL_KOLOM[col[0]] + " maksimal " + col[1]
+                            + " karakter — saat ini " + v.length() + " (\"" + v + "\")." });
+            }
         }
         // REQ_AUSY_00024 — total Debit harus sama dengan total Credit. Dulu berkas yang tidak
         // balance tetap masuk dengan sekadar peringatan, lalu baru tertahan di checker.
@@ -447,7 +478,27 @@ public class UploadService {
             b.rows.add(g);
             if (dc.equals("D")) b.debit = b.debit.add(amt); else b.credit = b.credit.add(amt);
         }
+        // REQ_AUSY_00066/00070: running number referensi 6 digit per batch.
+        if (b.rows.size() > Referensi.MAKS_URUT) {
+            b.message = "Upload gagal: berkas berisi " + b.rows.size() + " baris, melebihi batas "
+                    + "999.999 baris per batch. Pecah menjadi beberapa berkas lalu unggah satu per satu.";
+            b.rows.clear();
+        }
         return b;
+    }
+
+    /**
+     * Pesan untuk pengguna saat unggahan gagal karena galat tak terduga (REQ_AUSY_00067). Galat
+     * aslinya — bisa berisi query SQL dan nama constraint — hanya untuk log server, tidak pernah
+     * ditampilkan di layar.
+     */
+    public static String pesanGagal(Exception e) {
+        if (e instanceof org.springframework.dao.DataAccessException)
+            return "Upload gagal: data tidak dapat disimpan ke basis data. Tidak ada data yang tersimpan."
+                    + " Periksa kembali isian berkas, lalu unggah ulang. Bila masih gagal, hubungi admin"
+                    + " dengan menyebut waktu kejadian.";
+        return "Gagal membaca file Excel — pastikan berkas berformat .xlsx sesuai template MNC dan tidak"
+                + " sedang dibuka/terkunci, lalu unggah ulang.";
     }
 
     /**
@@ -455,12 +506,16 @@ public class UploadService {
      * nomor batch, pemilik, dan GLTRRF baru per baris.
      */
     public void simpanBaris(List<GlTabel> rows, String paket, String username) {
+        // REQ_AUSY_00066: running number per batch. Upload baru mulai dari 000001; Bulk Edit
+        // menghapus baris unggahan lalu menyimpan ulang, sehingga juga mulai dari awal — kecuali
+        // ada baris manual yang tetap tinggal di batch itu, maka dilanjutkan setelahnya.
+        int urut = gl.maxUrutReferensi(paket);
         for (GlTabel g : rows) {
             g.setNoPaket(paket);
             // username utuh: pemiliknya harus bisa dicocokkan untuk pembatasan data per maker (BUG_AUSY_00138).
             // Pemotongan ke 10 karakter tetap dilakukan GltrrfFormatter saat menulis file ACCTXT.
             g.setGltrus(username);
-            g.setGltrrf(paket + "-01-" + String.format("%04d", seq.next()));
+            g.setGltrrf(Referensi.of(paket, ++urut));
             gl.save(g);
         }
     }
@@ -476,7 +531,7 @@ public class UploadService {
             // REQ_AUSY_00031: nomor batch mulai dari 1 setiap hari, digabung tanggal supaya tetap
             // unik (20261008001). Tanpa pemisah "-": referensi GLTRRF berbentuk
             // <batch>-<transmisi>-<urut> dan dipecah per "-" saat mencetak jurnal. Panjangnya
-            // 11 karakter, jadi referensi 19 karakter masih muat di kolom 20 karakter ACCTXT.
+            // 11 karakter; di referensi tahunnya dipendekkan jadi YYMMDDXXX (lihat Referensi).
             String tgl = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String paket = tgl + String.format("%03d", gl.maxUrutBatchHarian(tgl) + 1);
             simpanBaris(b.rows, paket, username);

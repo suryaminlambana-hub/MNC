@@ -22,6 +22,7 @@ import java.util.*;
 
 @Controller
 public class GlDataController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlDataController.class);
     private final GlTabelRepository gl;
     private final DataScopeService scope;
     private final OtorisasiService otorisasi;
@@ -127,7 +128,9 @@ public class GlDataController {
             OtorisasiService.ExportResult r = otorisasi.bulkEditPending(paket, me, file.getInputStream());
             ra.addFlashAttribute(r.ok() ? "ok" : "warn", r.message());
         } catch (Exception e) {
-            ra.addFlashAttribute("warn", "Gagal membaca file Excel: " + e.getMessage());
+            // REQ_AUSY_00067: galat asli (bisa memuat SQL) hanya ke log, bukan ke layar.
+            log.error("Bulk Edit gagal: user={} batch={}", me.getUsername(), paket, e);
+            ra.addFlashAttribute("warn", com.mnc.ausy.service.UploadService.pesanGagal(e));
         }
         return "redirect:/gl-legacy";
     }

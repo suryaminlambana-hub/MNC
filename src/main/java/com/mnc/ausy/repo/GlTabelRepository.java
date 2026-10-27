@@ -286,6 +286,15 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     int markExported(@Param("rid") Long reqId);
 
     /**
+     * Running number terbesar pada referensi GLTRRF di batch ini, atau 0 bila belum ada
+     * (REQ_AUSY_00066). Referensi berformat lama ikut dihitung, supaya baris yang ditambahkan ke
+     * batch lama tidak bertabrakan nomor.
+     */
+    @Query(value = "select coalesce(max(cast(split_part(gltrrf, '-', 3) as integer)), 0) from gl_tabel"
+                 + " where no_paket = :p and split_part(gltrrf, '-', 3) ~ '^[0-9]{1,9}$'", nativeQuery = true)
+    int maxUrutReferensi(@Param("p") String paket);
+
+    /**
      * GL Name semua baris berakun {@code code} diselaraskan dengan nama di master Kode GL
      * (REQ_AUSY_00065). GL Name tidak masuk berkas ACCTXT, jadi baris yang sudah terkirim pun aman
      * ikut diperbarui.

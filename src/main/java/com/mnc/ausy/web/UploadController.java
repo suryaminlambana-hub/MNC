@@ -21,6 +21,7 @@ import java.util.Locale;
 @Controller
 @RequestMapping("/upload")
 public class UploadController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UploadController.class);
     private final UploadTemplateService templates;
     private final UploadService service;
     public UploadController(UploadService service, UploadTemplateService templates) {
@@ -37,7 +38,9 @@ public class UploadController {
             model.addAttribute("result", r);
         } catch (Exception e) {
             UploadResult r = new UploadResult();
-            r.message = "Gagal membaca file Excel: " + e.getMessage();
+            // REQ_AUSY_00067: galat asli (bisa memuat SQL) hanya ke log, bukan ke layar.
+            log.error("Upload Excel gagal: user={} file={}", me.getUsername(), file.getOriginalFilename(), e);
+            r.message = UploadService.pesanGagal(e);
             model.addAttribute("result", r);
         }
         return "upload/index";

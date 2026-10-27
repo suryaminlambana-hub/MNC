@@ -121,7 +121,7 @@ class UploadKolomValidationTest {
     }
 
     private static UploadResult proses(java.util.Set<String> kodeTerdaftar, String[]... baris) throws Exception {
-        return new UploadService(null, null, null, null, masterKode(kodeTerdaftar))
+        return new UploadService(null, null, null, masterKode(kodeTerdaftar))
                 .process(new ByteArrayInputStream(berkas(baris)), "uji.xlsx", "penguji");
     }
 
@@ -257,7 +257,7 @@ class UploadKolomValidationTest {
 
     private static UploadService.Bacaan baca(java.util.Map<String, String> master, String[]... baris) throws Exception {
         try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(berkas(baris)))) {
-            return new UploadService(null, null, null, null, masterKode(master))
+            return new UploadService(null, null, null, masterKode(master))
                     .baca(wb, LocalDate.now(), "hari ini");
         }
     }
@@ -288,6 +288,42 @@ class UploadKolomValidationTest {
         String total = h.errors.stream().filter(e -> e[0].equals("Total")).map(e -> e[1]).findFirst().orElse("");
         assertTrue(total.contains("selisih 0,01"), "pesan: " + total);
     }
+
+    // ---- REQ_AUSY_00067: isian yang tidak muat di basis data disebut per baris, bukan galat SQL ----
+
+    @Test
+    void dcSelainDatauCDitolak() throws Exception {
+        String[] b = barisSah(); b[1] = "Debit";
+        String pesan = pesanBaris(currencyAtauKolomLain(b), 2);
+        assertTrue(pesan.contains("Kolom B [D/C]"), pesan);
+        assertTrue(pesan.contains("Debit"), pesan);
+    }
+
+    @Test
+    void dcHurufKecilTetapDiterima() throws Exception {
+        String[] d = barisSah(); d[1] = "d";
+        String[] c = barisSah(); c[1] = "c";
+        UploadService.Bacaan h = baca(java.util.Map.of("1010100001", "KAS BESAR"), d, c);
+        assertTrue(h.ok(), h.message + " " + java.util.Arrays.deepToString(h.errors.toArray()));
+    }
+
+    @Test
+    void isianMelebihiLebarKolomDisebutBarisDanKolomnya() throws Exception {
+        String[] b = barisSah(); b[7] = "00100200300";      // Branch 11 karakter, kolomnya 10
+        String pesan = pesanBaris(currencyAtauKolomLain(b), 2);
+        assertTrue(pesan.contains("Kolom H [Branch] maksimal 10 karakter"), pesan);
+    }
+
+    @Test
+    void referensiTidakLagiDibentukDiTahapBaca() throws Exception {
+        // Nomor referensi baru diberikan saat disimpan (per batch); baca() tidak menyentuhnya.
+        UploadService.Bacaan h = baca(java.util.Map.of("1010100001", "KAS BESAR"), barisSah(),
+                barisSahCredit());
+        assertTrue(h.ok());
+        assertNull(h.rows.get(0).getGltrrf());
+    }
+
+    private static String[] barisSahCredit() { String[] c = barisSah(); c[1] = "C"; return c; }
 
     @Test
     void glNameDiambilDariMasterBukanKolomF() throws Exception {

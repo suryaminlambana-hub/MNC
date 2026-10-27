@@ -16,6 +16,35 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Tidak ada migrasi DB.
+
+- **Format nomor referensi baru: `YYMMDDXXX-01-NNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00070).
+  - Tahun 2 digit (`261027001`), nomor transmisi tetap `01`, running number **6 digit**.
+  - Running number **mulai dari 000001 di setiap batch**. Dulu diambil dari satu penghitung global
+    (`web_sequence`) yang tidak pernah di-reset, sehingga batch berikutnya melanjutkan nomor batch
+    sebelumnya dan referensi terus memanjang.
+  - Panjangnya tetap 19 karakter (20 bila nomor batch hari itu sudah 4 digit), selalu muat di
+    kolom 20 karakter ACCTXT. Satu batch maksimal 999.999 baris; lebih dari itu ditolak dengan
+    pesan yang jelas.
+  - Berlaku di Upload Excel, Bulk Edit (batch dinomori ulang dari 000001), dan Tambah data di
+    Kelola Data GL (melanjutkan nomor terakhir di batch itu).
+  - Data yang sudah ada **tidak diubah**: referensi lama (`20261021001-01-0457`) tetap seperti
+    semula. Baris yang ditambahkan ke batch lama melanjutkan dari nomor terbesar di batch itu.
+- **Upload gagal tidak lagi menampilkan galat SQL mentah** (REQ_AUSY_00067).
+  - Penyebab utamanya (referensi > 20 karakter pada upload besar) hilang dengan format baru.
+    Diuji: berkas **100.002 baris** berhasil diunggah, referensi `…-000001` s.d. `…-100002`.
+  - Isian yang lebih panjang dari kolomnya di basis data (mis. Branch > 10 karakter) kini ditolak
+    di pemeriksaan, disebut baris dan kolomnya.
+  - **D/C wajib `D` atau `C`.** Dulu isian lain diam-diam dihitung sebagai Credit, dan "Debit"
+    menggagalkan penyimpanan dengan galat SQL.
+  - Galat tak terduga lainnya ditampilkan sebagai pesan umum ("Tidak ada data yang tersimpan…");
+    detail aslinya hanya dicatat di log server. Berlaku di Upload Excel, Bulk Edit, dan unggahan
+    bertahap NALA.
+
+---
+
 ## dev-20261021-1 — 21-10-2026 16:29
 
 Commit `8e297c5`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &

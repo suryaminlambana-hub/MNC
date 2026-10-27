@@ -89,7 +89,6 @@ public class GlChangeService {
     private final AuditService audit;
     private final GlCodeService glCodeService;
     private final GlExportRequestRepository exportRequests;
-    private final SequenceService seq;
     private final DataScopeService scope;
     private final ObjectMapper json = new ObjectMapper();
 
@@ -98,10 +97,10 @@ public class GlChangeService {
 
     public GlChangeService(GlTabelRepository gl, GlChangeRequestRepository cr, ApprovalService approval,
                            AuditService audit, GlCodeService glCodeService,
-                           GlExportRequestRepository exportRequests, SequenceService seq,
+                           GlExportRequestRepository exportRequests,
                            DataScopeService scope, StagingService staging, NamaUserService nama) {
         this.gl = gl; this.cr = cr; this.approval = approval; this.audit = audit; this.glCodeService = glCodeService;
-        this.exportRequests = exportRequests; this.seq = seq; this.scope = scope; this.staging = staging;
+        this.exportRequests = exportRequests; this.scope = scope; this.staging = staging;
         this.nama = nama;
     }
     private final StagingService staging;
@@ -1137,7 +1136,9 @@ public class GlChangeService {
         g.setGleqam(amount); g.setGlotam(amount);
         g.setGlName(GlTextRule.trim(glCodeService.descriptionOf(code)));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
-        g.setGltrrf(n(a.get("noPaket")).trim() + "-01-" + String.format("%04d", seq.next()));
+        // REQ_AUSY_00066: lanjutkan running number batch tempat baris ini ditambahkan.
+        String paket = n(a.get("noPaket")).trim();
+        g.setGltrrf(Referensi.of(paket, gl.maxUrutReferensi(paket) + 1));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
         // Upload GL disaring status_dual='PENDING', jadi baris ini tetap tidak muncul di sana.
         // status_print='BELUM UPLOAD' = belum di-export; kalau ditandai 'SUDAH UPLOAD' baris manual

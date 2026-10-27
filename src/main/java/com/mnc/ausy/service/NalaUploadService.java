@@ -15,6 +15,7 @@ import java.util.*;
 
 @Service
 public class NalaUploadService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NalaUploadService.class);
     private final NalaUploadRepository repo;
     private final UploadService uploadService;
 
@@ -127,7 +128,9 @@ public class NalaUploadService {
             u.setResultMsg(r.message);
             u.setCompletedAt(LocalDateTime.now());
         } catch (Exception e) {
-            u.setStatus("failed"); u.setResultMsg("Gagal memproses: " + e.getMessage());
+            // REQ_AUSY_00067: galat asli (bisa memuat SQL) hanya ke log, bukan ke layar.
+            log.error("NALA upload gagal: id={} user={}", uploadId, u.getUserId(), e);
+            u.setStatus("failed"); u.setResultMsg(UploadService.pesanGagal(e));
         }
         repo.save(u);
         // clean chunk dir
