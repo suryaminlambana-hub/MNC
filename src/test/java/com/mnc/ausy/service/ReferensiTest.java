@@ -2,22 +2,33 @@ package com.mnc.ausy.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Format nomor referensi GLTRRF — REQ_AUSY_00066, 00067 &amp; 00068. */
 class ReferensiTest {
 
     @Test
-    void formatBaruTahunDuaDigitDanRunningNumberEnamDigit() {
-        assertEquals("261027001-01-000001", Referensi.of("20261027001", 1));
+    void formatBaruTanggalEmpatDigitTanpaKodeBatchRunningNumberTujuhDigit() {
+        // Contoh di tiket REQ_AUSY_00068: 27 Oktober 2026 -> 20261027-01-0000001
+        assertEquals("20261027-01-0000001", Referensi.of("20261027001", 1));
     }
 
     @Test
-    void runningNumberDiberikanPemanggil() {
-        // Angkanya (reset per hari, berlanjut antar-batch) dihitung dari basis data; di sini
-        // hanya bentuknya: batch kedua hari itu melanjutkan nomor batch pertama.
-        assertEquals("261027002-01-020001", Referensi.of("20261027002", 20001));
-        assertEquals("261028001-01-000001", Referensi.of("20261028001", 1), "hari berikutnya mulai dari 000001");
+    void kodeBatchTidakIkutDiReferensi() {
+        // Batch kedua hari itu melanjutkan running number (REQ_AUSY_00066); nomor batchnya tidak
+        // lagi terlihat di referensi.
+        assertEquals("20261027-01-0020001", Referensi.of("20261027002", 20001));
+        assertEquals("20261027-01-0020001", Referensi.of("202610271000", 20001));
+        assertEquals("20261028-01-0000001", Referensi.of("20261028001", 1), "hari berikutnya mulai dari 0000001");
+    }
+
+    @Test
+    void selaluSembilanBelasKarakter() {
+        assertEquals(19, Referensi.of("20261027001", 1).length());
+        assertEquals(19, Referensi.of("202610271000", Referensi.MAKS_URUT).length());
     }
 
     @Test
@@ -29,15 +40,9 @@ class ReferensiTest {
     }
 
     @Test
-    void selaluMuatDiKolomDuaPuluhKarakter() {
-        // batch ke-1000 di hari yang sama = nomor batch 4 digit; running number paling besar
-        assertEquals(19, Referensi.of("20261027001", Referensi.MAKS_URUT).length());
-        assertEquals(20, Referensi.of("202610271000", Referensi.MAKS_URUT).length());
-    }
-
-    @Test
-    void nomorBatchBukanFormatTanggalTidakDipotong() {
-        assertEquals("REF-01-000003", Referensi.of("REF", 3));
+    void batchLamaTanpaTanggalMemakaiTanggalHariIni() {
+        String hariIni = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        assertEquals(hariIni + "-01-0000003", Referensi.of("REF", 3));
     }
 
     @Test

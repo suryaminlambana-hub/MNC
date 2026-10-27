@@ -20,25 +20,27 @@ Setiap entri memuat:
 
 Tidak ada migrasi DB.
 
-- **Format nomor referensi baru: `YYMMDDXXX-01-NNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00068).
-  - Tahun 2 digit (`261027001`), nomor transmisi tetap `01`, running number **6 digit**.
-  - Running number **di-reset per hari**: batch pertama tiap hari mulai dari 000001, batch
-    berikutnya di hari yang sama melanjutkan (konfirmasi QA 27-10-2026, sesuai contoh tiket). Dulu
-    diambil dari satu penghitung global (`web_sequence`) yang tidak pernah di-reset, sehingga
-    referensi terus memanjang.
+- **Format nomor referensi baru: `YYYYMMDD-01-NNNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00068 revisi
+  27-10-2026). Selalu 19 karakter, muat di kolom 20 karakter ACCTXT.
+  - `YYYYMMDD` = tanggal batch (tahun tetap 4 digit). **Kode batch 3 digit tidak lagi ikut** di
+    referensi. `01` = nomor transmisi (tetap). Running number **7 digit**.
+  - Running number **di-reset per hari**: batch pertama tiap hari mulai dari 0000001, batch
+    berikutnya di hari yang sama melanjutkan (konfirmasi QA 27-10-2026). Dulu diambil dari satu
+    penghitung global (`web_sequence`) yang tidak pernah di-reset, sehingga referensi terus
+    memanjang.
+  - Karena kode batch tidak ikut, keunikan referensi bergantung pada running number harian.
+    Penomoran dikunci per tanggal, sehingga unggahan bersamaan tidak memakai angka yang sama.
   - "Hari" = tanggal di nomor batch. Bulk Edit menomori ulang batch melanjutkan hitungan tanggal
     batch itu; Tambah data di Kelola Data GL melanjutkan nomor terakhir tanggal batchnya.
-  - Diuji: batch 1 (20.000 baris) `000001`–`020000`, batch 2 hari yang sama `020001`–`040000`;
-    dua upload bersamaan mendapat nomor batch dan rentang yang tidak tumpang tindih (penomoran
-    dikunci per tanggal); tanggal berikutnya mulai lagi dari `000001`.
-  - Panjangnya tetap 19 karakter (20 bila nomor batch hari itu sudah 4 digit), selalu muat di
-    kolom 20 karakter ACCTXT. Maksimal 999.999 baris per hari; lebih dari itu ditolak dengan
-    pesan yang jelas.
+  - Diuji: batch 1 (20.000 baris) `20261027-01-0000001`–`0020000`, batch 2 hari yang sama
+    `0020001`–`0040000`, dua upload bersamaan `0040001`–`0040004` dan `0040005`–`0040008`;
+    40.008 referensi, semuanya unik.
+  - Maksimal 9.999.999 baris per hari; lebih dari itu ditolak dengan pesan yang jelas.
   - Data yang sudah ada **tidak diubah**: referensi lama (`20261021001-01-0457`) tetap seperti
-    semula dan tidak ikut dihitung, jadi hari rilis pun mulai dari 000001.
+    semula dan tidak ikut dihitung, jadi hari rilis pun mulai dari 0000001.
 - **Upload gagal tidak lagi menampilkan galat SQL mentah** (REQ_AUSY_00067).
   - Penyebab utamanya (referensi > 20 karakter pada upload besar) hilang dengan format baru.
-    Diuji: berkas **100.002 baris** berhasil diunggah, referensi `…-000001` s.d. `…-100002`.
+    Diuji: berkas **100.002 baris** berhasil diunggah tanpa galat.
   - Isian yang lebih panjang dari kolomnya di basis data (mis. Branch > 10 karakter) kini ditolak
     di pemeriksaan, disebut baris dan kolomnya.
   - **D/C wajib `D` atau `C`.** Dulu isian lain diam-diam dihitung sebagai Credit, dan "Debit"

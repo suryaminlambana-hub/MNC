@@ -265,7 +265,7 @@ public class OtorisasiService {
         // REQ_AUSY_00066: baris batch ini dinomori ulang melanjutkan running number tanggal
         // batchnya. Kapasitas diperiksa SEBELUM baris lama dihapus, supaya penolakan tidak
         // meninggalkan batch kosong.
-        uploads.kunciPenomoran(Referensi.tanggal(paket));
+        uploads.kunciPenomoran(Referensi.tanggalReferensi(paket));
         String penuh = uploads.cekKapasitasHarian(paket, b.rows.size());
         if (penuh != null)
             return new ExportResult(false, "Bulk Edit ditolak, tidak ada data yang diubah: "

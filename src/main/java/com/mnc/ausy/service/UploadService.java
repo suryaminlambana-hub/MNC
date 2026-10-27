@@ -478,10 +478,10 @@ public class UploadService {
             b.rows.add(g);
             if (dc.equals("D")) b.debit = b.debit.add(amt); else b.credit = b.credit.add(amt);
         }
-        // REQ_AUSY_00066/00068: running number referensi 6 digit, di-reset per hari.
+        // REQ_AUSY_00066/00068: running number referensi 7 digit, di-reset per hari.
         if (b.rows.size() > Referensi.MAKS_URUT) {
             b.message = "Upload gagal: berkas berisi " + b.rows.size() + " baris, melebihi batas "
-                    + "999.999 baris per hari. Pecah menjadi beberapa berkas lalu unggah satu per satu.";
+                    + "9.999.999 baris per hari. Pecah menjadi beberapa berkas lalu unggah satu per satu.";
             b.rows.clear();
         }
         return b;
@@ -530,13 +530,13 @@ public class UploadService {
 
     /**
      * Pesan penolakan bila running number hari itu tidak cukup untuk {@code n} baris lagi, atau
-     * null bila cukup. Batasnya 999.999 baris per hari (6 digit, REQ_AUSY_00068).
+     * null bila cukup. Batasnya 9.999.999 baris per hari (7 digit, REQ_AUSY_00068).
      */
     public String cekKapasitasHarian(String paket, int n) {
         int sisa = Referensi.MAKS_URUT - gl.urutReferensiTerakhir(paket);
         if (n <= sisa) return null;
         return "Upload gagal: nomor referensi untuk tanggal batch ini tinggal " + Math.max(sisa, 0)
-                + " (batas 999.999 baris per hari), sedangkan berkas berisi " + n + " baris.";
+                + " (batas 9.999.999 baris per hari), sedangkan berkas berisi " + n + " baris.";
     }
 
     @Transactional
@@ -550,7 +550,7 @@ public class UploadService {
             // REQ_AUSY_00031: nomor batch mulai dari 1 setiap hari, digabung tanggal supaya tetap
             // unik (20261008001). Tanpa pemisah "-": referensi GLTRRF berbentuk
             // <batch>-<transmisi>-<urut> dan dipecah per "-" saat mencetak jurnal. Panjangnya
-            // 11 karakter; di referensi tahunnya dipendekkan jadi YYMMDDXXX (lihat Referensi).
+            // 11 karakter; referensinya hanya memakai tanggalnya (lihat Referensi).
             String tgl = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             kunciPenomoran(tgl);   // REQ_AUSY_00066: nomor batch & running number harian tanpa balapan
             String paket = tgl + String.format("%03d", gl.maxUrutBatchHarian(tgl) + 1);

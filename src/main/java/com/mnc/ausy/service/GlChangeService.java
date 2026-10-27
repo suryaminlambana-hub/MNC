@@ -1139,8 +1139,7 @@ public class GlChangeService {
         // REQ_AUSY_00066: lanjutkan running number harian dari tanggal batch tempat baris ini
         // ditambahkan, di bawah kunci yang sama dengan Upload Excel.
         String paket = n(a.get("noPaket")).trim();
-        String tgl = Referensi.tanggal(paket);
-        if (tgl != null) gl.kunciPenomoranHarian(tgl);
+        gl.kunciPenomoranHarian(Referensi.tanggalReferensi(paket));
         g.setGltrrf(Referensi.of(paket, gl.urutReferensiTerakhir(paket) + 1));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
         // Upload GL disaring status_dual='PENDING', jadi baris ini tetap tidak muncul di sana.
