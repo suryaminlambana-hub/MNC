@@ -16,9 +16,16 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261027-1 — 27-10-2026 14:57
 
-Tidak ada migrasi DB.
+Commit `9a6c47a`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &
+ausy-trigger.jar sama dengan build, service aktif sejak 14:57:47, start tanpa error, login 200,
+scheduler sebagai user `ausy` menolak token salah (exit 2). JAR sebelumnya:
+`backup/ausy-2.0.0.jar.dev-20261021-1`.
+
+Catatan deploy: kiriman satu koneksi macet di 74,5 MB dari 80 MB. Bagian yang sudah sampai
+dicocokkan sha256-nya dengan berkas lokal, lalu hanya sisanya yang dikirim; sha256 berkas utuh
+dicek lagi sebelum install.
 
 - **Format nomor referensi baru: `YYYYMMDD-01-NNNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00068 revisi
   27-10-2026). Selalu 19 karakter, muat di kolom 20 karakter ACCTXT.
