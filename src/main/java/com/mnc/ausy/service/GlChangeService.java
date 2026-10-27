@@ -1136,9 +1136,12 @@ public class GlChangeService {
         g.setGleqam(amount); g.setGlotam(amount);
         g.setGlName(GlTextRule.trim(glCodeService.descriptionOf(code)));
         g.setGltrcy("IDR"); g.setGlotcc("IDR");
-        // REQ_AUSY_00066: lanjutkan running number batch tempat baris ini ditambahkan.
+        // REQ_AUSY_00066: lanjutkan running number harian dari tanggal batch tempat baris ini
+        // ditambahkan, di bawah kunci yang sama dengan Upload Excel.
         String paket = n(a.get("noPaket")).trim();
-        g.setGltrrf(Referensi.of(paket, gl.maxUrutReferensi(paket) + 1));
+        String tgl = Referensi.tanggal(paket);
+        if (tgl != null) gl.kunciPenomoranHarian(tgl);
+        g.setGltrrf(Referensi.of(paket, gl.urutReferensiTerakhir(paket) + 1));
         // ADD lewat change request sudah di-approve checker -> GL aktif langsung. Antrian Otorisasi
         // Upload GL disaring status_dual='PENDING', jadi baris ini tetap tidak muncul di sana.
         // status_print='BELUM UPLOAD' = belum di-export; kalau ditandai 'SUDAH UPLOAD' baris manual

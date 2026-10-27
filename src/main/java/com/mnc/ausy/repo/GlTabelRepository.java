@@ -286,13 +286,38 @@ public interface GlTabelRepository extends JpaRepository<GlTabel, Long> {
     int markExported(@Param("rid") Long reqId);
 
     /**
-     * Running number terbesar pada referensi GLTRRF di batch ini, atau 0 bila belum ada
-     * (REQ_AUSY_00066). Referensi berformat lama ikut dihitung, supaya baris yang ditambahkan ke
-     * batch lama tidak bertabrakan nomor.
+     * Running number terbesar pada referensi GLTRRF semua batch bertanggal {@code tgl}
+     * ({@code yyyyMMdd}), atau 0 bila belum ada — running number di-reset per hari dan berlanjut
+     * antar-batch di hari yang sama (REQ_AUSY_00066). Hanya referensi berformat baru
+     * ({@code YYMMDDXXX-TT-NNNNNN}) yang dihitung: nomor di format lama berasal dari penghitung
+     * global, dan ikut menghitungnya membuat hari pertama setelah rilis tidak mulai dari 000001.
      */
     @Query(value = "select coalesce(max(cast(split_part(gltrrf, '-', 3) as integer)), 0) from gl_tabel"
+                 + " where no_paket ~ ('^' || :tgl || '[0-9]{3,4}$')"
+                 + " and split_part(gltrrf, '-', 1) ~ '^[0-9]{9,10}$'"
+                 + " and split_part(gltrrf, '-', 3) ~ '^[0-9]{1,9}$'", nativeQuery = true)
+    int maxUrutReferensiHarian(@Param("tgl") String tgl);
+
+    /**
+     * Kunci per tanggal sampai transaksi selesai: dua unggahan pada saat yang sama tidak membaca
+     * nomor batch maupun running number terakhir yang sama (REQ_AUSY_00066).
+     */
+    @Query(value = "select 1 from (select pg_advisory_xact_lock(hashtext('ausy-ref-' || :tgl))) x", nativeQuery = true)
+    int kunciPenomoranHarian(@Param("tgl") String tgl);
+
+    /** Running number terbesar di satu batch — hanya untuk batch lama yang nomornya bukan tanggal. */
+    @Query(value = "select coalesce(max(cast(split_part(gltrrf, '-', 3) as integer)), 0) from gl_tabel"
                  + " where no_paket = :p and split_part(gltrrf, '-', 3) ~ '^[0-9]{1,9}$'", nativeQuery = true)
-    int maxUrutReferensi(@Param("p") String paket);
+    int maxUrutReferensiBatch(@Param("p") String paket);
+
+    /**
+     * Running number terakhir yang berlaku untuk batch {@code paket}: per hari (tanggal di nomor
+     * batch) untuk batch bertanggal, per batch untuk batch lama tanpa tanggal.
+     */
+    default int urutReferensiTerakhir(String paket) {
+        String tgl = com.mnc.ausy.service.Referensi.tanggal(paket);
+        return tgl != null ? maxUrutReferensiHarian(tgl) : maxUrutReferensiBatch(paket);
+    }
 
     /**
      * GL Name semua baris berakun {@code code} diselaraskan dengan nama di master Kode GL

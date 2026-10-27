@@ -13,9 +13,19 @@ class ReferensiTest {
     }
 
     @Test
-    void runningNumberBerjalanPerBatch() {
-        assertEquals("261027002-01-000001", Referensi.of("20261027002", 1), "batch baru mulai dari 000001");
-        assertEquals("261027001-01-020000", Referensi.of("20261027001", 20000));
+    void runningNumberDiberikanPemanggil() {
+        // Angkanya (reset per hari, berlanjut antar-batch) dihitung dari basis data; di sini
+        // hanya bentuknya: batch kedua hari itu melanjutkan nomor batch pertama.
+        assertEquals("261027002-01-020001", Referensi.of("20261027002", 20001));
+        assertEquals("261028001-01-000001", Referensi.of("20261028001", 1), "hari berikutnya mulai dari 000001");
+    }
+
+    @Test
+    void tanggalDiambilDariNomorBatch() {
+        assertEquals("20261027", Referensi.tanggal("20261027001"));
+        assertEquals("20261027", Referensi.tanggal("202610271000"));
+        assertNull(Referensi.tanggal("REF"), "batch lama tanpa tanggal");
+        assertNull(Referensi.tanggal(null));
     }
 
     @Test

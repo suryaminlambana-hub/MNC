@@ -22,16 +22,20 @@ Tidak ada migrasi DB.
 
 - **Format nomor referensi baru: `YYMMDDXXX-01-NNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00068).
   - Tahun 2 digit (`261027001`), nomor transmisi tetap `01`, running number **6 digit**.
-  - Running number **mulai dari 000001 di setiap batch**. Dulu diambil dari satu penghitung global
-    (`web_sequence`) yang tidak pernah di-reset, sehingga batch berikutnya melanjutkan nomor batch
-    sebelumnya dan referensi terus memanjang.
+  - Running number **di-reset per hari**: batch pertama tiap hari mulai dari 000001, batch
+    berikutnya di hari yang sama melanjutkan (konfirmasi QA 27-10-2026, sesuai contoh tiket). Dulu
+    diambil dari satu penghitung global (`web_sequence`) yang tidak pernah di-reset, sehingga
+    referensi terus memanjang.
+  - "Hari" = tanggal di nomor batch. Bulk Edit menomori ulang batch melanjutkan hitungan tanggal
+    batch itu; Tambah data di Kelola Data GL melanjutkan nomor terakhir tanggal batchnya.
+  - Diuji: batch 1 (20.000 baris) `000001`–`020000`, batch 2 hari yang sama `020001`–`040000`;
+    dua upload bersamaan mendapat nomor batch dan rentang yang tidak tumpang tindih (penomoran
+    dikunci per tanggal); tanggal berikutnya mulai lagi dari `000001`.
   - Panjangnya tetap 19 karakter (20 bila nomor batch hari itu sudah 4 digit), selalu muat di
-    kolom 20 karakter ACCTXT. Satu batch maksimal 999.999 baris; lebih dari itu ditolak dengan
+    kolom 20 karakter ACCTXT. Maksimal 999.999 baris per hari; lebih dari itu ditolak dengan
     pesan yang jelas.
-  - Berlaku di Upload Excel, Bulk Edit (batch dinomori ulang dari 000001), dan Tambah data di
-    Kelola Data GL (melanjutkan nomor terakhir di batch itu).
   - Data yang sudah ada **tidak diubah**: referensi lama (`20261021001-01-0457`) tetap seperti
-    semula. Baris yang ditambahkan ke batch lama melanjutkan dari nomor terbesar di batch itu.
+    semula dan tidak ikut dihitung, jadi hari rilis pun mulai dari 000001.
 - **Upload gagal tidak lagi menampilkan galat SQL mentah** (REQ_AUSY_00067).
   - Penyebab utamanya (referensi > 20 karakter pada upload besar) hilang dengan format baru.
     Diuji: berkas **100.002 baris** berhasil diunggah, referensi `…-000001` s.d. `…-100002`.

@@ -478,10 +478,10 @@ public class UploadService {
             b.rows.add(g);
             if (dc.equals("D")) b.debit = b.debit.add(amt); else b.credit = b.credit.add(amt);
         }
-        // REQ_AUSY_00066/00068: running number referensi 6 digit per batch.
+        // REQ_AUSY_00066/00068: running number referensi 6 digit, di-reset per hari.
         if (b.rows.size() > Referensi.MAKS_URUT) {
             b.message = "Upload gagal: berkas berisi " + b.rows.size() + " baris, melebihi batas "
-                    + "999.999 baris per batch. Pecah menjadi beberapa berkas lalu unggah satu per satu.";
+                    + "999.999 baris per hari. Pecah menjadi beberapa berkas lalu unggah satu per satu.";
             b.rows.clear();
         }
         return b;
@@ -506,10 +506,10 @@ public class UploadService {
      * nomor batch, pemilik, dan GLTRRF baru per baris.
      */
     public void simpanBaris(List<GlTabel> rows, String paket, String username) {
-        // REQ_AUSY_00066: running number per batch. Upload baru mulai dari 000001; Bulk Edit
-        // menghapus baris unggahan lalu menyimpan ulang, sehingga juga mulai dari awal — kecuali
-        // ada baris manual yang tetap tinggal di batch itu, maka dilanjutkan setelahnya.
-        int urut = gl.maxUrutReferensi(paket);
+        // REQ_AUSY_00066: running number di-reset per hari dan berlanjut antar-batch di hari yang
+        // sama. Pemanggil sudah memegang kunciPenomoran, jadi angka terakhir ini tidak dibaca
+        // bersamaan oleh unggahan lain.
+        int urut = gl.urutReferensiTerakhir(paket);
         for (GlTabel g : rows) {
             g.setNoPaket(paket);
             // username utuh: pemiliknya harus bisa dicocokkan untuk pembatasan data per maker (BUG_AUSY_00138).
@@ -518,6 +518,25 @@ public class UploadService {
             g.setGltrrf(Referensi.of(paket, ++urut));
             gl.save(g);
         }
+    }
+
+    /**
+     * Kunci penomoran untuk tanggal batch ini sampai transaksi selesai (REQ_AUSY_00066). Wajib
+     * dipanggil sebelum membaca nomor batch / running number terakhir lalu menyimpan.
+     */
+    public void kunciPenomoran(String tgl) {
+        if (tgl != null) gl.kunciPenomoranHarian(tgl);
+    }
+
+    /**
+     * Pesan penolakan bila running number hari itu tidak cukup untuk {@code n} baris lagi, atau
+     * null bila cukup. Batasnya 999.999 baris per hari (6 digit, REQ_AUSY_00068).
+     */
+    public String cekKapasitasHarian(String paket, int n) {
+        int sisa = Referensi.MAKS_URUT - gl.urutReferensiTerakhir(paket);
+        if (n <= sisa) return null;
+        return "Upload gagal: nomor referensi untuk tanggal batch ini tinggal " + Math.max(sisa, 0)
+                + " (batas 999.999 baris per hari), sedangkan berkas berisi " + n + " baris.";
     }
 
     @Transactional
@@ -533,7 +552,10 @@ public class UploadService {
             // <batch>-<transmisi>-<urut> dan dipecah per "-" saat mencetak jurnal. Panjangnya
             // 11 karakter; di referensi tahunnya dipendekkan jadi YYMMDDXXX (lihat Referensi).
             String tgl = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            kunciPenomoran(tgl);   // REQ_AUSY_00066: nomor batch & running number harian tanpa balapan
             String paket = tgl + String.format("%03d", gl.maxUrutBatchHarian(tgl) + 1);
+            String penuh = cekKapasitasHarian(paket, b.rows.size());
+            if (penuh != null) { res.message = penuh; return res; }
             simpanBaris(b.rows, paket, username);
             int n = b.rows.size();
             res.debit = b.debit; res.credit = b.credit;

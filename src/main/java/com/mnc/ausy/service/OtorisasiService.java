@@ -262,6 +262,15 @@ public class OtorisasiService {
         for (GlTabel g : lama) if ("D".equalsIgnoreCase(g.getGltrcd())) dLama = dLama.add(nz(g.getGltram()));
         LocalDateTime diupload = gl.uploadedAt(paket, maker);
 
+        // REQ_AUSY_00066: baris batch ini dinomori ulang melanjutkan running number tanggal
+        // batchnya. Kapasitas diperiksa SEBELUM baris lama dihapus, supaya penolakan tidak
+        // meninggalkan batch kosong.
+        uploads.kunciPenomoran(Referensi.tanggal(paket));
+        String penuh = uploads.cekKapasitasHarian(paket, b.rows.size());
+        if (penuh != null)
+            return new ExportResult(false, "Bulk Edit ditolak, tidak ada data yang diubah: "
+                    + penuh.replace("Upload gagal: ", ""), 0, null);
+
         gl.deletePaket(paket, maker);
         uploads.simpanBaris(b.rows, paket, maker);
         // Waktu upload batch tetap waktu upload aslinya, bukan waktu Bulk Edit.
