@@ -478,7 +478,7 @@ public class UploadService {
             b.rows.add(g);
             if (dc.equals("D")) b.debit = b.debit.add(amt); else b.credit = b.credit.add(amt);
         }
-        // REQ_AUSY_00066/00070: running number referensi 6 digit per batch.
+        // REQ_AUSY_00066/00068: running number referensi 6 digit per batch.
         if (b.rows.size() > Referensi.MAKS_URUT) {
             b.message = "Upload gagal: berkas berisi " + b.rows.size() + " baris, melebihi batas "
                     + "999.999 baris per batch. Pecah menjadi beberapa berkas lalu unggah satu per satu.";

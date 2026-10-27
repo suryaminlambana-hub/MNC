@@ -20,7 +20,7 @@ Setiap entri memuat:
 
 Tidak ada migrasi DB.
 
-- **Format nomor referensi baru: `YYMMDDXXX-01-NNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00070).
+- **Format nomor referensi baru: `YYMMDDXXX-01-NNNNNN`** (REQ_AUSY_00066, REQ_AUSY_00068).
   - Tahun 2 digit (`261027001`), nomor transmisi tetap `01`, running number **6 digit**.
   - Running number **mulai dari 000001 di setiap batch**. Dulu diambil dari satu penghitung global
     (`web_sequence`) yang tidak pernah di-reset, sehingga batch berikutnya melanjutkan nomor batch

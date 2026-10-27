@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Format nomor referensi GLTRRF — REQ_AUSY_00066, 00067 &amp; 00070. */
+/** Format nomor referensi GLTRRF — REQ_AUSY_00066, 00067 &amp; 00068. */
 class ReferensiTest {
 
     @Test

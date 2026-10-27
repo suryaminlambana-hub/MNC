@@ -4,7 +4,7 @@ package com.mnc.ausy.service;
  * Nomor referensi transaksi (GLTRRF) di berkas ACCTXT: {@code YYMMDDXXX-TT-NNNNNN}.
  *
  * <ul>
- *   <li>{@code YYMMDDXXX} — nomor batch dengan tahun 2 digit (REQ_AUSY_00070). Nomor batch di
+ *   <li>{@code YYMMDDXXX} — nomor batch dengan tahun 2 digit (REQ_AUSY_00068). Nomor batch di
  *       basis data tetap {@code YYYYMMDDXXX}; hanya referensinya yang dipendekkan.</li>
  *   <li>{@code TT} — nomor transmisi, selalu {@code 01}.</li>
  *   <li>{@code NNNNNN} — running number 6 digit yang mulai dari 000001 di setiap batch
