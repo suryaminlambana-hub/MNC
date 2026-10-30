@@ -2,6 +2,12 @@ server:
   port: 8080
   servlet:
     context-path: ${CONTEXT_PATH:/ausy}
+    # REQ_AUSY_00072: cookie sesi tidak ikut terkirim pada request lintas situs (POST dari situs
+    # lain), dan tidak terbaca JavaScript. Lax = default aman; Strict bisa dipasang lewat .env.
+    session:
+      cookie:
+        http-only: true
+        same-site: ${AUSY_COOKIE_SAMESITE:lax}
   # Aplikasi dipublish di belakang reverse proxy (dev-ausy.mncbank.co.id / Safous):
   # hormati X-Forwarded-* supaya redirect setelah login memakai alamat publik,
   # bukan alamat internal 10.5.99.24:8080 yang tidak bisa dijangkau browser user.

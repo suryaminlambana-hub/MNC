@@ -17,9 +17,10 @@ import java.time.LocalDateTime;
 public class LoginAuditListener {
     private final AuditService audit;
     private final UserRepository users;
+    private final LoginThrottle throttle;
 
-    public LoginAuditListener(AuditService audit, UserRepository users) {
-        this.audit = audit; this.users = users;
+    public LoginAuditListener(AuditService audit, UserRepository users, LoginThrottle throttle) {
+        this.audit = audit; this.users = users; this.throttle = throttle;
     }
 
     private static String ip() {
@@ -34,12 +35,15 @@ public class LoginAuditListener {
     public void onSuccess(InteractiveAuthenticationSuccessEvent ev) {
         String user = ev.getAuthentication().getName();
         audit.activity(user, ip(), "LOGIN", "Login berhasil");
+        throttle.berhasil(user);   // REQ_AUSY_00070
         users.findByUserId(user).ifPresent(u -> { u.setLastLogin(LocalDateTime.now()); users.save(u); });
     }
 
     @EventListener
     public void onFailure(AuthenticationFailureBadCredentialsEvent ev) {
         Object p = ev.getAuthentication().getPrincipal();
-        audit.activity(p == null ? "?" : p.toString(), ip(), "LOGIN_GAGAL", "Username atau password salah");
+        String ip = ip();
+        audit.activity(p == null ? "?" : p.toString(), ip, "LOGIN_GAGAL", "Username atau password salah");
+        throttle.gagal(p == null ? "" : p.toString(), ip);   // REQ_AUSY_00070
     }
 }

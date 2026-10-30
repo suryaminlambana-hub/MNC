@@ -16,6 +16,53 @@ Setiap entri memuat:
 
 ---
 
+## Belum di-deploy
+
+Tidak ada migrasi DB. Setelan `.env` baru (opsional): `AUSY_COOKIE_SAMESITE` (bawaan `lax`).
+
+Temuan pentest 30-10-2026 — bagian yang ada di aplikasi:
+
+- **REQ_AUSY_00069 (Web Scan):** header `Permissions-Policy` dan `Referrer-Policy` ditambahkan
+  (X-Frame-Options DENY dan X-Content-Type-Options nosniff sudah ada).
+- **REQ_AUSY_00070 (API Scan):**
+  - Hanya GET, HEAD, POST yang diterima; PUT/DELETE/PATCH/OPTIONS dijawab **405**, juga di path
+    publik (login, aset statis). Aplikasi memang tidak punya endpoint PUT/DELETE.
+  - **Pembatasan percobaan login** (sebelumnya tidak ada): 5 kali gagal dalam 15 menit → username
+    dikunci 15 menit (juga untuk password yang benar); 30 kali gagal dari satu IP → IP dikunci.
+    Dijawab **HTTP 429 + `Retry-After`**, halaman login menampilkan sisa menitnya. Login berhasil
+    menghapus hitungan.
+  - CORS: aplikasi tidak mengirim header CORS sama sekali — `Access-Control-Allow-Origin: *` yang
+    ditemukan datang dari reverse proxy (lihat "Butuh tindakan infra").
+- **REQ_AUSY_00071 (IDOR/BOLA)** — tiga celah ditutup:
+  - Unggahan bertahap NALA (`/nala/status`, `/nala/chunk`, `/nala/finalize`): dulu cukup tahu
+    uploadId untuk membaca hasil, menimpa potongan, atau memproses unggahan orang lain (barisnya
+    tersimpan atas nama pemilik asli). Kini hanya pemiliknya; selain itu 404.
+  - Jurnal PDF `/report/jurnal/{paket}`: dulu siapa pun yang login bisa membuka batch mana saja.
+    Kini hanya baris maker yang boleh dilihat user itu; selain itu 404.
+  - Export Excel Bulk Edit `/gl-change/{crId}/export/...`: kini hanya maker pengajuannya atau
+    checker yang berwenang atasnya.
+  - Ditemukan saat audit: **path traversal** pada nama berkas NALA (`..\..\x` bisa menulis/menghapus
+    berkas di luar folder unggahan). Nama berkas kini dibersihkan dan path dicek tetap di dalam
+    folder unggahan.
+- **REQ_AUSY_00072 (CSRF):** semua aksi yang mengubah data memang sudah POST + token CSRF; tidak
+  ada aksi lewat GET.
+  - Cookie sesi kini `SameSite=Lax` (bisa `Strict` lewat `AUSY_COOKIE_SAMESITE`) dan `HttpOnly`.
+  - POST tanpa token CSRF / dengan sesi habis kini dijawab **403** apa adanya. Dulu dijawab
+    redirect ke login, yang di mata pemindai berakhir "200 tanpa token". Browser tetap diantar ke
+    halaman login "sesi berakhir" seperti sebelumnya; GET dengan sesi habis tetap redirect.
+
+**Butuh tindakan infra** (tidak bisa diperbaiki dari kode aplikasi):
+- 00069: `server_tokens off;` di nginx; blokir path sensitif (`/.git`, `/.env`, `/backup.zip`,
+  `/server-status`, `/phpinfo.php`, `/wp-login.php`, `/swagger.json`) di nginx. Di bawah `/ausy`
+  path seperti itu hanya mengantar ke halaman login, tidak membuka isi apa pun.
+- 00070: hapus `add_header Access-Control-Allow-Origin *` di nginx (aplikasi tidak butuh CORS);
+  rate limit umum (`limit_req`) di nginx.
+- 00073: tutup port 21 (FTP) di 10.5.99.24 dan 10.5.99.23, ganti SFTP bila masih dipakai.
+- 00074: tutup port 23, 6379, 9200, 27017, 21 di host `dev-ausy.mncbank.co.id`. AUSY tidak memakai
+  Telnet, Redis, Elasticsearch, maupun MongoDB.
+
+---
+
 ## dev-20261027-1 — 27-10-2026 14:57
 
 Commit `9a6c47a`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Diverifikasi: JAR &

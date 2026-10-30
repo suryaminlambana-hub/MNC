@@ -286,10 +286,17 @@ public class GlChangeService {
                 + (badCode > 0 ? " " + badCode + " baris dilewati karena GL Code bukan angka." : ""));
     }
 
-    /** Rows (before/after) of a bulk-edit request, for the checker's Excel export. */
-    public List<Map<String,String>> bulkRows(Long crId, boolean after) {
+    /**
+     * Rows (before/after) of a bulk-edit request, for the checker's Excel export — or null when
+     * {@code me} may not see it (REQ_AUSY_00071, IDOR). Allowed: the request's own maker, or a
+     * checker who could decide it (same group rule and maker pairing as {@link #approve}).
+     */
+    public List<Map<String,String>> bulkRows(Long crId, boolean after, AusyUserDetails me) {
         GlChangeRequest c = cr.findById(crId).orElse(null);
-        if (c == null) return java.util.Collections.emptyList();
+        if (c == null || me == null) return null;
+        boolean milikSendiri = me.getUsername().equals(c.getMaker());
+        boolean berwenang = approval.canApproveGroup(me.getIdGroup(), makerGroupOf(c)) && scope.canSee(me, c.getMaker());
+        if (!milikSendiri && !berwenang) return null;
         return parseList(after ? c.getAfterJson() : c.getBeforeJson());
     }
 

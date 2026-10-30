@@ -110,8 +110,12 @@ public class ReportController {
     // Diotorisasi" di List Data GL (REQ_AUSY_00036 feedback): tidak ada lagi yang memakainya.
 
     @GetMapping("/report/jurnal/{paket}")
-    public void jurnal(@PathVariable String paket, HttpServletResponse resp) throws Exception {
-        List<GlTabel> rows = gl.findByNoPaketOrderById(paket);
+    public void jurnal(@PathVariable String paket, @AuthenticationPrincipal AusyUserDetails me,
+                       HttpServletResponse resp) throws Exception {
+        // REQ_AUSY_00071 (IDOR): hanya baris milik maker yang boleh dilihat user ini. Dulu siapa
+        // pun yang login bisa membuka jurnal batch mana saja cukup dengan mengganti nomor batch.
+        List<GlTabel> rows = scope.filterRows(me, gl.findByNoPaketOrderById(paket));
+        if (rows.isEmpty()) { resp.sendError(HttpServletResponse.SC_NOT_FOUND); return; }
         resp.setContentType("application/pdf");
         resp.setHeader("Content-Disposition", "inline; filename=\"jurnal_" + paket + ".pdf\"");
         writeJournals(resp, rows);

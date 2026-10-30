@@ -31,6 +31,31 @@ public class NalaUploadService {
         for (byte x : h) sb.append(String.format("%02x", x));
         return sb.toString();
     }
+    /**
+     * Unggahan milik {@code user}, atau 404 (REQ_AUSY_00071 — IDOR). Dulu cukup tahu uploadId untuk
+     * membaca hasil, menimpa potongan, atau memproses unggahan orang lain — dan barisnya tersimpan
+     * atas nama pemilik aslinya. Bukan 403, supaya keberadaan uploadId orang lain tidak terbocor.
+     */
+    private NalaUpload milik(String uploadId, String user) {
+        NalaUpload u = repo.findByUploadId(uploadId).orElse(null);
+        if (u == null || user == null || !user.equals(u.getUserId()))
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Unggahan tidak ditemukan.");
+        return u;
+    }
+
+    /**
+     * Nama berkas tanpa komponen folder dan karakter berisiko (REQ_AUSY_00071 — path traversal).
+     * Nama dari browser dipakai menyusun path di server; "..\..\x" dulu bisa keluar dari folder
+     * unggahan dan menimpa atau menghapus berkas lain.
+     */
+    static String namaAman(String name) {
+        String n = name == null ? "" : name.replace('\\', '/');
+        n = n.substring(n.lastIndexOf('/') + 1).replaceAll("[^A-Za-z0-9._ -]", "_").replaceAll("^\\.+", "");
+        if (n.length() > 120) n = n.substring(n.length() - 120);
+        return n.isBlank() ? "unggahan.xlsx" : n;
+    }
+
     private Path dir(String uploadId) { return Paths.get(baseDir, uploadId); }
 
     @Transactional
@@ -42,7 +67,7 @@ public class NalaUploadService {
         }
         if (u == null) {
             u = new NalaUpload();
-            u.setUploadId(uploadId); u.setUserId(user); u.setOriginalName(name); u.setFileSize(size);
+            u.setUploadId(uploadId); u.setUserId(user); u.setOriginalName(namaAman(name)); u.setFileSize(size);
             u.setTotalChunks(totalChunks); u.setChecksum(checksum); u.setStatus("uploading");
             u.setChunksReceived(0); u.setTempPath(dir(uploadId).toString());
             u.setCreatedAt(LocalDateTime.now()); u.setUpdatedAt(LocalDateTime.now());
@@ -62,8 +87,8 @@ public class NalaUploadService {
     }
 
     @Transactional
-    public Map<String,Object> receiveChunk(String uploadId, int index, byte[] data) throws Exception {
-        NalaUpload u = repo.findByUploadId(uploadId).orElseThrow();
+    public Map<String,Object> receiveChunk(String user, String uploadId, int index, byte[] data) throws Exception {
+        NalaUpload u = milik(uploadId, user);
         Files.createDirectories(dir(uploadId));
         Files.write(dir(uploadId).resolve("chunk_" + index), data);
         int recv = countChunks(uploadId);
@@ -74,8 +99,8 @@ public class NalaUploadService {
         return Map.of("ok", true, "chunks_received", recv, "total_chunks", u.getTotalChunks(), "complete", complete);
     }
 
-    public Map<String,Object> status(String uploadId) {
-        NalaUpload u = repo.findByUploadId(uploadId).orElseThrow();
+    public Map<String,Object> status(String user, String uploadId) {
+        NalaUpload u = milik(uploadId, user);
         Map<String,Object> m = new HashMap<>();
         m.put("upload_id", uploadId); m.put("status", u.getStatus());
         m.put("chunks_received", u.getChunksReceived()); m.put("total_chunks", u.getTotalChunks());
@@ -85,12 +110,15 @@ public class NalaUploadService {
 
     /** Combine chunks, verify checksum, then kick off async processing. */
     @Transactional
-    public Map<String,Object> finalizeUpload(String uploadId) throws Exception {
-        NalaUpload u = repo.findByUploadId(uploadId).orElseThrow();
+    public Map<String,Object> finalizeUpload(String user, String uploadId) throws Exception {
+        NalaUpload u = milik(uploadId, user);
         if ("done".equals(u.getStatus())) return Map.of("ok", true, "already_done", true);
 
         String ts = LocalDateTime.now().toString().replaceAll("[^0-9]", "").substring(0, 14);
-        Path finalPath = Paths.get(baseDir, ts + "_" + u.getOriginalName());
+        // Dibersihkan lagi di sini: baris lama di DB bisa menyimpan nama mentah dari sebelum perbaikan.
+        Path base = Paths.get(baseDir).toAbsolutePath().normalize();
+        Path finalPath = base.resolve(ts + "_" + namaAman(u.getOriginalName())).normalize();
+        if (!finalPath.startsWith(base)) return Map.of("ok", false, "error", "Nama berkas tidak valid.");
         try (OutputStream out = Files.newOutputStream(finalPath)) {
             for (int i = 0; i < u.getTotalChunks(); i++) {
                 Path c = dir(uploadId).resolve("chunk_" + i);

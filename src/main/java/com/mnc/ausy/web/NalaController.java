@@ -36,20 +36,22 @@ public class NalaController {
     @PostMapping("/nala/chunk")
     @ResponseBody
     public Map<String,Object> chunk(@RequestParam String uploadId, @RequestParam int chunkIndex,
-                                    @RequestParam("chunk") MultipartFile chunk) throws Exception {
-        return nala.receiveChunk(uploadId, chunkIndex, chunk.getBytes());
+                                    @RequestParam("chunk") MultipartFile chunk,
+                                    @AuthenticationPrincipal AusyUserDetails me) throws Exception {
+        return nala.receiveChunk(me.getUsername(), uploadId, chunkIndex, chunk.getBytes());
     }
 
     @GetMapping("/nala/status")
     @ResponseBody
-    public Map<String,Object> status(@RequestParam String uploadId) {
-        return nala.status(uploadId);
+    public Map<String,Object> status(@RequestParam String uploadId, @AuthenticationPrincipal AusyUserDetails me) {
+        return nala.status(me.getUsername(), uploadId);
     }
 
     @PostMapping("/nala/finalize")
     @ResponseBody
-    public Map<String,Object> finalize(@RequestParam String uploadId) throws Exception {
-        Map<String,Object> r = nala.finalizeUpload(uploadId);
+    public Map<String,Object> finalize(@RequestParam String uploadId, @AuthenticationPrincipal AusyUserDetails me) throws Exception {
+        // REQ_AUSY_00071: semua langkah setelah init hanya untuk pemilik unggahannya.
+        Map<String,Object> r = nala.finalizeUpload(me.getUsername(), uploadId);
         if (Boolean.TRUE.equals(r.get("ok")) && !Boolean.TRUE.equals(r.get("already_done"))) {
             nala.processAsync(uploadId);   // async backend processing
         }

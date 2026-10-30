@@ -95,10 +95,14 @@ public class GlChangeController {
 
     /** Checker downloads the bulk-edit data — before or after — as Excel to compare. */
     @GetMapping("/gl-change/{crId}/export/{side}")
-    public void exportSide(@PathVariable Long crId, @PathVariable String side, HttpServletResponse resp) throws Exception {
+    public void exportSide(@PathVariable Long crId, @PathVariable String side,
+                           @AuthenticationPrincipal AusyUserDetails me, HttpServletResponse resp) throws Exception {
         boolean after = "after".equalsIgnoreCase(side);
         List<List<Object>> data = new ArrayList<>();
-        for (Map<String,String> m : service.bulkRows(crId, after)) {
+        // REQ_AUSY_00071 (IDOR): hanya maker pengajuannya atau checker yang berwenang atasnya.
+        List<Map<String,String>> rows = service.bulkRows(crId, after, me);
+        if (rows == null) { resp.sendError(HttpServletResponse.SC_NOT_FOUND); return; }
+        for (Map<String,String> m : rows) {
             data.add(Arrays.asList(m.get("id"), m.get("gltrac"), m.get("gltrcd"),
                     num(m.get("gltram")), m.get("gltrds"), m.get("noPaket")));
         }

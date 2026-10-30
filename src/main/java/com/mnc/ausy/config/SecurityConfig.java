@@ -1,6 +1,9 @@
 package com.mnc.ausy.config;
 
 import com.mnc.ausy.security.AusyUserDetails;
+import com.mnc.ausy.security.LoginThrottle;
+import com.mnc.ausy.security.LoginThrottleFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import com.mnc.ausy.service.AccessService;
 import com.mnc.ausy.service.MenuService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +19,10 @@ import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
 // Hanya berlaku saat aplikasi berjalan sebagai web. Mode tugas (--ausy.task=..., REQ_AUSY_00058)
@@ -27,10 +34,12 @@ public class SecurityConfig {
 
     private final AccessService access;
     private final MenuService menuService;
+    private final LoginThrottle throttle;
 
-    public SecurityConfig(AccessService access, MenuService menuService) {
+    public SecurityConfig(AccessService access, MenuService menuService, LoginThrottle throttle) {
         this.access = access;
         this.menuService = menuService;
+        this.throttle = throttle;
     }
 
     /**
@@ -105,15 +114,48 @@ public class SecurityConfig {
             )
             // REQ_AUSY_00060: request yang membawa sesi yang sudah habis (idle) diantar ke halaman
             // login dengan pesan "sesi berakhir", bukan sekadar halaman login kosong.
-            .sessionManagement(s -> s.invalidSessionUrl("/login?expired"))
+            // REQ_AUSY_00072: POST dengan sesi habis / tanpa token CSRF tersimpan dijawab 403 (lihat
+            // tolak403), bukan redirect — Spring Security juga memakai strategi ini untuk token CSRF
+            // yang hilang dari sesi. GET tetap diantar ke login seperti biasa.
+            .sessionManagement(s -> s.invalidSessionStrategy((req, res) -> {
+                req.getSession();
+                String tujuan = req.getContextPath() + "/login?expired";
+                if ("POST".equals(req.getMethod())) tolak403(res, tujuan);
+                else res.sendRedirect(tujuan);
+            }))
             // Pemanggil JAR tidak punya sesi/form, jadi tidak membawa token CSRF; penjaganya token pemicu.
             .csrf(c -> c.ignoringRequestMatchers(AcctxtTriggerController.PATH))
-            // Never show the whitelabel 403 (e.g. a stale CSRF token from a cached tab):
-            // bounce anonymous users to a fresh login, authenticated users back to the dashboard.
+            // REQ_AUSY_00070: pembatasan percobaan login, sebelum kredensial diperiksa.
+            .addFilterBefore(new LoginThrottleFilter(throttle), UsernamePasswordAuthenticationFilter.class)
+            // REQ_AUSY_00069: header keamanan tambahan. X-Frame-Options DENY, X-Content-Type-Options
+            // dan Cache-Control sudah bawaan Spring Security; HSTS ikut terkirim bila request HTTPS.
+            .headers(h -> h
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"))
+                .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
             .exceptionHandling(ex -> ex.accessDeniedHandler((req, res, e) -> {
                 boolean anon = req.getUserPrincipal() == null;
-                res.sendRedirect(req.getContextPath() + (anon ? "/login?expired" : "/dashboard?denied"));
+                String tujuan = req.getContextPath() + (anon ? "/login?expired" : "/dashboard?denied");
+                // REQ_AUSY_00072: request tanpa token CSRF yang sah dijawab 403 apa adanya. Dulu
+                // dijawab redirect, yang di mata pemindai berakhir "200 tanpa token CSRF". Browser
+                // tetap diantar ke halaman yang sama (tab lama dengan token basi, sesi habis).
+                if (e instanceof CsrfException) { tolak403(res, tujuan); return; }
+                // Selain itu tidak pernah whitelabel 403: anonim ke login, yang sudah login ke dashboard.
+                res.sendRedirect(tujuan);
             }));
         return http.build();
+    }
+
+    /**
+     * 403 dengan halaman kecil yang langsung mengantar browser ke {@code tujuan} (REQ_AUSY_00072):
+     * status ditolak terlihat jelas bagi pemindai, sedangkan user tetap sampai di halaman yang sama
+     * seperti dulu (login "sesi berakhir" / dashboard).
+     */
+    private static void tolak403(HttpServletResponse res, String tujuan) throws java.io.IOException {
+        res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        res.setContentType("text/html;charset=UTF-8");
+        res.getWriter().write("<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url="
+                + tujuan + "\"><title>Sesi berakhir</title><p>Halaman sudah kedaluwarsa."
+                + " <a href=\"" + tujuan + "\">Lanjutkan</a></p>");
     }
 }

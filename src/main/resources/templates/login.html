@@ -22,6 +22,9 @@
     <!--/* REQ_AUSY_00060: sesi berakhir setelah 10 menit tanpa aktivitas. */-->
     <div th:if="${param.expired}" class="alert alert-warning py-2">Sesi Anda telah berakhir karena tidak ada
         aktivitas. Silakan login kembali.</div>
+    <!--/* REQ_AUSY_00070: pembatasan percobaan login. */-->
+    <div th:if="${param.locked}" class="alert alert-danger py-2">Terlalu banyak percobaan login yang gagal.
+        Coba lagi dalam <b th:text="${param.locked}">15</b> menit.</div>
     <!--/* BUG_AUSY_00190: password benar, tapi masa berlakunya habis. Disebut tegas berikut apa
            yang harus dilakukan — tanpa itu orangnya hanya tahu "gagal" dan mencoba terus. */-->
     <div th:if="${param.passexpired}" class="alert alert-danger py-2 text-start">
