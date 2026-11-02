@@ -16,9 +16,27 @@ Setiap entri memuat:
 
 ---
 
-## Belum di-deploy
+## dev-20261102-1 — 02-11-2026 15:32
 
-Tidak ada migrasi DB. Setelan `.env` baru (opsional): `AUSY_COOKIE_SAMESITE` (bawaan `lax`).
+Commit `9b4e853`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Setelan `.env` baru
+(opsional, belum diisi): `AUSY_COOKIE_SAMESITE` (bawaan `lax`). JAR sebelumnya:
+`backup/ausy-2.0.0.jar.dev-20261027-1`.
+
+Diverifikasi di server:
+- JAR & ausy-trigger.jar sama dengan build. Service aktif sejak 15:32:41, start tanpa error,
+  login 200.
+- Cookie sesi `HttpOnly; SameSite=Lax`, header `Permissions-Policy` & `Referrer-Policy` terkirim.
+- PUT/DELETE `/login` → 405, POST tanpa token CSRF → 403, trigger dengan token salah → 401.
+
+Temuan saat verifikasi (dibaca saja, tidak diubah):
+- Login 7 hari terakhir tercatat dari IP klien yang berbeda-beda (10.5.16.x, 10.5.19.x, 10.6.1.x),
+  bukan satu IP proxy. Kunci login per IP tidak akan mengunci semua user sekaligus.
+- **`FTP_HOST=10.5.99.23`**: ACCTXT dikirim lewat FTP ke 10.5.99.23. Menutup port 21 di .23
+  (REQ_AUSY_00073) akan memutus pengiriman ACCTXT; perlu pindah ke SFTP (perubahan kode) dulu.
+- Di 10.5.99.24 sendiri berjalan `vsftpd` di port 21. AUSY tidak memakainya (AUSY klien FTP, bukan
+  server), tapi perlu dicek ke infra apakah ada pihak lain yang mengirim berkas ke .24.
+- Tidak ada nginx di 10.5.99.24: aplikasi langsung di port 8080. Reverse proxy (sumber header
+  `Server: nginx` dan CORS `*`) ada di mesin lain.
 
 Temuan pentest 30-10-2026 — bagian yang ada di aplikasi:
 
