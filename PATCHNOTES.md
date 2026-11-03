@@ -16,6 +16,53 @@ Setiap entri memuat:
 
 ---
 
+## prod-20261103-1 — 03-11-2026 16:27 (pemasangan pertama PRODUKSI)
+
+Server `AUSY-WEB-APP-PROD` (10.5.37.168, RHEL 9.8), database `AUSY-DB-PROD` (10.5.68.91,
+PostgreSQL 18). Kode = commit `9b4e853`, JAR identik dengan `dev-20261102-1` (sha256 `21dc8983f3bec173…`).
+Flyway membuat skema dari nol sampai **v53** (52 migrasi, 0,55 detik); aplikasi start 10,3 detik, tanpa
+error di log, login 200, trigger token salah → 401, PUT → 405, POST tanpa CSRF → 403.
+
+Jam aktual (WIB, jam server):
+
+| Baris sheet | Kegiatan | Mulai | Selesai |
+|---|---|---|---|
+| 1 | `setup-db.sql` + firewall/pg_hba DB (MNC) | — | — (diisi MNC) |
+| 2 | Kirim zip 80 MB + unzip jar | 15:31:19 | 15:37:20 |
+| 3 | Setup ausy-service | 15:37:20 | 15:37:20 |
+| 4 | `.env` (kerangka 15:37:20; `DB_HOST`/`DB_PASS` diisi kemudian) | 15:37:20 | — |
+| 5 | Start service + verifikasi (percobaan 16:20 berhenti: port 5432 DB belum dibuka) | 16:27:27 | 16:27:42 |
+| 6 | Muat GL Master 2.299 kode | 16:46:24 | 16:46:24 |
+| — | `ausy-trigger.jar` terpasang dari zip yang sama; crontab belum dipasang | — | — |
+
+Setelan server: user `ausy` (grup `users`), folder export `/var/ftp/ausy_export` milik `ausy`,
+`/opt/ausy/.env` (`600`, milik `ausy`). `DB_PASS` dibuat acak untuk produksi (bukan bawaan repo).
+`FTP_*` masih kosong, `AUSY_SCHEDULER_ENABLED=false`, token scheduler dibuat acak di server.
+
+**Operasional — GL Master dimuat langsung ke tabel, bukan lewat maker-checker** (sama seperti
+REQ_AUSY_00062 di DEV, dipilih karena produksi masih kosong sebelum go-live): 2.299 kode dari
+`Parameter COA per 20261023.xlsx` (file resmi MNC) dimasukkan dalam satu transaksi memakai role
+database aplikasi, `created_by = 'migrasi-COA20261023'`, tanpa jejak audit di aplikasi. Alat muat
+memeriksa tabel masih kosong dan hanya commit bila jumlahnya cocok dengan CSV.
+Dibanding daftar 1.685 kode yang dipakai di DEV: 619 kode baru, 580 nama berubah (474 isinya
+berbeda, antara lain 10202003 BTN JAKARTA → MAYBANK CASH dan 10202004 PERMATA JAKARTA → BANK OF
+CHINA), 5 kode tidak ada lagi (1091153, 10809009, 20998603, 51000011, 70111210); 71 dari 73 kode yang
+dulu hilang sudah ada. Sekitar 378 kode tampak sebagai induk/header (mis. 10000000 AKTIVA, 10100000
+KAS) — perkiraan dari pola kode; **perlu konfirmasi MNC** apakah boleh dipakai untuk posting. DEV tidak
+diubah (tetap 1.685 kode).
+
+**Belum dikerjakan / harus ditindaklanjuti:**
+- Akun yang ada hanya `mncsuperadmin` dan `mncadmin` (V41), passwordnya sama dengan UAT/DEV:
+  **ganti lewat popup di header begitu login pertama**.
+- Konfigurasi nginx di app server (MNC): `proxy_pass` ke `127.0.0.1:8080/ausy`, `client_max_body_size 35m`,
+  `server_tokens off`, tanpa CORS `*`, `limit_req` di `/ausy/login`. Port 8080 saat ini terbuka di semua alamat.
+- `FTP_*` di `.env` (tergantung core mengambil langsung dari folder export atau lewat FTP lain).
+- Jadwal cron `ausy-trigger.jar` (jam 23:00) belum dipasang; menunggu keputusan MNC karena
+  menghasilkan dan mengirim ACCTXT sungguhan.
+- Password sudo server dan akun database yang beredar di chat sebaiknya diganti.
+
+---
+
 ## dev-20261102-1 — 02-11-2026 15:32
 
 Commit `9b4e853`. DB tetap **v53** (tidak ada migrasi). `.env` tidak ditimpa. Setelan `.env` baru
