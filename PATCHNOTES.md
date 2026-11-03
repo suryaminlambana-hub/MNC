@@ -51,9 +51,22 @@ dulu hilang sudah ada. Sekitar 378 kode tampak sebagai induk/header (mis. 100000
 KAS) — perkiraan dari pola kode; **perlu konfirmasi MNC** apakah boleh dipakai untuk posting. DEV tidak
 diubah (tetap 1.685 kode).
 
+**Operasional — akun uji MNC dibuat langsung di database** (16:58:08, atas persetujuan Ernest; melewati
+alur persetujuan konfigurasi): 5 akun dengan password acak (disimpan hanya sebagai hash BCrypt),
+hak menu disalin dari cetakan role (bukan dicentang manual lewat Access User), `addby = 'migrasi-akun-uji'`:
+`mncmaker1` & `mncmaker2` (BUSINESS MAKER), `mncchecker1` & `mncchecker2` (BUSINESS APPROVER),
+`mncexec1` (EXECUTE). Pasangan checker-maker: `mncchecker1`↔`mncmaker1`, `mncchecker2`↔`mncmaker2`.
+Keduanya tidak muncul sebagai pengajuan di Admin Approval. Login tiap akun diuji dari app server
+(maker → Upload/Data GL, checker → Otorisasi GL, execute → Generate ACCTXT). Jejak audit login memuat
+5 baris `LOGIN_GAGAL` pukul 16:58 dari uji pertama yang keliru (berkas uji berakhiran CRLF), bukan percobaan
+orang lain. Hapus/nonaktifkan akun ini lewat menu User bila sudah tidak dipakai.
+
 **Belum dikerjakan / harus ditindaklanjuti:**
-- Akun yang ada hanya `mncsuperadmin` dan `mncadmin` (V41), passwordnya sama dengan UAT/DEV:
-  **ganti lewat popup di header begitu login pertama**.
+- Akun bawaan hanya `mncsuperadmin` dan `mncadmin` (V41), passwordnya sama dengan UAT/DEV:
+  **ganti lewat popup di header begitu login pertama**. Lima akun uji (lihat di atas) ikut disarankan
+  mengganti password pada login pertama; password berlaku 30 hari.
+- Jangan tekan Generate ACCTXT di prod sebelum `FTP_*` / folder tujuan dipastikan: berkas diterbitkan ke
+  `/var/ftp/ausy_export` dan, bila folder itu dipantau core, ikut terbaca.
 - Konfigurasi nginx di app server (MNC): `proxy_pass` ke `127.0.0.1:8080/ausy`, `client_max_body_size 35m`,
   `server_tokens off`, tanpa CORS `*`, `limit_req` di `/ausy/login`. Port 8080 saat ini terbuka di semua alamat.
 - `FTP_*` di `.env` (tergantung core mengambil langsung dari folder export atau lewat FTP lain).
