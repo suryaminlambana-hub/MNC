@@ -33,7 +33,7 @@ Jam aktual (WIB, jam server):
 | 4 | `.env` (kerangka 15:37:20; `DB_HOST`/`DB_PASS` diisi kemudian) | 15:37:20 | — |
 | 5 | Start service + verifikasi (percobaan 16:20 berhenti: port 5432 DB belum dibuka) | 16:27:27 | 16:27:42 |
 | 6 | Muat GL Master 2.299 kode | 16:46:24 | 16:46:24 |
-| — | `ausy-trigger.jar` terpasang dari zip yang sama; crontab belum dipasang | — | — |
+| 7 | `ausy-trigger.jar` terpasang dari zip yang sama; jadwal cron jam 20:45 dipasang & diuji (token palsu) | 17:08:33 | 17:09:00 |
 
 Setelan server: user `ausy` (grup `users`), folder export `/var/ftp/ausy_export` milik `ausy`,
 `/opt/ausy/.env` (`600`, milik `ausy`). `DB_PASS` dibuat acak untuk produksi (bukan bawaan repo).
@@ -70,8 +70,14 @@ orang lain. Hapus/nonaktifkan akun ini lewat menu User bila sudah tidak dipakai.
 - Konfigurasi nginx di app server (MNC): `proxy_pass` ke `127.0.0.1:8080/ausy`, `client_max_body_size 35m`,
   `server_tokens off`, tanpa CORS `*`, `limit_req` di `/ausy/login`. Port 8080 saat ini terbuka di semua alamat.
 - `FTP_*` di `.env` (tergantung core mengambil langsung dari folder export atau lewat FTP lain).
-- Jadwal cron `ausy-trigger.jar` (jam 23:00) belum dipasang; menunggu keputusan MNC karena
-  menghasilkan dan mengirim ACCTXT sungguhan.
+- **Jadwal cron terpasang (03-11-2026 17:09)**: `45 20 * * *` di crontab user `ausy`, menjalankan
+  `ausy-trigger.jar` dengan log `/opt/ausy/logs/trigger.log`. Jam 20:45 atas permintaan MNC (Ananda
+  Dessi): core menarik data AUSY jam 21:00, jadi 23:00 terlalu lambat dan 11:00 terlalu awal. Server
+  `Asia/Jakarta`, `crond` aktif. Sebelum dipasang diuji dengan token palsu lewat cron sungguhan
+  (HTTP 401, tidak ada ACCTXT terbit). **Perhatian:** jadwal ini menerbitkan ACCTXT dari semua export
+  yang sudah di-approve hari itu, termasuk data uji tester; selama `FTP_*` kosong berkas hanya ditulis ke
+  `/var/ftp/ausy_export`. Tester diminta tidak meng-approve data uji sebelum 20:45. Matikan sementara:
+  `sudo crontab -u ausy -e`, beri `#` di depan baris `45 20 ...`.
 - Password sudo server dan akun database yang beredar di chat sebaiknya diganti.
 
 ---
