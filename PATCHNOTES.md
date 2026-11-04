@@ -61,6 +61,18 @@ Keduanya tidak muncul sebagai pengajuan di Admin Approval. Login tiap akun diuji
 5 baris `LOGIN_GAGAL` pukul 16:58 dari uji pertama yang keliru (berkas uji berakhiran CRLF), bukan percobaan
 orang lain. Hapus/nonaktifkan akun ini lewat menu User bila sudah tidak dipakai.
 
+**Operasional — user UAT/DEV disalin ke PROD** (04-11-2026 14:52:47 WIB, atas permintaan MNC dan arahan
+Pak Enno; melewati alur persetujuan konfigurasi): 18 user dari DEV (`10.5.99.23/ausy`) disalin langsung ke
+database PROD dalam satu transaksi (dry-run rollback dulu, lalu commit), **beserta hash password-nya**
+(password di PROD sama dengan di UAT), hak menu per user, dan 6 pasangan checker-maker. Penanda
+`addby = 'migrasi-dev-20261104'`. Rinciannya: 8 maker, 5 checker, 3 config, 1 config approver, 1 execute
+(`123546`). Jumlah `users` 7 → 25, `user_menu` 62 → 228, `checker_maker` 2 → 8. `mncsuperadmin` dan `mncadmin` sudah ada sehingga dilewati. Satu user (`202124098`) tidak punya
+hak menu di DEV, jadi di PROD pun kosong. **4 akun pentest** (`20261001`–`20261004`) sengaja **tidak**
+disalin karena password-nya dipegang tim pentest. Masa berlaku password 30 hari dihitung dari 04-11-2026
+(`pass_changed_at` = saat disalin). Pemeriksaan sesudahnya (SELECT saja): 25 hash BCrypt valid, `ausy.service`
+aktif. Login per akun tidak diuji karena password tidak diketahui. User diminta mengganti password lewat
+menu Akun begitu login di PROD.
+
 **Belum dikerjakan / harus ditindaklanjuti:**
 - Akun bawaan hanya `mncsuperadmin` dan `mncadmin` (V41), passwordnya sama dengan UAT/DEV:
   **ganti lewat popup di header begitu login pertama**. Lima akun uji (lihat di atas) ikut disarankan
