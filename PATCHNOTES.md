@@ -85,8 +85,11 @@ menu Akun begitu login di PROD.
   di semua `location`; tanpa itu aplikasi melihat semua pengguna sebagai 127.0.0.1 (pembatas login per IP
   berlaku untuk semua orang sekaligus). Konfigurasi nginx di PROD per 05-11-2026 memang belum memuat keduanya.
 - Pentest ulang DEV: 6 temuan Medium sudah tertutup. Sisa 1 temuan Low, header `Server: nginx` (#7). Ini berasal
-  dari nginx, bukan aplikasi: `server_tokens off` menyembunyikan versi, tapi kata "nginx" baru hilang dengan modul
-  headers-more (`more_clear_headers Server`). Sisanya catatan infra: 5 port terbuka (21, 23, 6379, 9200, 27017) di sisi MNC.
+  dari nginx, bukan aplikasi. Rekomendasi penguji sendiri: `server_tokens off;` di blok `http` pada `nginx.conf`
+  (menyembunyikan versi; kata "nginx" baru hilang dengan modul headers-more, tidak diminta). Catatan infra dari
+  laporan yang sama: 5 port berisiko Medium terbuka di sisi MNC, yaitu 23 (Telnet), 445 (SMB), 6379 (Redis),
+  9200 (Elasticsearch), 27017 (MongoDB); AUSY tidak memakai satu pun. Port lain hanya berstatus info
+  (22, 25, 53, 80, 110, 139, 143, 389, 443, 587, 8080).
 - `FTP_*` di `.env` (tergantung core mengambil langsung dari folder export atau lewat FTP lain).
 - **Jadwal cron terpasang (03-11-2026 17:09)**: `45 20 * * *` di crontab user `ausy`, menjalankan
   `ausy-trigger.jar` dengan log `/opt/ausy/logs/trigger.log`. Jam 20:45 atas permintaan MNC (Ananda
