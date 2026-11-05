@@ -81,6 +81,12 @@ menu Akun begitu login di PROD.
   `/var/ftp/ausy_export` dan, bila folder itu dipantau core, ikut terbaca.
 - Konfigurasi nginx di app server (MNC): `proxy_pass` ke `127.0.0.1:8080/ausy`, `client_max_body_size 35m`,
   `server_tokens off`, tanpa CORS `*`, `limit_req` di `/ausy/login`. Port 8080 saat ini terbuka di semua alamat.
+  Acuan siap pakai: `packaging/nginx-ausy.conf`. **Wajib** meneruskan `X-Forwarded-For` dan `X-Forwarded-Proto`
+  di semua `location`; tanpa itu aplikasi melihat semua pengguna sebagai 127.0.0.1 (pembatas login per IP
+  berlaku untuk semua orang sekaligus). Konfigurasi nginx di PROD per 05-11-2026 memang belum memuat keduanya.
+- Pentest ulang DEV: 6 temuan Medium sudah tertutup. Sisa 1 temuan Low, header `Server: nginx` (#7). Ini berasal
+  dari nginx, bukan aplikasi: `server_tokens off` menyembunyikan versi, tapi kata "nginx" baru hilang dengan modul
+  headers-more (`more_clear_headers Server`). Sisanya catatan infra: 5 port terbuka (21, 23, 6379, 9200, 27017) di sisi MNC.
 - `FTP_*` di `.env` (tergantung core mengambil langsung dari folder export atau lewat FTP lain).
 - **Jadwal cron terpasang (03-11-2026 17:09)**: `45 20 * * *` di crontab user `ausy`, menjalankan
   `ausy-trigger.jar` dengan log `/opt/ausy/logs/trigger.log`. Jam 20:45 atas permintaan MNC (Ananda
