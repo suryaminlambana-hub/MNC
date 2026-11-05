@@ -81,6 +81,8 @@ menu Akun begitu login di PROD.
   `/var/ftp/ausy_export` dan, bila folder itu dipantau core, ikut terbaca.
 - Konfigurasi nginx di app server (MNC): `proxy_pass` ke `127.0.0.1:8080/ausy`, `client_max_body_size 35m`,
   `server_tokens off`, tanpa CORS `*`, `limit_req` di `/ausy/login`. Port 8080 saat ini terbuka di semua alamat.
+  `nginx.conf` PROD (diterima 05-11-2026) sudah punya `server_tokens off;` di blok `http` dan zona
+  `limit_req_zone ... zone=one:10m rate=5r/s`, jadi temuan pentest #7 sudah terjawab di PROD.
   Acuan siap pakai: `packaging/nginx-ausy.conf`. **Wajib** meneruskan `X-Forwarded-For` dan `X-Forwarded-Proto`
   di semua `location`; tanpa itu aplikasi melihat semua pengguna sebagai 127.0.0.1 (pembatas login per IP
   berlaku untuk semua orang sekaligus). Konfigurasi nginx di PROD per 05-11-2026 memang belum memuat keduanya.
